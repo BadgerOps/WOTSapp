@@ -20,5 +20,11 @@ service firebase.storage {
       allow write: if isAdmin() &&
         request.resource.size < 50 * 1024 * 1024; // 50MB limit
     }
+
+    // CQ DA Forms (generated server-side)
+    match /cq/da-forms/{allPaths=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
   }
 }
