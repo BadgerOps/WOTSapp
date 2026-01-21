@@ -1,0 +1,167 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isUniformAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'uniform_admin' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own document
+      allow read: if isOwner(userId);
+      // Users can create their own document (on first login)
+      allow create: if isOwner(userId);
+      // Users can update their own document (except role)
+      allow update: if isOwner(userId) &&
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+      // Admins can read all users and update roles
+      allow read, update: if isAdmin();
+    }
+
+    // Posts collection
+    match /posts/{postId} {
+      // Anyone authenticated can read published posts
+      allow read: if isAuthenticated() && resource.data.status == 'published';
+      // Admins can read all posts (including drafts)
+      allow read: if isAdmin();
+      // Only admins can create, update, delete posts
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Documents collection
+    match /documents/{documentId} {
+      // Anyone authenticated can read documents
+      allow read: if isAuthenticated();
+      // Only admins can create, update, delete documents
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Uniforms collection
+    match /uniforms/{uniformId} {
+      // Anyone authenticated can read uniforms
+      allow read: if isAuthenticated();
+      // Only admins can create, update, delete uniforms
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Settings collection (for UOTD schedule, etc.)
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // App Config settings - admins can manage
+    match /settings/appConfig {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Weather Location settings - uniform admins can manage
+    match /settings/weatherLocation {
+      allow read: if isAuthenticated();
+      allow write: if isUniformAdmin();
+    }
+
+    // Weather Rules settings - uniform admins can manage
+    match /settings/weatherRules {
+      allow read: if isAuthenticated();
+      allow write: if isUniformAdmin();
+    }
+
+    // Weather Cache - read-only for clients, written by Cloud Functions
+    match /settings/weatherCache {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // Weather Recommendations collection
+    match /weatherRecommendations/{id} {
+      // Uniform admins can read and update (approve/reject)
+      allow read, update: if isUniformAdmin();
+      // Only Cloud Functions can create/delete
+      allow create, delete: if false;
+    }
+
+    // Personnel collection
+    match /personnel/{personnelId} {
+      // Anyone authenticated can read personnel
+      allow read: if isAuthenticated();
+      // Only admins can create, update, delete personnel
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Personnel Imports collection (tracks import history)
+    match /personnelImports/{importId} {
+      // Only admins can read and write import records
+      allow read, create: if isAdmin();
+      // No updates or deletes needed
+      allow update, delete: if false;
+    }
+
+    // Detail Templates collection
+    match /detailTemplates/{templateId} {
+      // Anyone authenticated can read templates
+      allow read: if isAuthenticated();
+      // Only admins can create, update, delete templates
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Detail Assignments collection
+    match /detailAssignments/{assignmentId} {
+      // Anyone authenticated can read assignments
+      allow read: if isAuthenticated();
+      // Only admins can create, update, delete assignments
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Detail Completions collection
+    match /detailCompletions/{completionId} {
+      // Anyone authenticated can read completions
+      allow read: if isAuthenticated();
+      // Users can create their own completion records
+      allow create: if isAuthenticated() &&
+        request.resource.data.personnelId == request.auth.uid;
+      // Users can update their own completions, admins can update any
+      allow update: if isAuthenticated() &&
+        (resource.data.personnelId == request.auth.uid || isAdmin());
+      // Only admins can delete completions
+      allow delete: if isAdmin();
+    }
+
+    // Detail Config collection
+    match /detailConfig/{configId} {
+      // Anyone authenticated can read config
+      allow read: if isAuthenticated();
+      // Only admins can write config
+      allow write: if isAdmin();
+    }
+
+    // Password Resets collection (temporary passwords for new accounts)
+    match /passwordResets/{userId} {
+      // Only admins can read temporary passwords
+      allow read: if isAdmin();
+      // Only Cloud Functions can create/update password resets
+      allow create, update: if false;
+      // Admins can mark as used or delete
+      allow delete: if isAdmin();
+    }
+  }
+}

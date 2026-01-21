@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+firepit-log.txt
+
+# Firebase
+.firebase/
+
+# Terraform (additional security)
+terraform/terraform.tfvars
+terraform/*.tfstate*
+terraform/.terraform/
+.secrets/
+
+# other stuff
+*.pdf
+MILITARY_FEATURES_PLAN.md
+PHASE3_READINESS.md
+PROJECT_STATUS.md
+WOTS_COLOR.jpg
+handoff.md
