@@ -154,6 +154,34 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // CQ Shifts collection (admin-only for now; future cq_admin role)
+    match /cqShifts/{shiftId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Personnel Status collection (rolling current status)
+    match /personnelStatus/{userId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Personnel Status History collection
+    match /personnelStatusHistory/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // CQ Notes collection
+    match /cqNotes/{noteId} {
+      allow read, write: if isAdmin();
+    }
+
+    // DA Forms collection (generated server-side)
+    match /daForms/{formId} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
     // Password Resets collection (temporary passwords for new accounts)
     match /passwordResets/{userId} {
       // Only admins can read temporary passwords
