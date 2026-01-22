@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import {
   GoogleAuthProvider,
   signInWithPopup,
@@ -7,6 +7,7 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
 import { auth, db } from '../config/firebase'
+import { authLog } from '../lib/authDebugger'
 
 const AuthContext = createContext()
 
@@ -22,15 +23,29 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [userRole, setUserRole] = useState(null)
   const [loading, setLoading] = useState(true)
+  const authStateChangeCount = useRef(0)
+  const mountTime = useRef(Date.now())
+
+  authLog('AuthProvider', 'Component mounting', {
+    timestamp: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    isStandalone: window.matchMedia('(display-mode: standalone)').matches,
+    url: window.location.href,
+  })
 
   async function fetchUserRole(uid) {
+    authLog('Auth', 'Fetching user role', { uid })
     try {
       const userDoc = await getDoc(doc(db, 'users', uid))
       if (userDoc.exists()) {
-        return userDoc.data().role || 'user'
+        const role = userDoc.data().role || 'user'
+        authLog('Auth', 'User role fetched', { uid, role })
+        return role
       }
+      authLog('Auth', 'User doc does not exist, defaulting to user role', { uid })
       return 'user'
     } catch (error) {
+      authLog('Auth', 'ERROR fetching user role', { uid, error: error.message })
       console.error('Error fetching user role:', error)
       return 'user'
     }
@@ -80,55 +95,108 @@ export function AuthProvider({ children }) {
 
   async function signInWithGoogle() {
     const provider = new GoogleAuthProvider()
-    console.log('[Auth] Starting Google sign-in...')
-    console.log('[Auth] Auth domain:', auth.config.authDomain)
+    authLog('Auth', 'Starting Google sign-in', {
+      authDomain: auth.config.authDomain,
+      currentUser: auth.currentUser?.email || null,
+    })
+
     try {
       const result = await signInWithPopup(auth, provider)
-      console.log('[Auth] Sign-in successful:', result.user.email)
+      authLog('Auth', 'signInWithPopup succeeded', {
+        uid: result.user.uid,
+        email: result.user.email,
+        providerId: result.providerId,
+      })
 
       // Check if user exists in personnel table
+      authLog('Auth', 'Checking personnel table...')
       const isPersonnel = await checkPersonnelExists(result.user.email)
+      authLog('Auth', 'Personnel check result', { isPersonnel, email: result.user.email })
+
       if (!isPersonnel) {
-        console.log('[Auth] User not in personnel table, signing out')
+        authLog('Auth', 'User NOT in personnel table, signing out', { email: result.user.email })
         await signOut(auth)
         throw new Error('Access denied. You must be registered in the personnel roster to use this application.')
       }
 
+      authLog('Auth', 'Creating/updating user document...')
       await createUserDocument(result.user)
+      authLog('Auth', 'Sign-in complete', { uid: result.user.uid })
       return result.user
     } catch (error) {
-      console.error('[Auth] Sign-in error:', {
+      authLog('Auth', 'SIGN-IN ERROR', {
         code: error.code,
         message: error.message,
-        fullError: error,
+        name: error.name,
       })
       throw error
     }
   }
 
   async function logout() {
+    authLog('Auth', 'Logout initiated by user')
     try {
       await signOut(auth)
+      authLog('Auth', 'signOut() completed')
       setUserRole(null)
     } catch (error) {
-      console.error('Error signing out:', error)
+      authLog('Auth', 'Logout error', { error: error.message })
       throw error
     }
   }
 
   useEffect(() => {
+    authLog('Auth', 'Setting up onAuthStateChanged listener')
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      authStateChangeCount.current += 1
+      const timeSinceMount = Date.now() - mountTime.current
+
+      authLog('Auth', 'onAuthStateChanged fired', {
+        changeCount: authStateChangeCount.current,
+        timeSinceMount: `${timeSinceMount}ms`,
+        hasUser: !!currentUser,
+        uid: currentUser?.uid || null,
+        email: currentUser?.email || null,
+        emailVerified: currentUser?.emailVerified || null,
+        isAnonymous: currentUser?.isAnonymous || null,
+        providerId: currentUser?.providerId || null,
+        previousUser: user?.uid || null,
+      })
+
+      // Check if this is a logout (had user, now don't)
+      if (user && !currentUser) {
+        authLog('Auth', 'USER LOGGED OUT - was logged in, now null', {
+          previousUid: user.uid,
+          previousEmail: user.email,
+        })
+      }
+
       setUser(currentUser)
+
       if (currentUser) {
-        const role = await fetchUserRole(currentUser.uid)
-        setUserRole(role)
+        authLog('Auth', 'User authenticated, fetching role...')
+        try {
+          const role = await fetchUserRole(currentUser.uid)
+          authLog('Auth', 'Role fetch complete, setting state', { role })
+          setUserRole(role)
+        } catch (error) {
+          authLog('Auth', 'ERROR during role fetch', { error: error.message })
+          setUserRole('user')
+        }
       } else {
+        authLog('Auth', 'No user, clearing role')
         setUserRole(null)
       }
+
+      authLog('Auth', 'Setting loading to false')
       setLoading(false)
     })
 
-    return unsubscribe
+    return () => {
+      authLog('Auth', 'Cleaning up onAuthStateChanged listener')
+      unsubscribe()
+    }
   }, [])
 
   const value = {

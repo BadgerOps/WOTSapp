@@ -11,6 +11,7 @@ import {
   doc,
   serverTimestamp,
   Timestamp,
+  getDocs,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import { useAuth } from '../contexts/AuthContext'
@@ -106,6 +107,31 @@ export function useMyDetailAssignments(statusFilter = null) {
   const [myAssignments, setMyAssignments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [personnelDocId, setPersonnelDocId] = useState(null)
+
+  // Look up the user's personnel record by email to get their personnel document ID
+  useEffect(() => {
+    if (!user?.email) return
+
+    async function lookupPersonnel() {
+      try {
+        const q = query(
+          collection(db, 'personnel'),
+          where('email', '==', user.email)
+        )
+        const snapshot = await getDocs(q)
+        if (!snapshot.empty) {
+          const personnelDoc = snapshot.docs[0]
+          setPersonnelDocId(personnelDoc.id)
+          console.log('useMyDetailAssignments - Found personnel doc ID:', personnelDoc.id)
+        }
+      } catch (err) {
+        console.error('Error looking up personnel record:', err)
+      }
+    }
+
+    lookupPersonnel()
+  }, [user?.email])
 
   useEffect(() => {
     if (!user) {
@@ -140,20 +166,23 @@ export function useMyDetailAssignments(statusFilter = null) {
 
         console.log('useMyDetailAssignments - Raw assignments:', allAssignments.length)
         console.log('useMyDetailAssignments - User UID:', user.uid)
+        console.log('useMyDetailAssignments - Personnel Doc ID:', personnelDocId)
+
+        // Match by either user.uid OR personnel document ID
+        const matchIds = [user.uid]
+        if (personnelDocId && personnelDocId !== user.uid) {
+          matchIds.push(personnelDocId)
+        }
 
         const filtered = allAssignments.filter((assignment) => {
-          // Check if user is in assignedTo array
-          const inAssignedTo = assignment.assignedTo?.some(person => person.personnelId === user.uid)
-          // OR check if user has any tasks assigned to them
-          const hasTasks = assignment.tasks?.some(task => task.assignedTo?.personnelId === user.uid)
-
-          console.log(`Assignment ${assignment.id}:`, {
-            inAssignedTo,
-            hasTasks,
-            assignedToArray: assignment.assignedTo,
-            tasksCount: assignment.tasks?.length,
-            sampleTask: assignment.tasks?.[0]
-          })
+          // Check if user is in assignedTo array (by any matching ID)
+          const inAssignedTo = assignment.assignedTo?.some(
+            person => matchIds.includes(person.personnelId)
+          )
+          // OR check if user has any tasks assigned to them (by any matching ID)
+          const hasTasks = assignment.tasks?.some(
+            task => matchIds.includes(task.assignedTo?.personnelId)
+          )
 
           return inAssignedTo || hasTasks
         })
@@ -170,7 +199,7 @@ export function useMyDetailAssignments(statusFilter = null) {
     )
 
     return unsubscribe
-  }, [user, statusFilter])
+  }, [user, statusFilter, personnelDocId])
 
   return { myAssignments, loading, error }
 }

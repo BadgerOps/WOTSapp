@@ -8,6 +8,7 @@ import {
   doc,
   updateDoc,
   serverTimestamp,
+  getDocs,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import { useAuth } from '../contexts/AuthContext'
@@ -71,6 +72,7 @@ export function useMyActiveDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [currentTimeSlot, setCurrentTimeSlot] = useState(getCurrentTimeSlot())
+  const [personnelDocId, setPersonnelDocId] = useState(null)
 
   // Update time slot every minute
   useEffect(() => {
@@ -80,6 +82,29 @@ export function useMyActiveDetail() {
 
     return () => clearInterval(interval)
   }, [])
+
+  // Look up the user's personnel record by email to get their personnel document ID
+  useEffect(() => {
+    if (!user?.email) return
+
+    async function lookupPersonnel() {
+      try {
+        const q = query(
+          collection(db, 'personnel'),
+          where('email', '==', user.email)
+        )
+        const snapshot = await getDocs(q)
+        if (!snapshot.empty) {
+          const personnelDoc = snapshot.docs[0]
+          setPersonnelDocId(personnelDoc.id)
+        }
+      } catch (err) {
+        console.error('Error looking up personnel record:', err)
+      }
+    }
+
+    lookupPersonnel()
+  }, [user?.email])
 
   useEffect(() => {
     if (!user) {
@@ -103,14 +128,20 @@ export function useMyActiveDetail() {
           ...doc.data(),
         }))
 
+        // Match by either user.uid OR personnel document ID
+        const matchIds = [user.uid]
+        if (personnelDocId && personnelDocId !== user.uid) {
+          matchIds.push(personnelDocId)
+        }
+
         // Filter for today's assignments where user has tasks AND is active now
         const myActiveAssignments = assignments.filter((assignment) => {
           // Filter by today's date (client-side)
           if (assignment.assignmentDate !== today) return false
 
-          // Check if user has tasks assigned
+          // Check if user has tasks assigned (by any matching ID)
           const hasTasks = assignment.tasks?.some(
-            (task) => task.assignedTo?.personnelId === user.uid
+            (task) => matchIds.includes(task.assignedTo?.personnelId)
           )
           if (!hasTasks) return false
 
@@ -130,7 +161,7 @@ export function useMyActiveDetail() {
     )
 
     return unsubscribe
-  }, [user, currentTimeSlot])
+  }, [user, currentTimeSlot, personnelDocId])
 
   return { activeDetail, loading, error, currentTimeSlot }
 }
@@ -142,6 +173,39 @@ export function useDetailCardActions() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [personnelDocId, setPersonnelDocId] = useState(null)
+
+  // Look up the user's personnel record by email
+  useEffect(() => {
+    if (!user?.email) return
+
+    async function lookupPersonnel() {
+      try {
+        const q = query(
+          collection(db, 'personnel'),
+          where('email', '==', user.email)
+        )
+        const snapshot = await getDocs(q)
+        if (!snapshot.empty) {
+          setPersonnelDocId(snapshot.docs[0].id)
+        }
+      } catch (err) {
+        console.error('Error looking up personnel record:', err)
+      }
+    }
+
+    lookupPersonnel()
+  }, [user?.email])
+
+  // Build array of matching IDs
+  const matchIds = user ? [user.uid] : []
+  if (personnelDocId && personnelDocId !== user?.uid) {
+    matchIds.push(personnelDocId)
+  }
+
+  function isCurrentUser(personnelId) {
+    return personnelId && matchIds.includes(personnelId)
+  }
 
   /**
    * Start the detail (move from assigned to in_progress)
@@ -176,7 +240,7 @@ export function useDetailCardActions() {
         if (
           task.taskId === taskId &&
           task.location === location &&
-          task.assignedTo?.personnelId === user.uid
+          isCurrentUser(task.assignedTo?.personnelId)
         ) {
           return {
             ...task,
@@ -208,7 +272,7 @@ export function useDetailCardActions() {
     setError(null)
     try {
       const updatedTasks = allTasks.map((task) => {
-        if (task.assignedTo?.personnelId === user.uid && !task.completed) {
+        if (isCurrentUser(task.assignedTo?.personnelId) && !task.completed) {
           return {
             ...task,
             completed: true,

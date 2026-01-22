@@ -171,10 +171,12 @@ service cloud.firestore {
     match /personnelStatus/{statusId} {
       // Users can read and update their own status (for self sign-out)
       allow read, write: if isOwner(statusId);
-      // Allow authenticated users to write status for group sign-outs
+      // Allow authenticated users to write status for group operations (sign-out, sign-in, stage updates)
       allow write: if isAuthenticated() &&
-        request.resource.data.groupSignOut == true &&
-        request.resource.data.updatedBy == request.auth.uid;
+        request.resource.data.updatedBy == request.auth.uid &&
+        (request.resource.data.groupSignOut == true ||
+         request.resource.data.groupSignIn == true ||
+         request.resource.data.groupUpdate == true);
       // Admins can read and write all
       allow read, write: if isAdmin();
       // Anyone authenticated can read all status (for status display)
@@ -191,10 +193,12 @@ service cloud.firestore {
       allow create: if isAuthenticated() &&
         request.resource.data.personnelId == request.auth.uid &&
         request.resource.data.selfUpdated == true;
-      // Users can create history entries for group sign-outs
+      // Users can create history entries for group operations (sign-out, sign-in, stage updates)
       allow create: if isAuthenticated() &&
-        request.resource.data.groupSignOut == true &&
-        request.resource.data.updatedBy == request.auth.uid;
+        request.resource.data.updatedBy == request.auth.uid &&
+        (request.resource.data.groupSignOut == true ||
+         request.resource.data.groupSignIn == true ||
+         request.resource.data.groupUpdate == true);
       // No updates or deletes allowed
       allow update, delete: if false;
     }

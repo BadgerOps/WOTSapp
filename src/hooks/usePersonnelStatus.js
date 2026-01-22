@@ -587,10 +587,20 @@ export function useSelfSignOut() {
       // Also update all companions' stage
       for (const companion of companions) {
         const companionStatusRef = doc(db, "personnelStatus", companion.id);
-        batch.update(companionStatusRef, {
+        batch.set(companionStatusRef, {
+          personnelId: companion.id,
+          status: "pass",
           passStage: newStage,
+          destination: currentData.destination || null,
+          expectedReturn: currentData.expectedReturn || null,
+          contactNumber: currentData.contactNumber || null,
+          withPersonId: user.uid,
+          withPersonName: user.displayName || user.email,
+          updatedBy: user.uid,
+          updatedByName: user.displayName || user.email,
           updatedAt: serverTimestamp(),
-        });
+          groupUpdate: true,
+        }, { merge: true });
 
         // Add companion history entry
         const companionHistoryRef = doc(
@@ -604,6 +614,7 @@ export function useSelfSignOut() {
           passStage: newStage,
           previousStage: previousStage || null,
           destination: currentData.destination || null,
+          timeOut: currentData.timeOut || null,
           action: `stage_${newStage}`,
           notes: `Group update with ${user.displayName || user.email}`,
           updatedBy: user.uid,

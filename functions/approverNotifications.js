@@ -1,6 +1,7 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore')
 const { getFirestore } = require('firebase-admin/firestore')
 const { getMessaging } = require('firebase-admin/messaging')
+const { getConfiguredTimezone, formatTimestampForNotification } = require('./utils/timezone')
 
 /**
  * Send push notification to uniform_admins when a new weather recommendation is created
@@ -42,14 +43,10 @@ exports.onRecommendationCreated = onDocumentCreated(
 
     console.log(`Sending notification to ${tokens.length} approver tokens`)
 
-    // Format current timestamp (24hr format)
-    const now = new Date()
-    const hours = String(now.getHours()).padStart(2, '0')
-    const minutes = String(now.getMinutes()).padStart(2, '0')
-    const day = now.getDate()
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    const month = months[now.getMonth()]
-    const timestamp = `${hours}:${minutes} ${month} ${day}`
+    // Get configured timezone and format timestamp
+    const timezone = await getConfiguredTimezone(db)
+    const timestamp = formatTimestampForNotification(null, timezone)
+    console.log(`Using timezone: ${timezone}, formatted timestamp: ${timestamp}`)
 
     // Build notification message
     const tempDisplay = `${Math.round(recommendation.weather.temperature)}°`

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import Navbar from './components/layout/Navbar'
 import Loading from './components/common/Loading'
@@ -10,29 +10,53 @@ import MyDetails from './pages/MyDetails'
 import CQView from './pages/CQView'
 import Profile from './pages/Profile'
 import Admin from './pages/Admin'
+import { authLog } from './lib/authDebugger'
 
-function ProtectedRoute({ children, adminOnly = false }) {
+function ProtectedRoute({ children, adminOnly = false, routeName = 'unknown' }) {
   const { user, loading, isAdmin } = useAuth()
+  const location = useLocation()
 
   if (loading) {
+    authLog('Router', `ProtectedRoute[${routeName}] - loading`, { path: location.pathname })
     return <Loading />
   }
 
   if (!user) {
+    authLog('Router', `ProtectedRoute[${routeName}] - NO USER, redirecting to login`, {
+      path: location.pathname,
+      wasLoading: false,
+    })
     return <Navigate to="/login" replace />
   }
 
   if (adminOnly && !isAdmin) {
+    authLog('Router', `ProtectedRoute[${routeName}] - not admin, redirecting to home`, {
+      path: location.pathname,
+      userEmail: user.email,
+    })
     return <Navigate to="/" replace />
   }
 
+  authLog('Router', `ProtectedRoute[${routeName}] - access granted`, {
+    path: location.pathname,
+    userEmail: user.email,
+  })
   return children
 }
 
 export default function App() {
   const { user, loading } = useAuth()
+  const location = useLocation()
+
+  authLog('App', 'Render', {
+    loading,
+    hasUser: !!user,
+    userEmail: user?.email || null,
+    path: location.pathname,
+  })
 
   if (loading) {
+    authLog('App', 'Showing fullscreen loading')
     return <Loading fullScreen />
   }
 
@@ -43,12 +67,21 @@ export default function App() {
         <Routes>
           <Route
             path="/login"
-            element={user ? <Navigate to="/" replace /> : <Login />}
+            element={
+              user ? (
+                (() => {
+                  authLog('Router', 'Login page - user exists, redirecting to home', { email: user.email })
+                  return <Navigate to="/" replace />
+                })()
+              ) : (
+                <Login />
+              )
+            }
           />
           <Route
             path="/"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute routeName="Home">
                 <Home />
               </ProtectedRoute>
             }
@@ -56,7 +89,7 @@ export default function App() {
           <Route
             path="/schedule"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute routeName="Schedule">
                 <Schedule />
               </ProtectedRoute>
             }
@@ -64,7 +97,7 @@ export default function App() {
           <Route
             path="/documents"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute routeName="Documents">
                 <Documents />
               </ProtectedRoute>
             }
@@ -72,7 +105,7 @@ export default function App() {
           <Route
             path="/details"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute routeName="Details">
                 <MyDetails />
               </ProtectedRoute>
             }
@@ -80,7 +113,7 @@ export default function App() {
           <Route
             path="/cq"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute routeName="CQ">
                 <CQView />
               </ProtectedRoute>
             }
@@ -88,7 +121,7 @@ export default function App() {
           <Route
             path="/profile"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute routeName="Profile">
                 <Profile />
               </ProtectedRoute>
             }
@@ -96,7 +129,7 @@ export default function App() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute adminOnly>
+              <ProtectedRoute adminOnly routeName="Admin">
                 <Admin />
               </ProtectedRoute>
             }

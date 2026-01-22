@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUserProfile } from '../hooks/useUserProfile'
+import { useSearchParams } from 'react-router-dom'
 import Loading from '../components/common/Loading'
+import DebugPanel from '../components/common/DebugPanel'
+
+const APP_VERSION = '1.0.0'
 
 export default function Profile() {
   const { user } = useAuth()
@@ -10,12 +14,41 @@ export default function Profile() {
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState(null)
+  const [showDebug, setShowDebug] = useState(false)
+  const [searchParams] = useSearchParams()
+  const tapCount = useRef(0)
+  const tapTimer = useRef(null)
 
   useEffect(() => {
     if (profile?.phoneNumber) {
       setPhoneNumber(profile.phoneNumber)
     }
   }, [profile])
+
+  // Check for ?debug=true in URL
+  useEffect(() => {
+    if (searchParams.get('debug') === 'true') {
+      setShowDebug(true)
+    }
+  }, [searchParams])
+
+  // Handle version tap to reveal debug panel (tap 5 times quickly)
+  function handleVersionTap() {
+    tapCount.current += 1
+
+    if (tapTimer.current) {
+      clearTimeout(tapTimer.current)
+    }
+
+    if (tapCount.current >= 5) {
+      setShowDebug(true)
+      tapCount.current = 0
+    } else {
+      tapTimer.current = setTimeout(() => {
+        tapCount.current = 0
+      }, 2000)
+    }
+  }
 
   if (loading) {
     return <Loading />
@@ -112,6 +145,19 @@ export default function Profile() {
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </form>
+
+      {/* Version number - tap 5 times to open debug panel */}
+      <div className="mt-8 text-center">
+        <p
+          onClick={handleVersionTap}
+          className="text-xs text-gray-400 cursor-default select-none"
+        >
+          WOTS App v{APP_VERSION}
+        </p>
+      </div>
+
+      {/* Debug Panel */}
+      {showDebug && <DebugPanel onClose={() => setShowDebug(false)} />}
     </div>
   )
 }

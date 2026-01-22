@@ -16,18 +16,29 @@ firebase.initializeApp({
 const messaging = firebase.messaging()
 
 // Handle background messages
+// NOTE: If the message contains a 'notification' field, FCM automatically shows it.
+// We only need to manually show a notification for data-only messages.
 messaging.onBackgroundMessage((payload) => {
   console.log('[SW] Received background message:', payload)
 
-  const notificationTitle = payload.notification?.title || 'New Update'
+  // If the message has a notification field, FCM will show it automatically.
+  // We only show manually for data-only messages to avoid duplicates.
+  if (payload.notification) {
+    console.log('[SW] Message has notification field - FCM will handle display')
+    return
+  }
+
+  // Data-only message - show notification manually
+  const notificationTitle = payload.data?.title || 'New Update'
   const notificationOptions = {
-    body: payload.notification?.body || 'You have a new notification',
-    icon: '/vite.svg',
-    badge: '/vite.svg',
-    tag: payload.data?.postId || 'wots-notification',
+    body: payload.data?.body || 'You have a new notification',
+    icon: '/icon-192x192.png',
+    badge: '/icon-192x192.png',
+    tag: payload.data?.postId || payload.data?.recommendationId || 'wots-notification',
     data: payload.data,
   }
 
+  console.log('[SW] Showing data-only notification:', notificationTitle)
   self.registration.showNotification(notificationTitle, notificationOptions)
 })
 

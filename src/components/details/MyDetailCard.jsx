@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMyActiveDetail, useDetailCardActions, DETAIL_STAGES } from '../../hooks/useMyActiveDetail'
+import { useMyPersonnelIds } from '../../hooks/useMyPersonnelIds'
 import Loading from '../common/Loading'
 
 export default function MyDetailCard() {
   const { user } = useAuth()
+  const { isCurrentUser } = useMyPersonnelIds()
   const { activeDetail, loading, error, currentTimeSlot } = useMyActiveDetail()
   const { startDetail, completeTask, completeAllTasks, submitForApproval, loading: actionLoading, error: actionError } = useDetailCardActions()
   const [expandedTasks, setExpandedTasks] = useState(false)
@@ -18,7 +20,7 @@ export default function MyDetailCard() {
 
   // Get user's tasks from the assignment
   const myTasks = activeDetail.tasks?.filter(
-    (t) => t.assignedTo?.personnelId === user.uid
+    (t) => isCurrentUser(t.assignedTo?.personnelId)
   ) || []
 
   const completedTasks = myTasks.filter((t) => t.completed)

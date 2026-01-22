@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDetailAssignmentActions } from '../../hooks/useDetailAssignments'
+import { useMyPersonnelIds } from '../../hooks/useMyPersonnelIds'
 import { doc, updateDoc } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import { format } from 'date-fns'
 
 export default function DetailChecklistView({ assignment, onClose }) {
   const { user } = useAuth()
+  const { isCurrentUser } = useMyPersonnelIds()
   const { startAssignment, completeAssignment, loading: actionLoading } = useDetailAssignmentActions()
 
   const [tasks, setTasks] = useState([])
@@ -21,7 +23,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
   useEffect(() => {
     if (assignment && user) {
       const myTasks = assignment.tasks?.filter(
-        t => t.assignedTo?.personnelId === user.uid
+        t => isCurrentUser(t.assignedTo?.personnelId)
       ) || []
       setTasks(myTasks)
 
@@ -81,7 +83,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
         const globalTaskIndex = updatedTasks.findIndex(
           t => t.taskId === tasks[taskIndex].taskId &&
               t.location === tasks[taskIndex].location &&
-              t.assignedTo?.personnelId === user.uid
+              isCurrentUser(t.assignedTo?.personnelId)
         )
 
         if (globalTaskIndex !== -1 && !updatedTasks[globalTaskIndex].completed) {
@@ -100,7 +102,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
       })
 
       // Update local state
-      const newMyTasks = updatedTasks.filter(t => t.assignedTo?.personnelId === user.uid)
+      const newMyTasks = updatedTasks.filter(t => isCurrentUser(t.assignedTo?.personnelId))
       setTasks(newMyTasks)
       setSelectedTaskIds(new Set())
     } catch (err) {
@@ -127,7 +129,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
         const globalTaskIndex = updatedTasks.findIndex(
           t => t.taskId === tasks[taskIndex].taskId &&
               t.location === tasks[taskIndex].location &&
-              t.assignedTo?.personnelId === user.uid
+              isCurrentUser(t.assignedTo?.personnelId)
         )
 
         if (globalTaskIndex !== -1 && updatedTasks[globalTaskIndex].completed) {
@@ -144,7 +146,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
       })
 
       // Update local state
-      const newMyTasks = updatedTasks.filter(t => t.assignedTo?.personnelId === user.uid)
+      const newMyTasks = updatedTasks.filter(t => isCurrentUser(t.assignedTo?.personnelId))
       setTasks(newMyTasks)
       setSelectedTaskIds(new Set())
     } catch (err) {
@@ -166,7 +168,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
         const globalTaskIndex = updatedTasks.findIndex(
           t => t.taskId === tasks[parseInt(taskIndex)].taskId &&
               t.location === tasks[parseInt(taskIndex)].location &&
-              t.assignedTo?.personnelId === user.uid
+              isCurrentUser(t.assignedTo?.personnelId)
         )
 
         if (globalTaskIndex !== -1) {

@@ -30,6 +30,9 @@ const { onRecommendationCreated } = require('./approverNotifications')
 // Import personnel auth functions
 const { onPersonnelCreated } = require('./personnelAuth')
 
+// Import timezone utilities
+const { getConfiguredTimezone, formatTimestampForNotification } = require('./utils/timezone')
+
 initializeApp()
 
 const db = getFirestore()
@@ -71,6 +74,10 @@ exports.onPostCreated = onDocumentCreated('posts/{postId}', async (event) => {
 
   console.log('New post created:', post.title)
 
+  // Get configured timezone for timestamp formatting
+  const timezone = await getConfiguredTimezone(db)
+  console.log(`Using timezone: ${timezone}`)
+
   // Get all users with FCM tokens
   const usersSnapshot = await db.collection('users').get()
 
@@ -89,7 +96,7 @@ exports.onPostCreated = onDocumentCreated('posts/{postId}', async (event) => {
 
   console.log(`Sending notification to ${tokens.length} tokens`)
 
-  const title = getNotificationTitle(post.type, post)
+  const title = getNotificationTitle(post.type, post, timezone)
   const body = formatNotificationBody(post)
 
   // Build notification message with platform-specific configs
@@ -190,20 +197,12 @@ exports.onPostCreated = onDocumentCreated('posts/{postId}', async (event) => {
   }
 })
 
-function formatTimestamp(isoString) {
-  if (!isoString) return ''
-  const date = new Date(isoString)
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  const day = date.getDate()
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const month = months[date.getMonth()]
-  return `${hours}:${minutes} ${month} ${day}`
-}
-
-function getNotificationTitle(postType, post) {
-  const timestamp = formatTimestamp(post.publishedAt)
-  const timePrefix = timestamp ? `[${timestamp}] ` : ''
+function getNotificationTitle(postType, post, timezone) {
+  // Use the shared timezone-aware formatting function
+  const timestamp = post.publishedAt
+    ? formatTimestampForNotification(post.publishedAt, timezone)
+    : formatTimestampForNotification(null, timezone)
+  const timePrefix = `[${timestamp}] `
 
   switch (postType) {
     case 'announcement':

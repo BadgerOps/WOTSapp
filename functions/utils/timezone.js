@@ -110,6 +110,43 @@ function isToday(timestamp, timezone) {
   return timestampDay === getTodayInTimezone(timezone)
 }
 
+/**
+ * Format a timestamp for notification display in the configured timezone
+ * @param {Object|Date|string|null} timestamp - Firestore timestamp, Date, ISO string, or null for current time
+ * @param {string} timezone - IANA timezone string
+ * @returns {string} Formatted time string like "14:30 Jan 22"
+ */
+function formatTimestampForNotification(timestamp, timezone) {
+  const date = timestamp
+    ? timestamp.toDate
+      ? timestamp.toDate()
+      : new Date(timestamp)
+    : new Date()
+
+  // Format hours and minutes
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const timeParts = timeFormatter.formatToParts(date)
+  const hours = timeParts.find((p) => p.type === 'hour').value
+  const minutes = timeParts.find((p) => p.type === 'minute').value
+
+  // Format month and day
+  const dateFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    month: 'short',
+    day: 'numeric',
+  })
+  const dateParts = dateFormatter.formatToParts(date)
+  const month = dateParts.find((p) => p.type === 'month').value
+  const day = dateParts.find((p) => p.type === 'day').value
+
+  return `${hours}:${minutes} ${month} ${day}`
+}
+
 module.exports = {
   DEFAULT_TIMEZONE,
   getConfiguredTimezone,
@@ -118,4 +155,5 @@ module.exports = {
   getCurrentHourInTimezone,
   determineTargetSlot,
   isToday,
+  formatTimestampForNotification,
 }

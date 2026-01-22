@@ -1,24 +1,54 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { authLog, isDebugEnabled, setDebugEnabled } from '../lib/authDebugger'
+import DebugPanel from '../components/common/DebugPanel'
 
 export default function Login() {
   const { signInWithGoogle } = useAuth()
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [debugEnabled, setDebugEnabledState] = useState(false)
+  const [showDebugPanel, setShowDebugPanel] = useState(false)
+
+  useEffect(() => {
+    // Check if debug was previously enabled
+    setDebugEnabledState(isDebugEnabled())
+  }, [])
+
+  useEffect(() => {
+    authLog('Login', 'Login page mounted', {
+      url: window.location.href,
+      referrer: document.referrer,
+    })
+  }, [])
+
+  function handleDebugToggle(e) {
+    const enabled = e.target.checked
+    setDebugEnabledState(enabled)
+    setDebugEnabled(enabled)
+    if (enabled) {
+      authLog('Login', 'Debug logging enabled by user')
+    }
+  }
 
   async function handleGoogleSignIn() {
     setError(null)
     setLoading(true)
-    console.log('[Login] Button clicked, attempting sign-in...')
+    authLog('Login', 'Sign-in button clicked')
+
     try {
       await signInWithGoogle()
-      console.log('[Login] Sign-in completed successfully')
+      authLog('Login', 'signInWithGoogle() returned successfully')
     } catch (err) {
-      console.error('[Login] Sign-in failed:', err)
+      authLog('Login', 'Sign-in failed', {
+        code: err.code,
+        message: err.message,
+        name: err.name,
+      })
       // Show more detailed error for debugging
       const errorMessage = err.code
         ? `${err.code}: ${err.message}`
-        : 'Failed to sign in. Please try again.'
+        : err.message || 'Failed to sign in. Please try again.'
       setError(errorMessage)
     } finally {
       setLoading(false)
@@ -73,8 +103,32 @@ export default function Login() {
           <p className="mt-6 text-center text-sm text-gray-500">
             Sign in with your authorized Google account
           </p>
+
+          {/* Debug logging toggle */}
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <label className="flex items-center justify-center gap-2 text-xs text-gray-400 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={debugEnabled}
+                onChange={handleDebugToggle}
+                className="w-3 h-3"
+              />
+              Enable debug logging
+            </label>
+            {debugEnabled && (
+              <button
+                onClick={() => setShowDebugPanel(true)}
+                className="mt-2 w-full text-xs text-blue-500 hover:text-blue-600"
+              >
+                View Debug Logs
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Debug Panel */}
+      {showDebugPanel && <DebugPanel onClose={() => setShowDebugPanel(false)} />}
     </div>
   )
 }
