@@ -2,6 +2,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { useAppConfig } from '../hooks/useAppConfig'
 import PostFeed from '../components/posts/PostFeed'
 import MyPassStatusCard from '../components/cq/MyPassStatusCard'
+import MyDetailCard from '../components/details/MyDetailCard'
+import MyCQShiftCard from '../components/cq/MyCQShiftCard'
 
 /**
  * Calculate the graduation countdown ("X days and a wakeup")
@@ -46,6 +48,12 @@ export default function Home() {
 
       {/* Pass Status Card - shows if user is on pass */}
       <MyPassStatusCard />
+
+      {/* Detail Card - shows at 7am and 7:30pm if user has assigned details */}
+      <MyDetailCard />
+
+      {/* CQ Shift Card - shows if user has CQ duty today */}
+      <MyCQShiftCard />
 
       <h2 className="text-lg font-semibold text-gray-900 mb-3">Today's Updates</h2>
       <PostFeed todayOnly={true} />

@@ -28,12 +28,12 @@ export function useDetailAssignments(statusFilter = null) {
       q = query(
         collection(db, 'detailAssignments'),
         where('status', '==', statusFilter),
-        orderBy('dueDateTime', 'desc')
+        orderBy('dueDateTime', 'asc')
       )
     } else {
       q = query(
         collection(db, 'detailAssignments'),
-        orderBy('dueDateTime', 'desc')
+        orderBy('dueDateTime', 'asc')
       )
     }
 
@@ -66,10 +66,10 @@ export function usePendingDetailApprovals() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    // Query by status only, sort client-side to avoid extra index
     const q = query(
       collection(db, 'detailAssignments'),
-      where('status', '==', 'completed'),
-      orderBy('completedAt', 'desc')
+      where('status', '==', 'completed')
     )
 
     const unsubscribe = onSnapshot(
@@ -79,6 +79,12 @@ export function usePendingDetailApprovals() {
           id: doc.id,
           ...doc.data(),
         }))
+        // Sort by completedAt descending client-side
+        pendingData.sort((a, b) => {
+          const aTime = a.completedAt?.toDate?.() || new Date(a.completedAt || 0)
+          const bTime = b.completedAt?.toDate?.() || new Date(b.completedAt || 0)
+          return bTime - aTime
+        })
         setPendingAssignments(pendingData)
         setLoading(false)
       },
@@ -335,11 +341,10 @@ export function useDetailHistory({ dateRange, templateId, personnelId, status })
   const [personnel, setPersonnel] = useState([])
 
   useEffect(() => {
-    // Query for completed or approved/rejected details
+    // Query for approved/rejected details, sort client-side to avoid extra index
     const q = query(
       collection(db, 'detailAssignments'),
-      where('status', 'in', ['approved', 'rejected']),
-      orderBy('completedAt', 'desc')
+      where('status', 'in', ['approved', 'rejected'])
     )
 
     const unsubscribe = onSnapshot(
@@ -349,6 +354,13 @@ export function useDetailHistory({ dateRange, templateId, personnelId, status })
           id: doc.id,
           ...doc.data(),
         }))
+
+        // Sort by completedAt descending client-side
+        historyData.sort((a, b) => {
+          const aTime = a.completedAt?.toDate?.() || new Date(a.completedAt || 0)
+          const bTime = b.completedAt?.toDate?.() || new Date(b.completedAt || 0)
+          return bTime - aTime
+        })
 
         // Client-side filtering for date range
         if (dateRange === 'week') {

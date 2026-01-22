@@ -30,15 +30,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "dueDateTime", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "detailAssignments",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "completedAt", "order": "DESCENDING" }
+        { "fieldPath": "dueDateTime", "order": "ASCENDING" }
       ]
     },
     {
@@ -47,6 +39,14 @@
       "fields": [
         { "fieldPath": "assignmentId", "order": "ASCENDING" },
         { "fieldPath": "personnelId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "cqSchedule",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "date", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
       ]
     }
   ],

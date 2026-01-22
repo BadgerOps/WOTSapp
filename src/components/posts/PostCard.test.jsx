@@ -362,4 +362,75 @@ describe('PostCard', () => {
     expect(screen.queryByText('Warm')).not.toBeInTheDocument();
     expect(screen.queryByText('Wet')).not.toBeInTheDocument();
   });
+
+  it('should display rain icon in content for rainy weather', () => {
+    const post = {
+      id: '21',
+      title: 'UOTD',
+      content: 'Current weather: 55°F, Rain. Humidity: 80%',
+      type: 'uotd',
+      authorId: 'admin1',
+      authorName: 'Admin User',
+      weatherCondition: 'Rain',
+      weatherTemp: 55,
+      createdAt: new Date('2026-01-19'),
+    };
+
+    render(<PostCard post={post} />);
+
+    expect(screen.getByText(/Current weather: 🌧️ 55°F/)).toBeInTheDocument();
+  });
+
+  it('should display snow icon in content for snowy weather', () => {
+    const post = {
+      id: '22',
+      title: 'UOTD',
+      content: 'Current weather: 28°F, Snow. Humidity: 70%',
+      type: 'uotd',
+      authorId: 'admin1',
+      authorName: 'Admin User',
+      weatherCondition: 'Snow',
+      weatherTemp: 28,
+      createdAt: new Date('2026-01-19'),
+    };
+
+    render(<PostCard post={post} />);
+
+    expect(screen.getByText(/Current weather: ❄️ 28°F/)).toBeInTheDocument();
+  });
+
+  it('should display sun icon in content for clear weather', () => {
+    const post = {
+      id: '23',
+      title: 'UOTD',
+      content: 'Current weather: 75°F, Clear. Humidity: 40%',
+      type: 'uotd',
+      authorId: 'admin1',
+      authorName: 'Admin User',
+      weatherCondition: 'Clear',
+      weatherTemp: 75,
+      createdAt: new Date('2026-01-19'),
+    };
+
+    render(<PostCard post={post} />);
+
+    expect(screen.getByText(/Current weather: ☀️ 75°F/)).toBeInTheDocument();
+  });
+
+  it('should not modify content without weatherCondition', () => {
+    const post = {
+      id: '24',
+      title: 'UOTD',
+      content: 'Current weather: 65°F, Clear.',
+      type: 'uotd',
+      authorId: 'admin1',
+      authorName: 'Admin User',
+      createdAt: new Date('2026-01-19'),
+    };
+
+    render(<PostCard post={post} />);
+
+    // Should show original content without icon
+    expect(screen.getByText('Current weather: 65°F, Clear.')).toBeInTheDocument();
+  });
 });

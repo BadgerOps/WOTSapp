@@ -17,8 +17,10 @@ import TaskAssignmentForm from '../components/details/TaskAssignmentForm'
 import DetailAssignmentList from '../components/details/DetailAssignmentList'
 import DetailApprovalQueue from '../components/details/DetailApprovalQueue'
 import DetailHistory from '../components/details/DetailHistory'
+import DetailAssignmentImporter from '../components/details/DetailAssignmentImporter'
 import CQDashboard from '../components/cq/CQDashboard'
 import ShiftManager from '../components/cq/ShiftManager'
+import CQScheduleManager from '../components/cq/CQScheduleManager'
 import PersonnelStatusTracker from '../components/cq/PersonnelStatusTracker'
 import CQNotesLog from '../components/cq/CQNotesLog'
 import CQAuditLog from '../components/cq/CQAuditLog'
@@ -241,6 +243,16 @@ export default function Admin() {
             >
               History
             </button>
+            <button
+              onClick={() => setDetailsSubTab('import')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                detailsSubTab === 'import'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Import
+            </button>
           </div>
 
           {detailsSubTab === 'templates' && <DetailTemplateManager />}
@@ -252,6 +264,7 @@ export default function Admin() {
           )}
           {detailsSubTab === 'approvals' && <DetailApprovalQueue />}
           {detailsSubTab === 'history' && <DetailHistory />}
+          {detailsSubTab === 'import' && <DetailAssignmentImporter />}
         </div>
       )}
 
@@ -270,6 +283,16 @@ export default function Admin() {
               Dashboard
             </button>
             <button
+              onClick={() => setCqSubTab('schedule')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cqSubTab === 'schedule'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Schedule
+            </button>
+            <button
               onClick={() => setCqSubTab('shifts')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 cqSubTab === 'shifts'
@@ -277,7 +300,7 @@ export default function Admin() {
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              Shifts
+              Manual Shifts
             </button>
             <button
               onClick={() => setCqSubTab('status')}
@@ -312,6 +335,7 @@ export default function Admin() {
           </div>
 
           {cqSubTab === 'dashboard' && <CQDashboard />}
+          {cqSubTab === 'schedule' && <CQScheduleManager />}
           {cqSubTab === 'shifts' && <ShiftManager />}
           {cqSubTab === 'status' && <PersonnelStatusTracker />}
           {cqSubTab === 'notes' && <CQNotesLog />}

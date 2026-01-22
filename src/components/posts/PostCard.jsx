@@ -20,6 +20,41 @@ const typeBadgeClasses = {
   general: "badge-general",
 };
 
+function getWeatherIcon(condition) {
+  if (!condition) return null;
+
+  const lowerCondition = condition.toLowerCase();
+
+  if (lowerCondition.includes("snow") || lowerCondition.includes("sleet")) {
+    return "❄️";
+  }
+  if (lowerCondition.includes("thunder") || lowerCondition.includes("storm")) {
+    return "⛈️";
+  }
+  if (
+    lowerCondition.includes("rain") ||
+    lowerCondition.includes("drizzle") ||
+    lowerCondition.includes("shower")
+  ) {
+    return "🌧️";
+  }
+  if (lowerCondition.includes("cloud") || lowerCondition.includes("overcast")) {
+    return "☁️";
+  }
+  if (lowerCondition.includes("fog") || lowerCondition.includes("mist") || lowerCondition.includes("haze")) {
+    return "🌫️";
+  }
+  if (lowerCondition.includes("clear") || lowerCondition.includes("sunny")) {
+    return "☀️";
+  }
+  if (lowerCondition.includes("wind")) {
+    return "💨";
+  }
+
+  // Default to sun with clouds for partial conditions
+  return "⛅";
+}
+
 function getWeatherBadge(condition, temp) {
   if (!condition) return null;
 
@@ -56,6 +91,16 @@ function getWeatherBadge(condition, temp) {
 
   // Default to condition name if no temp
   return { label: condition, className: "bg-gray-100 text-gray-700" };
+}
+
+function insertWeatherIcon(content, weatherCondition) {
+  if (!content || !weatherCondition) return content;
+
+  const icon = getWeatherIcon(weatherCondition);
+  if (!icon) return content;
+
+  // Insert icon after "Current weather:"
+  return content.replace("Current weather:", `Current weather: ${icon}`);
 }
 
 export default function PostCard({ post }) {
@@ -101,7 +146,11 @@ export default function PostCard({ post }) {
 
       <h2 className="text-lg font-semibold text-gray-900 mb-2">{post.title}</h2>
 
-      <div className="text-gray-700 whitespace-pre-wrap">{post.content}</div>
+      <div className="text-gray-700 whitespace-pre-wrap">
+        {post.type === "uotd" && post.weatherCondition
+          ? insertWeatherIcon(post.content, post.weatherCondition)
+          : post.content}
+      </div>
 
       {post.adminNote && post.adminNote.trim() && (
         <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-900">

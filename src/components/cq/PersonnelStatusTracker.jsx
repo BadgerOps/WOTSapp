@@ -22,6 +22,7 @@ export default function PersonnelStatusTracker() {
   const { bulkSignIn, loading: actionLoading } = usePersonnelStatusActions();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [sortBy, setSortBy] = useState("name-asc"); // name-asc, name-desc, status
   const [selectedPerson, setSelectedPerson] = useState(null);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -37,18 +38,32 @@ export default function PersonnelStatusTracker() {
   }
 
   // Filter personnel
-  const filteredPersonnel = personnelWithStatus.filter((person) => {
-    const matchesSearch =
-      !searchTerm ||
-      `${person.firstName} ${person.lastName}`
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      person.rank?.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredPersonnel = personnelWithStatus
+    .filter((person) => {
+      const matchesSearch =
+        !searchTerm ||
+        `${person.firstName} ${person.lastName}`
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
 
-    const matchesStatus = !statusFilter || person.status === statusFilter;
+      const matchesStatus = !statusFilter || person.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      if (sortBy === "name-asc") {
+        return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+      } else if (sortBy === "name-desc") {
+        return `${b.lastName} ${b.firstName}`.localeCompare(`${a.lastName} ${a.firstName}`);
+      } else if (sortBy === "status") {
+        // Sort by status (present first, then pass, then sick_call), then by name
+        const statusOrder = { present: 0, pass: 1, sick_call: 2 };
+        const statusDiff = (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+        if (statusDiff !== 0) return statusDiff;
+        return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+      }
+      return 0;
+    });
 
   // Get personnel on pass (not present)
   const personnelOnPass = filteredPersonnel.filter(
@@ -138,12 +153,12 @@ export default function PersonnelStatusTracker() {
         ))}
       </div>
 
-      {/* Search and Filter */}
+      {/* Search, Filter, and Sort */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
           <input
             type="text"
-            placeholder="Search by name or rank..."
+            placeholder="Search by name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
@@ -163,6 +178,15 @@ export default function PersonnelStatusTracker() {
               {label}
             </option>
           ))}
+        </select>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+        >
+          <option value="name-asc">Name A-Z</option>
+          <option value="name-desc">Name Z-A</option>
+          <option value="status">By Status</option>
         </select>
       </div>
 
@@ -210,7 +234,6 @@ export default function PersonnelStatusTracker() {
                   />
                   <div>
                     <div className="font-semibold text-gray-900">
-                      {person.rank && `${person.rank} `}
                       {person.lastName}, {person.firstName}
                     </div>
                     <span
@@ -303,9 +326,6 @@ export default function PersonnelStatusTracker() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Name
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                    Rank
-                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
@@ -321,7 +341,7 @@ export default function PersonnelStatusTracker() {
                 {filteredPersonnel.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="6"
+                      colSpan="5"
                       className="px-4 py-8 text-center text-gray-500"
                     >
                       No personnel found matching your criteria.
@@ -345,12 +365,6 @@ export default function PersonnelStatusTracker() {
                         <div className="font-medium text-gray-900">
                           {person.lastName}, {person.firstName}
                         </div>
-                        <div className="sm:hidden text-xs text-gray-500">
-                          {person.rank}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-gray-600 hidden sm:table-cell">
-                        {person.rank || "-"}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span

@@ -311,6 +311,62 @@ export default function ConfigManager() {
           </p>
         </div>
 
+        {/* CQ Shift Times */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            CQ Shift Times
+          </label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm font-medium text-gray-700 mb-2">First Shift</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  value={config.cqFirstShiftStart || '20:00'}
+                  onChange={(e) =>
+                    setConfig({ ...config, cqFirstShiftStart: e.target.value })
+                  }
+                  className="input text-sm"
+                />
+                <span className="text-gray-500">to</span>
+                <input
+                  type="time"
+                  value={config.cqFirstShiftEnd || '01:00'}
+                  onChange={(e) =>
+                    setConfig({ ...config, cqFirstShiftEnd: e.target.value })
+                  }
+                  className="input text-sm"
+                />
+              </div>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm font-medium text-gray-700 mb-2">Second Shift</p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  value={config.cqSecondShiftStart || '01:00'}
+                  onChange={(e) =>
+                    setConfig({ ...config, cqSecondShiftStart: e.target.value })
+                  }
+                  className="input text-sm"
+                />
+                <span className="text-gray-500">to</span>
+                <input
+                  type="time"
+                  value={config.cqSecondShiftEnd || '06:00'}
+                  onChange={(e) =>
+                    setConfig({ ...config, cqSecondShiftEnd: e.target.value })
+                  }
+                  className="input text-sm"
+                />
+              </div>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            First shift: 8:00 PM - 1:00 AM, Second shift: 1:00 AM - 6:00 AM (default)
+          </p>
+        </div>
+
         {/* Flights */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">

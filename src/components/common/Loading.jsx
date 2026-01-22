@@ -6,6 +6,7 @@ const PHRASES = [
   "Making it make sense",
   "Staying in lane",
   "Loading way too much javascript",
+  'Screaming (at the top of my lungs) "WOTS GOING ON?"',
 ];
 
 export default function Loading({ fullScreen = false }) {
