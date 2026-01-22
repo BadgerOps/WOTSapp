@@ -4,6 +4,8 @@ import {
   isValidPhoneNumber,
   isValidRosterId,
   isValidRole,
+  isValidClassFormat,
+  parseBoolean,
   validatePersonnelRecord,
   parsePersonnelCSV,
   generateCSVTemplate,
@@ -66,6 +68,53 @@ describe('personnelCsvParser', () => {
     });
   });
 
+  describe('isValidClassFormat', () => {
+    it('should validate correct class format (NN-NN)', () => {
+      expect(isValidClassFormat('26-01')).toBe(true);
+      expect(isValidClassFormat('26-03')).toBe(true);
+      expect(isValidClassFormat('25-12')).toBe(true);
+      expect(isValidClassFormat('00-00')).toBe(true);
+    });
+
+    it('should allow empty class (optional)', () => {
+      expect(isValidClassFormat('')).toBe(true);
+      expect(isValidClassFormat(null)).toBe(true);
+      expect(isValidClassFormat(undefined)).toBe(true);
+    });
+
+    it('should reject invalid class formats', () => {
+      expect(isValidClassFormat('26')).toBe(false);
+      expect(isValidClassFormat('2601')).toBe(false);
+      expect(isValidClassFormat('26-1')).toBe(false);
+      expect(isValidClassFormat('6-01')).toBe(false);
+      expect(isValidClassFormat('AB-CD')).toBe(false);
+      expect(isValidClassFormat('Alpha')).toBe(false);
+    });
+  });
+
+  describe('parseBoolean', () => {
+    it('should parse true values', () => {
+      expect(parseBoolean(true)).toBe(true);
+      expect(parseBoolean('TRUE')).toBe(true);
+      expect(parseBoolean('true')).toBe(true);
+      expect(parseBoolean('True')).toBe(true);
+      expect(parseBoolean('yes')).toBe(true);
+      expect(parseBoolean('YES')).toBe(true);
+      expect(parseBoolean('1')).toBe(true);
+    });
+
+    it('should parse false values', () => {
+      expect(parseBoolean(false)).toBe(false);
+      expect(parseBoolean('FALSE')).toBe(false);
+      expect(parseBoolean('false')).toBe(false);
+      expect(parseBoolean('no')).toBe(false);
+      expect(parseBoolean('0')).toBe(false);
+      expect(parseBoolean('')).toBe(false);
+      expect(parseBoolean(null)).toBe(false);
+      expect(parseBoolean(undefined)).toBe(false);
+    });
+  });
+
   describe('validatePersonnelRecord', () => {
     it('should validate a correct record', () => {
       const record = {
@@ -75,9 +124,10 @@ describe('personnelCsvParser', () => {
         lastName: 'Doe',
         rank: 'A1C',
         phoneNumber: '555-0123',
-        squad: 'Alpha',
-        flight: 'Flight A',
+        class: '26-01',
+        flight: 'Barrow',
         detailEligible: 'TRUE',
+        cqEligible: 'TRUE',
       };
 
       const errors = validatePersonnelRecord(record, 2);
@@ -181,6 +231,19 @@ describe('personnelCsvParser', () => {
       expect(errors.some(err => err.includes('Invalid phone number'))).toBe(true);
     });
 
+    it('should validate class format if provided', () => {
+      const record = {
+        rosterId: '1',
+        email: 'john@example.com',
+        firstName: 'John',
+        lastName: 'Doe',
+        class: 'invalid',
+      };
+
+      const errors = validatePersonnelRecord(record, 2);
+      expect(errors.some(err => err.includes('Invalid class format'))).toBe(true);
+    });
+
     it('should allow valid roles', () => {
       const record = {
         rosterId: '1',
@@ -232,9 +295,9 @@ describe('personnelCsvParser', () => {
 
   describe('parsePersonnelCSV', () => {
     it('should parse valid CSV file', async () => {
-      const csvContent = `RosterID,Email,FirstName,LastName,Rank,PhoneNumber,Squad,Flight,DetailEligible
-1,john.doe@example.com,John,Doe,A1C,555-0123,Alpha,Flight A,TRUE
-2,jane.smith@example.com,Jane,Smith,SrA,555-0124,Bravo,Flight B,TRUE`;
+      const csvContent = `RosterID,Email,FirstName,LastName,Rank,PhoneNumber,Class,Flight,DetailEligible,CQ_Eligible
+1,john.doe@example.com,John,Doe,A1C,555-0123,26-01,Barrow,TRUE,TRUE
+2,jane.smith@example.com,Jane,Smith,SrA,555-0124,26-02,Long,TRUE,FALSE`;
 
       const file = new File([csvContent], 'test.csv', { type: 'text/csv' });
       const result = await parsePersonnelCSV(file);
@@ -250,9 +313,10 @@ describe('personnelCsvParser', () => {
         lastName: 'Doe',
         rank: 'A1C',
         phoneNumber: '555-0123',
-        squad: 'Alpha',
-        flight: 'Flight A',
+        class: '26-01',
+        flight: 'Barrow',
         detailEligible: true,
+        cqEligible: true,
       });
 
       expect(result.data[1]).toMatchObject({
@@ -262,15 +326,16 @@ describe('personnelCsvParser', () => {
         lastName: 'Smith',
         rank: 'SrA',
         phoneNumber: '555-0124',
-        squad: 'Bravo',
-        flight: 'Flight B',
+        class: '26-02',
+        flight: 'Long',
         detailEligible: true,
+        cqEligible: false,
       });
     });
 
     it('should handle CSV with flexible header names', async () => {
-      const csvContent = `roster id,email,first name,last name,rank,phone,squad,flight,detail eligible
-1,test@example.com,Test,User,AB,555-9999,Charlie,Flight C,TRUE`;
+      const csvContent = `roster id,email,first name,last name,rank,phone,class,flight,detail eligible,cq eligible
+1,test@example.com,Test,User,AB,555-9999,26-03,Brow,TRUE,FALSE`;
 
       const file = new File([csvContent], 'test.csv', { type: 'text/csv' });
       const result = await parsePersonnelCSV(file);
@@ -281,12 +346,25 @@ describe('personnelCsvParser', () => {
       expect(result.data[0].email).toBe('test@example.com');
       expect(result.data[0].firstName).toBe('Test');
       expect(result.data[0].lastName).toBe('User');
+      expect(result.data[0].class).toBe('26-03');
+      expect(result.data[0].cqEligible).toBe(false);
+    });
+
+    it('should handle legacy Squad header as Class', async () => {
+      const csvContent = `RosterID,Email,FirstName,LastName,Rank,PhoneNumber,Squad,Flight,DetailEligible
+1,test@example.com,Test,User,AB,555-9999,26-01,Barrow,TRUE`;
+
+      const file = new File([csvContent], 'test.csv', { type: 'text/csv' });
+      const result = await parsePersonnelCSV(file);
+
+      expect(result.valid).toBe(true);
+      expect(result.data[0].class).toBe('26-01');
     });
 
     it('should detect validation errors', async () => {
-      const csvContent = `RosterID,Email,FirstName,LastName,Rank,PhoneNumber,Squad,Flight,DetailEligible
-abc,invalid-email,John,Doe,A1C,555-0123,Alpha,Flight A,TRUE
-2,jane@example.com,Jane,,SrA,555-0124,Bravo,Flight B,TRUE`;
+      const csvContent = `RosterID,Email,FirstName,LastName,Rank,PhoneNumber,Class,Flight,DetailEligible,CQ_Eligible
+abc,invalid-email,John,Doe,A1C,555-0123,26-01,Barrow,TRUE,TRUE
+2,jane@example.com,Jane,,SrA,555-0124,26-02,Long,TRUE,FALSE`;
 
       const file = new File([csvContent], 'test.csv', { type: 'text/csv' });
       const result = await parsePersonnelCSV(file);
@@ -299,8 +377,8 @@ abc,invalid-email,John,Doe,A1C,555-0123,Alpha,Flight A,TRUE
     });
 
     it('should clean and normalize data', async () => {
-      const csvContent = `RosterID,Email,FirstName,LastName,Rank,PhoneNumber,Squad,Flight,DetailEligible
-1,  JOHN.DOE@EXAMPLE.COM  ,  John  ,  Doe  ,  a1c  ,  555-0123  ,  Alpha  ,  Flight A  ,TRUE`;
+      const csvContent = `RosterID,Email,FirstName,LastName,Rank,PhoneNumber,Class,Flight,DetailEligible,CQ_Eligible
+1,  JOHN.DOE@EXAMPLE.COM  ,  John  ,  Doe  ,  a1c  ,  555-0123  ,  26-01  ,  Barrow  ,TRUE,FALSE`;
 
       const file = new File([csvContent], 'test.csv', { type: 'text/csv' });
       const result = await parsePersonnelCSV(file);
@@ -310,21 +388,25 @@ abc,invalid-email,John,Doe,A1C,555-0123,Alpha,Flight A,TRUE
       expect(result.data[0].email).toBe('john.doe@example.com'); // lowercased
       expect(result.data[0].firstName).toBe('John'); // trimmed
       expect(result.data[0].rank).toBe('a1c'); // kept as entered
+      expect(result.data[0].class).toBe('26-01'); // trimmed
     });
 
-    it('should handle detailEligible boolean conversion', async () => {
-      const csvContent = `RosterID,Email,FirstName,LastName,Rank,PhoneNumber,Squad,Flight,DetailEligible
-1,test1@example.com,Test,One,A1C,555-0001,Squad,Flight,TRUE
-2,test2@example.com,Test,Two,A1C,555-0002,Squad,Flight,true
-3,test3@example.com,Test,Three,A1C,555-0003,Squad,Flight,FALSE`;
+    it('should handle detailEligible and cqEligible boolean conversion', async () => {
+      const csvContent = `RosterID,Email,FirstName,LastName,Rank,PhoneNumber,Class,Flight,DetailEligible,CQ_Eligible
+1,test1@example.com,Test,One,A1C,555-0001,26-01,Barrow,TRUE,FALSE
+2,test2@example.com,Test,Two,A1C,555-0002,26-01,Long,true,yes
+3,test3@example.com,Test,Three,A1C,555-0003,26-01,Brow,FALSE,1`;
 
       const file = new File([csvContent], 'test.csv', { type: 'text/csv' });
       const result = await parsePersonnelCSV(file);
 
       expect(result.valid).toBe(true);
       expect(result.data[0].detailEligible).toBe(true);
+      expect(result.data[0].cqEligible).toBe(false);
       expect(result.data[1].detailEligible).toBe(true);
+      expect(result.data[1].cqEligible).toBe(true);
       expect(result.data[2].detailEligible).toBe(false);
+      expect(result.data[2].cqEligible).toBe(true);
     });
 
     it('should parse role field and default to user', async () => {
@@ -379,10 +461,10 @@ abc,invalid-email,John,Doe,A1C,555-0123,Alpha,Flight A,TRUE
       expect(firstLine).toContain('LastName');
       expect(firstLine).toContain('Rank');
       expect(firstLine).toContain('PhoneNumber');
-      expect(firstLine).toContain('Squad');
+      expect(firstLine).toContain('Class');
       expect(firstLine).toContain('Flight');
       expect(firstLine).toContain('DetailEligible');
-      expect(firstLine).toContain('Role');
+      expect(firstLine).toContain('CQ_Eligible');
     });
   });
 });

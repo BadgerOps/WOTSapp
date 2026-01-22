@@ -6,6 +6,7 @@ import { ToastContainer } from '../components/common/Toast'
 import {
   requestNotificationPermission,
   getFCMToken,
+  onForegroundMessage,
 } from '../services/notifications'
 
 const NotificationContext = createContext()
@@ -56,7 +57,58 @@ export function NotificationProvider({ children }) {
       // Not a PWA and no Notification API
       setPushSupported(false)
     }
+
+    // Register Firebase messaging service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then((registration) => {
+          console.log('[Notifications] Firebase SW registered:', registration.scope)
+        })
+        .catch((error) => {
+          console.error('[Notifications] Firebase SW registration failed:', error)
+        })
+    }
   }, [])
+
+  // Auto-request FCM token when user logs in (if permission was previously granted)
+  useEffect(() => {
+    if (!user) return
+
+    async function autoRegisterToken() {
+      // Only auto-register if permission was previously granted
+      if ('Notification' in window && Notification.permission === 'granted') {
+        console.log('[Notifications] Auto-registering FCM token for user:', user.uid)
+        const token = await getFCMToken(user.uid)
+        if (token) {
+          setPushEnabled(true)
+          console.log('[Notifications] Token registered successfully')
+        }
+      }
+    }
+
+    autoRegisterToken()
+  }, [user])
+
+  // Set up foreground message listener when push is enabled
+  useEffect(() => {
+    if (!pushEnabled) return
+
+    console.log('[Notifications] Setting up foreground message listener')
+    const unsubscribe = onForegroundMessage((payload) => {
+      console.log('[Notifications] Foreground message:', payload)
+
+      // Show a toast notification for foreground messages
+      const title = payload.notification?.title || 'New Update'
+      const body = payload.notification?.body || ''
+
+      addToast(
+        { title, body },
+        payload.data?.type === 'announcement' ? 'warning' : 'info'
+      )
+    })
+
+    return unsubscribe
+  }, [pushEnabled, addToast])
 
   // Enable push notifications
   const enablePushNotifications = useCallback(async () => {

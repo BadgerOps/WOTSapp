@@ -5,7 +5,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
 import { auth, db } from '../config/firebase'
 
 const AuthContext = createContext()
@@ -63,6 +63,21 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function checkPersonnelExists(email) {
+    console.log('[Auth] Checking if email exists in personnel:', email)
+    try {
+      const personnelQuery = query(
+        collection(db, 'personnel'),
+        where('email', '==', email.toLowerCase())
+      )
+      const snapshot = await getDocs(personnelQuery)
+      return !snapshot.empty
+    } catch (error) {
+      console.error('[Auth] Error checking personnel:', error)
+      return false
+    }
+  }
+
   async function signInWithGoogle() {
     const provider = new GoogleAuthProvider()
     console.log('[Auth] Starting Google sign-in...')
@@ -70,6 +85,15 @@ export function AuthProvider({ children }) {
     try {
       const result = await signInWithPopup(auth, provider)
       console.log('[Auth] Sign-in successful:', result.user.email)
+
+      // Check if user exists in personnel table
+      const isPersonnel = await checkPersonnelExists(result.user.email)
+      if (!isPersonnel) {
+        console.log('[Auth] User not in personnel table, signing out')
+        await signOut(auth)
+        throw new Error('Access denied. You must be registered in the personnel roster to use this application.')
+      }
+
       await createUserDocument(result.user)
       return result.user
     } catch (error) {

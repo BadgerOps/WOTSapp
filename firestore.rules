@@ -154,20 +154,48 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Personnel Config collection (flights, classes)
+    match /personnelConfig/{configId} {
+      // Anyone authenticated can read config
+      allow read: if isAuthenticated();
+      // Only admins can write config
+      allow write: if isAdmin();
+    }
+
     // CQ Shifts collection (admin-only for now; future cq_admin role)
     match /cqShifts/{shiftId} {
       allow read, write: if isAdmin();
     }
 
     // Personnel Status collection (rolling current status)
-    match /personnelStatus/{userId} {
+    match /personnelStatus/{statusId} {
+      // Users can read and update their own status (for self sign-out)
+      allow read, write: if isOwner(statusId);
+      // Allow authenticated users to write status for group sign-outs
+      allow write: if isAuthenticated() &&
+        request.resource.data.groupSignOut == true &&
+        request.resource.data.updatedBy == request.auth.uid;
+      // Admins can read and write all
       allow read, write: if isAdmin();
+      // Anyone authenticated can read all status (for status display)
+      allow read: if isAuthenticated();
     }
 
     // Personnel Status History collection
     match /personnelStatusHistory/{logId} {
+      // Admins can read all history
       allow read: if isAdmin();
+      // Admins can create history entries
       allow create: if isAdmin();
+      // Users can create their own history entries (for self sign-out)
+      allow create: if isAuthenticated() &&
+        request.resource.data.personnelId == request.auth.uid &&
+        request.resource.data.selfUpdated == true;
+      // Users can create history entries for group sign-outs
+      allow create: if isAuthenticated() &&
+        request.resource.data.groupSignOut == true &&
+        request.resource.data.updatedBy == request.auth.uid;
+      // No updates or deletes allowed
       allow update, delete: if false;
     }
 

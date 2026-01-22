@@ -5,7 +5,9 @@ import { db } from '../config/firebase'
 export const DEFAULT_CONFIG = {
   timezone: 'America/New_York',
   classNumber: '',
+  graduationDate: '', // YYYY-MM-DD format
   flights: [],
+  classes: [], // Available class options (e.g., ['26-01', '26-02'])
 }
 
 /**

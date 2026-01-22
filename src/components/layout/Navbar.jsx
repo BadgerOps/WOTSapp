@@ -21,6 +21,7 @@ export default function Navbar() {
     { path: '/schedule', label: 'Schedule' },
     { path: '/documents', label: 'Documents' },
     { path: '/details', label: 'Details' },
+    { path: '/cq', label: 'CQ' },
   ]
 
   if (isAdmin) {
@@ -78,12 +79,17 @@ export default function Navbar() {
                     </svg>
                   </span>
                 )}
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName}
-                  className="w-8 h-8 rounded-full"
-                />
-                <span className="text-sm">{user.displayName}</span>
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-primary-500 transition-colors"
+                >
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName}
+                    className="w-8 h-8 rounded-full"
+                  />
+                  <span className="text-sm">{user.displayName}</span>
+                </Link>
                 <button
                   onClick={logout}
                   className="text-sm text-primary-200 hover:text-white"
@@ -144,14 +150,18 @@ export default function Navbar() {
             ))}
             {user && (
               <div className="mt-4 pt-4 border-t border-primary-500">
-                <div className="flex items-center px-3 py-2">
+                <Link
+                  to="/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center px-3 py-2 hover:bg-primary-500 rounded-md transition-colors"
+                >
                   <img
                     src={user.photoURL}
                     alt={user.displayName}
                     className="w-8 h-8 rounded-full mr-3"
                   />
                   <span className="text-sm">{user.displayName}</span>
-                </div>
+                </Link>
                 {!pushEnabled && (
                   <button
                     onClick={() => {

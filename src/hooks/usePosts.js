@@ -58,6 +58,50 @@ export function usePosts(filter = null) {
   return { posts, loading, error }
 }
 
+/**
+ * Hook to fetch posts for today only
+ * Filters posts client-side to those created/published today
+ */
+export function useTodaysPosts() {
+  const [posts, setPosts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    // Get start of today
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const q = query(
+      collection(db, 'posts'),
+      where('status', '==', 'published'),
+      where('createdAt', '>=', today),
+      orderBy('createdAt', 'desc')
+    )
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const postsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        setPosts(postsData)
+        setLoading(false)
+      },
+      (err) => {
+        console.error('Error fetching today\'s posts:', err)
+        setError(err.message)
+        setLoading(false)
+      }
+    )
+
+    return unsubscribe
+  }, [])
+
+  return { posts, loading, error }
+}
+
 export function usePostActions() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)

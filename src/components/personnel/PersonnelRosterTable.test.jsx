@@ -7,6 +7,16 @@ import * as AuthContext from '../../contexts/AuthContext';
 vi.mock('../../hooks/usePersonnel');
 vi.mock('../../contexts/AuthContext');
 
+// Mock PersonnelEditModal to avoid rendering issues
+vi.mock('./PersonnelEditModal', () => ({
+  default: ({ person, onClose }) => (
+    <div data-testid="edit-modal">
+      Editing {person.firstName} {person.lastName}
+      <button onClick={onClose}>Close</button>
+    </div>
+  ),
+}));
+
 describe('PersonnelRosterTable', () => {
   const mockPersonnel = [
     {
@@ -17,10 +27,10 @@ describe('PersonnelRosterTable', () => {
       lastName: 'Doe',
       rank: 'A1C',
       phoneNumber: '555-0123',
-      squad: 'Alpha',
-      flight: 'Flight A',
+      class: '26-01',
+      flight: 'Barrow',
       detailEligible: true,
-      role: 'user',
+      cqEligible: true,
     },
     {
       id: '2',
@@ -30,10 +40,10 @@ describe('PersonnelRosterTable', () => {
       lastName: 'Smith',
       rank: 'SrA',
       phoneNumber: '555-0124',
-      squad: 'Bravo',
-      flight: 'Flight B',
+      class: '26-02',
+      flight: 'Long',
       detailEligible: true,
-      role: 'admin',
+      cqEligible: false,
     },
   ];
 
@@ -66,9 +76,10 @@ describe('PersonnelRosterTable', () => {
   it('should render personnel table with data', () => {
     render(<PersonnelRosterTable />);
 
-    expect(screen.getByText('Personnel Roster (2)')).toBeInTheDocument();
-    expect(screen.getByText('John Doe')).toBeInTheDocument();
-    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    expect(screen.getByText('Personnel Roster (2 of 2)')).toBeInTheDocument();
+    // Name format is "Last, First"
+    expect(screen.getByText('Doe, John')).toBeInTheDocument();
+    expect(screen.getByText('Smith, Jane')).toBeInTheDocument();
     expect(screen.getByText('john.doe@example.com')).toBeInTheDocument();
     expect(screen.getByText('jane.smith@example.com')).toBeInTheDocument();
   });
@@ -111,38 +122,51 @@ describe('PersonnelRosterTable', () => {
     ).toBeInTheDocument();
   });
 
-  it('should display role badges correctly', () => {
+  it('should have Edit buttons for each person', () => {
     render(<PersonnelRosterTable />);
 
-    const userBadge = screen.getByTestId('role-badge-1');
-    const adminBadge = screen.getByTestId('role-badge-2');
-
-    expect(userBadge).toHaveTextContent('User');
-    expect(adminBadge).toHaveTextContent('Admin');
+    const editButtons = screen.getAllByText('Edit');
+    expect(editButtons).toHaveLength(2);
   });
 
-  it('should show role selector when badge is clicked', () => {
+  it('should open edit modal when Edit is clicked', () => {
     render(<PersonnelRosterTable />);
 
-    const userBadge = screen.getByTestId('role-badge-1');
-    fireEvent.click(userBadge);
+    const editButtons = screen.getAllByText('Edit');
+    fireEvent.click(editButtons[0]);
 
-    expect(screen.getByTestId('role-select-1')).toBeInTheDocument();
+    expect(screen.getByTestId('edit-modal')).toBeInTheDocument();
+    expect(screen.getByText('Editing John Doe')).toBeInTheDocument();
   });
 
-  it('should update role when selection changes', async () => {
+  it('should toggle detailEligible when toggle button is clicked', async () => {
     mockUpdatePersonnel.mockResolvedValueOnce();
 
     render(<PersonnelRosterTable />);
 
-    const userBadge = screen.getByTestId('role-badge-1');
-    fireEvent.click(userBadge);
-
-    const select = screen.getByTestId('role-select-1');
-    fireEvent.change(select, { target: { value: 'admin' } });
+    // First person has detailEligible: true, find the toggle buttons
+    // The table has Detail and CQ columns with toggle buttons
+    const toggleButtons = screen.getAllByTitle(/Detail Eligible|CQ Eligible/i);
+    // Click the first Detail toggle (should toggle off)
+    const detailToggle = screen.getAllByTitle('Detail Eligible - Click to toggle')[0];
+    fireEvent.click(detailToggle);
 
     await waitFor(() => {
-      expect(mockUpdatePersonnel).toHaveBeenCalledWith('1', { role: 'admin' });
+      expect(mockUpdatePersonnel).toHaveBeenCalledWith('1', { detailEligible: false });
+    });
+  });
+
+  it('should toggle cqEligible when toggle button is clicked', async () => {
+    mockUpdatePersonnel.mockResolvedValueOnce();
+
+    render(<PersonnelRosterTable />);
+
+    // Second person has cqEligible: false
+    const cqToggle = screen.getAllByTitle('Not CQ Eligible - Click to toggle')[0];
+    fireEvent.click(cqToggle);
+
+    await waitFor(() => {
+      expect(mockUpdatePersonnel).toHaveBeenCalledWith('2', { cqEligible: true });
     });
   });
 
@@ -151,8 +175,8 @@ describe('PersonnelRosterTable', () => {
 
     render(<PersonnelRosterTable />);
 
-    const deleteButton = screen.getByTestId('delete-button-1');
-    fireEvent.click(deleteButton);
+    const deleteButtons = screen.getAllByText('Delete');
+    fireEvent.click(deleteButtons[0]);
 
     await waitFor(() => {
       expect(mockDeletePersonnel).toHaveBeenCalledWith('1');
@@ -164,32 +188,27 @@ describe('PersonnelRosterTable', () => {
 
     render(<PersonnelRosterTable />);
 
-    const deleteButton = screen.getByTestId('delete-button-1');
-    fireEvent.click(deleteButton);
+    const deleteButtons = screen.getAllByText('Delete');
+    fireEvent.click(deleteButtons[0]);
 
     await waitFor(() => {
       expect(mockDeletePersonnel).not.toHaveBeenCalled();
     });
   });
 
-  it('should display RBAC note at bottom', () => {
-    render(<PersonnelRosterTable />);
-
-    expect(
-      screen.getByText(/comprehensive Role-Based Access Control/i)
-    ).toBeInTheDocument();
-  });
-
-  it('should display roster ID, rank, and flight', () => {
+  it('should display roster ID, rank, class, and flight', () => {
     render(<PersonnelRosterTable />);
 
     expect(screen.getByText('1')).toBeInTheDocument();
-    expect(screen.getByText('A1C')).toBeInTheDocument();
-    expect(screen.getByText('Flight A')).toBeInTheDocument();
+    // Rank appears in both table cell and inline mobile display, so use getAllByText
+    expect(screen.getAllByText('A1C').length).toBeGreaterThanOrEqual(1);
+    // Classes appear both in table cells and filter dropdown, so use getAllByText
+    expect(screen.getAllByText('26-01').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Barrow').length).toBeGreaterThanOrEqual(1);
   });
 
   it('should show dash for missing optional fields', () => {
-    const personnelWithoutRank = [
+    const personnelWithoutOptional = [
       {
         id: '3',
         rosterId: 3,
@@ -197,13 +216,16 @@ describe('PersonnelRosterTable', () => {
         firstName: 'Test',
         lastName: 'User',
         rank: '',
+        phoneNumber: '',
+        class: '',
         flight: '',
-        role: 'user',
+        detailEligible: false,
+        cqEligible: false,
       },
     ];
 
     usePersonnelHook.usePersonnel = vi.fn(() => ({
-      personnel: personnelWithoutRank,
+      personnel: personnelWithoutOptional,
       loading: false,
       error: null,
     }));
@@ -212,5 +234,73 @@ describe('PersonnelRosterTable', () => {
 
     const dashes = screen.getAllByText('-');
     expect(dashes.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('should filter by search term', () => {
+    render(<PersonnelRosterTable />);
+
+    const searchInput = screen.getByPlaceholderText('Search by name, email, or rank...');
+    fireEvent.change(searchInput, { target: { value: 'john' } });
+
+    expect(screen.getByText('Personnel Roster (1 of 2)')).toBeInTheDocument();
+    expect(screen.getByText('Doe, John')).toBeInTheDocument();
+    expect(screen.queryByText('Smith, Jane')).not.toBeInTheDocument();
+  });
+
+  it('should show class and flight filter dropdowns', () => {
+    render(<PersonnelRosterTable />);
+
+    expect(screen.getByText('All Classes')).toBeInTheDocument();
+    expect(screen.getByText('All Flights')).toBeInTheDocument();
+  });
+
+  it('should filter by class', () => {
+    render(<PersonnelRosterTable />);
+
+    const classSelect = screen.getByDisplayValue('All Classes');
+    fireEvent.change(classSelect, { target: { value: '26-01' } });
+
+    expect(screen.getByText('Personnel Roster (1 of 2)')).toBeInTheDocument();
+    expect(screen.getByText('Doe, John')).toBeInTheDocument();
+    expect(screen.queryByText('Smith, Jane')).not.toBeInTheDocument();
+  });
+
+  it('should filter by flight', () => {
+    render(<PersonnelRosterTable />);
+
+    const flightSelect = screen.getByDisplayValue('All Flights');
+    fireEvent.change(flightSelect, { target: { value: 'Long' } });
+
+    expect(screen.getByText('Personnel Roster (1 of 2)')).toBeInTheDocument();
+    expect(screen.getByText('Smith, Jane')).toBeInTheDocument();
+    expect(screen.queryByText('Doe, John')).not.toBeInTheDocument();
+  });
+
+  it('should show "Linked" indicator for personnel with userId', () => {
+    const personnelWithLink = [
+      {
+        id: '1',
+        rosterId: 1,
+        email: 'john.doe@example.com',
+        firstName: 'John',
+        lastName: 'Doe',
+        rank: 'A1C',
+        class: '26-01',
+        flight: 'Barrow',
+        detailEligible: true,
+        cqEligible: true,
+        userId: 'user-123',
+      },
+    ];
+
+    usePersonnelHook.usePersonnel = vi.fn(() => ({
+      personnel: personnelWithLink,
+      loading: false,
+      error: null,
+    }));
+
+    render(<PersonnelRosterTable />);
+
+    expect(screen.getByText('Linked')).toBeInTheDocument();
   });
 });

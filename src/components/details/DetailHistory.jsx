@@ -111,7 +111,7 @@ export default function DetailHistory() {
         </div>
 
         {/* Statistics */}
-        <div className="mt-4 pt-4 border-t border-gray-200 flex gap-6">
+        <div className="mt-4 pt-4 border-t border-gray-200 flex flex-wrap gap-x-6 gap-y-2">
           <div>
             <span className="text-xs text-gray-600">Total:</span>
             <span className="ml-2 font-semibold text-gray-900">{totalCompleted}</span>

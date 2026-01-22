@@ -10,14 +10,21 @@ import WeatherApprovalQueue from '../components/admin/WeatherApprovalQueue'
 import ManualWeatherCheck from '../components/admin/ManualWeatherCheck'
 import PersonnelRosterUpload from '../components/personnel/PersonnelRosterUpload'
 import PersonnelRosterTable from '../components/personnel/PersonnelRosterTable'
+import PersonnelConfigPanel from '../components/personnel/PersonnelConfigPanel'
 import ConfigManager from '../components/admin/ConfigManager'
 import DetailTemplateManager from '../components/details/DetailTemplateManager'
 import TaskAssignmentForm from '../components/details/TaskAssignmentForm'
 import DetailAssignmentList from '../components/details/DetailAssignmentList'
 import DetailApprovalQueue from '../components/details/DetailApprovalQueue'
 import DetailHistory from '../components/details/DetailHistory'
+import CQDashboard from '../components/cq/CQDashboard'
+import ShiftManager from '../components/cq/ShiftManager'
+import PersonnelStatusTracker from '../components/cq/PersonnelStatusTracker'
+import CQNotesLog from '../components/cq/CQNotesLog'
+import CQAuditLog from '../components/cq/CQAuditLog'
 import { usePendingCount } from '../hooks/useWeatherRecommendations'
 import { usePendingDetailApprovals } from '../hooks/useDetailAssignments'
+import { useActiveShift } from '../hooks/useCQShifts'
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('posts')
@@ -25,14 +32,18 @@ export default function Admin() {
   const [uotdSubTab, setUotdSubTab] = useState('uniforms')
   const [weatherSubTab, setWeatherSubTab] = useState('location')
   const [detailsSubTab, setDetailsSubTab] = useState('templates')
+  const [cqSubTab, setCqSubTab] = useState('dashboard')
+  const [personnelSubTab, setPersonnelSubTab] = useState('roster')
   const { count: pendingCount } = usePendingCount()
   const { count: pendingDetailsCount } = usePendingDetailApprovals()
+  const { activeShift } = useActiveShift()
 
   const tabs = [
     { id: 'posts', label: 'Posts' },
     { id: 'uotd', label: 'UOTD' },
     { id: 'approvals', label: 'Approvals', badge: pendingCount > 0 ? pendingCount : null },
     { id: 'details', label: 'Cleaning Details' },
+    { id: 'cq', label: 'CQ', badge: activeShift ? '!' : null },
     { id: 'documents', label: 'Documents' },
     { id: 'personnel', label: 'Personnel' },
     { id: 'config', label: 'Config' },
@@ -59,8 +70,8 @@ export default function Admin() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="flex space-x-8">
+      <div className="border-b border-gray-200 mb-6 -mx-4 px-4 overflow-x-auto">
+        <nav className="flex space-x-2 sm:space-x-4 md:space-x-8 min-w-max">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -100,7 +111,7 @@ export default function Admin() {
       {activeTab === 'uotd' && (
         <div className="space-y-6">
           {/* UOTD Sub-tabs */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setUotdSubTab('uniforms')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -138,7 +149,7 @@ export default function Admin() {
           {uotdSubTab === 'weather' && (
             <div className="space-y-6">
               {/* Weather Sub-tabs */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setWeatherSubTab('location')}
                   className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -184,7 +195,7 @@ export default function Admin() {
       {activeTab === 'details' && (
         <div className="space-y-6">
           {/* Details Sub-tabs */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setDetailsSubTab('templates')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -244,12 +255,111 @@ export default function Admin() {
         </div>
       )}
 
+      {activeTab === 'cq' && (
+        <div className="space-y-6">
+          {/* CQ Sub-tabs */}
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setCqSubTab('dashboard')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cqSubTab === 'dashboard'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setCqSubTab('shifts')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cqSubTab === 'shifts'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Shifts
+            </button>
+            <button
+              onClick={() => setCqSubTab('status')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cqSubTab === 'status'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Personnel Status
+            </button>
+            <button
+              onClick={() => setCqSubTab('notes')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cqSubTab === 'notes'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Notes Log
+            </button>
+            <button
+              onClick={() => setCqSubTab('audit')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cqSubTab === 'audit'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Audit Log
+            </button>
+          </div>
+
+          {cqSubTab === 'dashboard' && <CQDashboard />}
+          {cqSubTab === 'shifts' && <ShiftManager />}
+          {cqSubTab === 'status' && <PersonnelStatusTracker />}
+          {cqSubTab === 'notes' && <CQNotesLog />}
+          {cqSubTab === 'audit' && <CQAuditLog />}
+        </div>
+      )}
+
       {activeTab === 'documents' && <DocumentUpload />}
 
       {activeTab === 'personnel' && (
         <div className="space-y-6">
-          <PersonnelRosterUpload />
-          <PersonnelRosterTable />
+          {/* Personnel Sub-tabs */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setPersonnelSubTab('roster')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                personnelSubTab === 'roster'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Roster
+            </button>
+            <button
+              onClick={() => setPersonnelSubTab('import')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                personnelSubTab === 'import'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Import
+            </button>
+            <button
+              onClick={() => setPersonnelSubTab('config')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                personnelSubTab === 'config'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Config
+            </button>
+          </div>
+
+          {personnelSubTab === 'roster' && <PersonnelRosterTable />}
+          {personnelSubTab === 'import' && <PersonnelRosterUpload />}
+          {personnelSubTab === 'config' && <PersonnelConfigPanel />}
         </div>
       )}
 

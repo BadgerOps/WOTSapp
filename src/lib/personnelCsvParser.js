@@ -37,6 +37,25 @@ export function isValidRole(role) {
 }
 
 /**
+ * Parse boolean value from various formats
+ */
+export function parseBoolean(value) {
+  if (value === true || value === false) return value;
+  if (!value) return false;
+  const strValue = String(value).toLowerCase().trim();
+  return strValue === 'true' || strValue === 'yes' || strValue === '1';
+}
+
+/**
+ * Validate class format (NN-NN, e.g., 26-03)
+ */
+export function isValidClassFormat(classValue) {
+  if (!classValue) return true; // Class is optional
+  const classRegex = /^\d{2}-\d{2}$/;
+  return classRegex.test(classValue.trim());
+}
+
+/**
  * Validate a single personnel record
  */
 export function validatePersonnelRecord(record, rowNumber) {
@@ -68,6 +87,10 @@ export function validatePersonnelRecord(record, rowNumber) {
     errors.push(`Row ${rowNumber}: Invalid phone number format`);
   }
 
+  if (record.class && !isValidClassFormat(record.class)) {
+    errors.push(`Row ${rowNumber}: Invalid class format. Must be NN-NN (e.g., 26-03)`);
+  }
+
   if (record.role && !isValidRole(record.role)) {
     errors.push(`Row ${rowNumber}: Invalid role. Must be one of: user, admin, uniform_admin`);
   }
@@ -77,6 +100,8 @@ export function validatePersonnelRecord(record, rowNumber) {
 
 /**
  * Parse and validate CSV file for personnel import
+ *
+ * Expected columns: RosterID, Email, FirstName, LastName, Rank, PhoneNumber, Class, Flight, DetailEligible, CQ_Eligible
  *
  * @param {File} file - The CSV file to parse
  * @returns {Promise<{data: Array, errors: Array, valid: boolean}>}
@@ -97,20 +122,29 @@ export function parsePersonnelCSV(file) {
         const headerMap = {
           'rosterid': 'rosterId',
           'roster id': 'rosterId',
+          'roster_id': 'rosterId',
           'id': 'rosterId',
           'email': 'email',
           'firstname': 'firstName',
           'first name': 'firstName',
+          'first_name': 'firstName',
           'lastname': 'lastName',
           'last name': 'lastName',
+          'last_name': 'lastName',
           'rank': 'rank',
           'phonenumber': 'phoneNumber',
           'phone number': 'phoneNumber',
+          'phone_number': 'phoneNumber',
           'phone': 'phoneNumber',
-          'squad': 'squad',
+          'class': 'class',
+          'squad': 'class', // Legacy support
           'flight': 'flight',
           'detaileligible': 'detailEligible',
           'detail eligible': 'detailEligible',
+          'detail_eligible': 'detailEligible',
+          'cqeligible': 'cqEligible',
+          'cq eligible': 'cqEligible',
+          'cq_eligible': 'cqEligible',
           'role': 'role',
         };
 
@@ -145,10 +179,10 @@ export function parsePersonnelCSV(file) {
               lastName: row.lastName.trim(),
               rank: row.rank ? row.rank.trim() : '',
               phoneNumber: row.phoneNumber ? row.phoneNumber.trim() : '',
-              squad: row.squad ? row.squad.trim() : '',
+              class: row.class ? row.class.trim() : '',
               flight: row.flight ? row.flight.trim() : '',
-              detailEligible: row.detailEligible === 'TRUE' || row.detailEligible === 'true' || row.detailEligible === true,
-              detailExemptReason: null,
+              detailEligible: parseBoolean(row.detailEligible),
+              cqEligible: parseBoolean(row.cqEligible),
               userId: null, // Will be linked when user signs in
               role: row.role ? row.role.trim().toLowerCase() : 'user', // Default to 'user' role
             };
@@ -179,10 +213,10 @@ export function generateCSVTemplate() {
     'LastName',
     'Rank',
     'PhoneNumber',
-    'Squad',
+    'Class',
     'Flight',
     'DetailEligible',
-    'Role',
+    'CQ_Eligible',
   ];
 
   const exampleRows = [
@@ -193,10 +227,10 @@ export function generateCSVTemplate() {
       'Doe',
       'A1C',
       '555-0123',
+      '25-001',
       'Alpha',
-      'Flight A',
       'TRUE',
-      'user',
+      'TRUE',
     ],
     [
       '2',
@@ -205,10 +239,10 @@ export function generateCSVTemplate() {
       'Smith',
       'SrA',
       '555-0124',
+      '25-001',
       'Bravo',
-      'Flight B',
       'TRUE',
-      'user',
+      'FALSE',
     ],
   ];
 

@@ -81,6 +81,7 @@ exports.uotdScheduler = onSchedule('* * * * *', async () => {
 
       // Create the UOTD post
       const now = new Date()
+      const todayStr = now.toISOString().split('T')[0]
       const post = {
         type: 'uotd',
         title: `Uniform of the Day: ${uniform.number} - ${uniform.name}`,
@@ -88,8 +89,10 @@ exports.uotdScheduler = onSchedule('* * * * *', async () => {
         uniformId: slot.uniformId,
         uniformNumber: uniform.number,
         uniformName: uniform.name,
+        targetSlot: slotKey,
+        targetDate: todayStr,
         status: 'published',
-        scheduledSlot: slotKey,
+        scheduledSlot: slotKey, // Keep for backwards compatibility
         createdAt: FieldValue.serverTimestamp(),
         publishedAt: now.toISOString(),
         updatedAt: FieldValue.serverTimestamp(),

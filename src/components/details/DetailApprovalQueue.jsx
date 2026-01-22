@@ -188,7 +188,7 @@ export default function DetailApprovalQueue() {
         <>
           {/* Bulk Action Bar - Top */}
           <div className="card bg-gray-50 border-2 border-gray-200">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -354,7 +354,7 @@ export default function DetailApprovalQueue() {
 
           {/* Bulk Action Bar - Bottom */}
           <div className="card bg-gray-50 border-2 border-gray-200">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input

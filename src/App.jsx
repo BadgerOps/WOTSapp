@@ -7,6 +7,8 @@ import Home from './pages/Home'
 import Schedule from './pages/Schedule'
 import Documents from './pages/Documents'
 import MyDetails from './pages/MyDetails'
+import CQView from './pages/CQView'
+import Profile from './pages/Profile'
 import Admin from './pages/Admin'
 
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -72,6 +74,22 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <MyDetails />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cq"
+            element={
+              <ProtectedRoute>
+                <CQView />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             }
           />
