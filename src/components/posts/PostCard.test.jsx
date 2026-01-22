@@ -250,4 +250,116 @@ describe('PostCard', () => {
 
     expect(screen.queryByText(/Note:/)).not.toBeInTheDocument();
   });
+
+  it('should display Cold weather badge for low temperatures', () => {
+    const post = {
+      id: '15',
+      title: 'UOTD',
+      content: 'Cold weather uniform',
+      type: 'uotd',
+      authorId: 'admin1',
+      authorName: 'Admin User',
+      weatherBased: true,
+      weatherCondition: 'Clear',
+      weatherTemp: 35,
+      createdAt: new Date('2026-01-19'),
+    };
+
+    render(<PostCard post={post} />);
+
+    expect(screen.getByText('Cold')).toBeInTheDocument();
+  });
+
+  it('should display Warm weather badge for moderate temperatures', () => {
+    const post = {
+      id: '16',
+      title: 'UOTD',
+      content: 'Warm weather uniform',
+      type: 'uotd',
+      authorId: 'admin1',
+      authorName: 'Admin User',
+      weatherBased: true,
+      weatherCondition: 'Clear',
+      weatherTemp: 72,
+      createdAt: new Date('2026-01-19'),
+    };
+
+    render(<PostCard post={post} />);
+
+    expect(screen.getByText('Warm')).toBeInTheDocument();
+  });
+
+  it('should display Wet weather badge for rainy conditions', () => {
+    const post = {
+      id: '17',
+      title: 'UOTD',
+      content: 'Rainy day uniform',
+      type: 'uotd',
+      authorId: 'admin1',
+      authorName: 'Admin User',
+      weatherBased: true,
+      weatherCondition: 'Rain',
+      weatherTemp: 55,
+      createdAt: new Date('2026-01-19'),
+    };
+
+    render(<PostCard post={post} />);
+
+    expect(screen.getByText('Wet')).toBeInTheDocument();
+  });
+
+  it('should display Snow weather badge for snowy conditions', () => {
+    const post = {
+      id: '18',
+      title: 'UOTD',
+      content: 'Snowy day uniform',
+      type: 'uotd',
+      authorId: 'admin1',
+      authorName: 'Admin User',
+      weatherBased: true,
+      weatherCondition: 'Snow',
+      weatherTemp: 28,
+      createdAt: new Date('2026-01-19'),
+    };
+
+    render(<PostCard post={post} />);
+
+    expect(screen.getByText('Snow')).toBeInTheDocument();
+  });
+
+  it('should not display weather badge for non-UOTD posts', () => {
+    const post = {
+      id: '19',
+      title: 'Announcement',
+      content: 'General announcement',
+      type: 'announcement',
+      authorId: 'admin1',
+      authorName: 'Admin User',
+      weatherCondition: 'Clear',
+      weatherTemp: 72,
+      createdAt: new Date('2026-01-19'),
+    };
+
+    render(<PostCard post={post} />);
+
+    expect(screen.queryByText('Warm')).not.toBeInTheDocument();
+  });
+
+  it('should not display weather badge when weatherCondition is missing', () => {
+    const post = {
+      id: '20',
+      title: 'UOTD',
+      content: 'Manual UOTD post',
+      type: 'uotd',
+      authorId: 'admin1',
+      authorName: 'Admin User',
+      createdAt: new Date('2026-01-19'),
+    };
+
+    render(<PostCard post={post} />);
+
+    expect(screen.queryByText('Cold')).not.toBeInTheDocument();
+    expect(screen.queryByText('Warm')).not.toBeInTheDocument();
+    expect(screen.queryByText('Wet')).not.toBeInTheDocument();
+  });
 });

@@ -20,6 +20,44 @@ const typeBadgeClasses = {
   general: "badge-general",
 };
 
+function getWeatherBadge(condition, temp) {
+  if (!condition) return null;
+
+  const lowerCondition = condition.toLowerCase();
+
+  // Check for precipitation conditions first
+  if (lowerCondition.includes("snow") || lowerCondition.includes("sleet")) {
+    return { label: "Snow", className: "bg-slate-200 text-slate-700" };
+  }
+  if (
+    lowerCondition.includes("rain") ||
+    lowerCondition.includes("drizzle") ||
+    lowerCondition.includes("shower")
+  ) {
+    return { label: "Wet", className: "bg-sky-200 text-sky-800" };
+  }
+  if (lowerCondition.includes("thunder") || lowerCondition.includes("storm")) {
+    return { label: "Stormy", className: "bg-purple-200 text-purple-800" };
+  }
+
+  // Temperature-based conditions
+  if (temp !== undefined && temp !== null) {
+    if (temp < 45) {
+      return { label: "Cold", className: "bg-blue-200 text-blue-800" };
+    }
+    if (temp < 60) {
+      return { label: "Cool", className: "bg-cyan-100 text-cyan-700" };
+    }
+    if (temp < 80) {
+      return { label: "Warm", className: "bg-amber-100 text-amber-700" };
+    }
+    return { label: "Hot", className: "bg-red-200 text-red-800" };
+  }
+
+  // Default to condition name if no temp
+  return { label: condition, className: "bg-gray-100 text-gray-700" };
+}
+
 export default function PostCard({ post }) {
   const createdAt = post.createdAt?.toDate
     ? post.createdAt.toDate()
@@ -44,6 +82,14 @@ export default function PostCard({ post }) {
               {slotLabels[post.targetSlot] || post.targetSlot}
             </span>
           )}
+          {post.type === "uotd" && post.weatherCondition && (() => {
+            const badge = getWeatherBadge(post.weatherCondition, post.weatherTemp);
+            return badge ? (
+              <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${badge.className}`}>
+                {badge.label}
+              </span>
+            ) : null;
+          })()}
         </div>
         <time className="text-xs text-gray-500">
           {"Posted at"}{" "}

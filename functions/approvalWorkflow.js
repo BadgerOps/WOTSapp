@@ -111,6 +111,8 @@ exports.approveRecommendation = onCall(async (request) => {
     approvedByName: approverName,
     weatherBased: true,
     weatherRecommendationId: recommendationId,
+    weatherCondition: weatherInfo.weatherMain || "Clear",
+    weatherTemp: Math.round(weatherInfo.temperature),
   };
 
   // Use a transaction to ensure consistency
@@ -378,6 +380,8 @@ exports.autoPublishPendingRecommendations = onSchedule(
           weatherBased: true,
           weatherRecommendationId: recommendationId,
           autoPublished: true,
+          weatherCondition: weatherInfo.weatherMain || "Clear",
+          weatherTemp: Math.round(weatherInfo.temperature),
         };
 
         // Use a transaction to ensure consistency
