@@ -12,10 +12,15 @@ export default function PersonnelRosterTable() {
   const [searchTerm, setSearchTerm] = useState('')
   const [classFilter, setClassFilter] = useState('')
   const [flightFilter, setFlightFilter] = useState('')
+  const [linkedFilter, setLinkedFilter] = useState('')
 
   // Get unique classes and flights for filters
   const uniqueClasses = [...new Set(personnel.map(p => p.class).filter(Boolean))].sort()
   const uniqueFlights = [...new Set(personnel.map(p => p.flight).filter(Boolean))].sort()
+
+  // Calculate linked stats
+  const linkedCount = personnel.filter(p => p.userId).length
+  const unlinkedCount = personnel.length - linkedCount
 
   async function handleToggle(person, field) {
     setUpdatingId(person.id)
@@ -67,8 +72,11 @@ export default function PersonnelRosterTable() {
 
     const matchesClass = !classFilter || person.class === classFilter
     const matchesFlight = !flightFilter || person.flight === flightFilter
+    const matchesLinked = !linkedFilter ||
+      (linkedFilter === 'linked' && person.userId) ||
+      (linkedFilter === 'unlinked' && !person.userId)
 
-    return matchesSearch && matchesClass && matchesFlight
+    return matchesSearch && matchesClass && matchesFlight && matchesLinked
   })
 
   if (loading) {
@@ -103,6 +111,17 @@ export default function PersonnelRosterTable() {
         <h2 className="text-lg font-semibold text-gray-900">
           Personnel Roster ({filteredPersonnel.length} of {personnel.length})
         </h2>
+        {/* Linked Status Summary */}
+        <div className="flex items-center gap-3 text-sm">
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+            <span className="text-gray-600">{linkedCount} linked</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+            <span className="text-gray-600">{unlinkedCount} unlinked</span>
+          </span>
+        </div>
       </div>
 
       {/* Filters */}
@@ -140,6 +159,15 @@ export default function PersonnelRosterTable() {
             ))}
           </select>
         )}
+        <select
+          value={linkedFilter}
+          onChange={(e) => setLinkedFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+        >
+          <option value="">All Status</option>
+          <option value="linked">Linked</option>
+          <option value="unlinked">Unlinked</option>
+        </select>
       </div>
 
       <div className="overflow-x-auto">
@@ -185,17 +213,17 @@ export default function PersonnelRosterTable() {
                   {person.rosterId}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
-                  <div className="font-medium text-gray-900">
-                    {person.lastName}, {person.firstName}
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${person.userId ? 'bg-green-500' : 'bg-yellow-500'}`} title={person.userId ? 'Account linked' : 'Account not linked'}></span>
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {person.lastName}, {person.firstName}
+                      </div>
+                      <div className="sm:hidden text-xs text-gray-500">
+                        {person.rank && <span>{person.rank}</span>}
+                      </div>
+                    </div>
                   </div>
-                  <div className="sm:hidden text-xs text-gray-500">
-                    {person.rank && <span>{person.rank}</span>}
-                  </div>
-                  {person.userId && (
-                    <span className="text-xs text-green-600" title={`Linked: ${person.userId}`}>
-                      Linked
-                    </span>
-                  )}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-gray-600 hidden md:table-cell">
                   {person.email}

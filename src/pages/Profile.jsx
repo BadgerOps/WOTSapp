@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUserProfile } from '../hooks/useUserProfile'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import Loading from '../components/common/Loading'
 import DebugPanel from '../components/common/DebugPanel'
 
-const APP_VERSION = '1.0.0'
+const APP_VERSION = '0.1.0'
 
 export default function Profile() {
   const { user } = useAuth()
@@ -146,14 +146,20 @@ export default function Profile() {
         </button>
       </form>
 
-      {/* Version number - tap 5 times to open debug panel */}
-      <div className="mt-8 text-center">
+      {/* Version and Changelog */}
+      <div className="mt-8 text-center space-y-2">
         <p
           onClick={handleVersionTap}
           className="text-xs text-gray-400 cursor-default select-none"
         >
           WOTS App v{APP_VERSION}
         </p>
+        <Link
+          to="/changelog"
+          className="inline-block text-sm text-primary-600 hover:text-primary-800 hover:underline"
+        >
+          View Changelog
+        </Link>
       </div>
 
       {/* Debug Panel */}

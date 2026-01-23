@@ -36,6 +36,18 @@ exports.uotdScheduler = onSchedule('* * * * *', async () => {
     return null
   }
 
+  // Check if weather rules are configured - if so, defer to weather system
+  const weatherRulesDoc = await db.doc('settings/weatherRules').get()
+  const hasActiveWeatherRules =
+    weatherRulesDoc.exists && weatherRulesDoc.data().rules?.length > 0
+
+  if (hasActiveWeatherRules) {
+    console.log(
+      'Weather rules are active - deferring UOTD creation to weather system',
+    )
+    return null
+  }
+
   // Log enabled slots for debugging
   const enabledSlots = Object.entries(schedule.slots)
     .filter(([, slot]) => slot.enabled)

@@ -1,0 +1,163 @@
+import { Link } from 'react-router-dom'
+
+const APP_VERSION = '0.1.0'
+
+const changelog = [
+  {
+    version: '0.1.0',
+    date: '2026-01-23',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Weather-Based UOTD System',
+            details: [
+              'Automatic weather checking at configured UOTD schedule times',
+              '30-90 minute forecast window for accurate recommendations',
+              'Sunrise/sunset data for twilight detection',
+              'Smart accessory recommendation engine with configurable rules',
+            ],
+          },
+          {
+            category: 'Accessory Rules',
+            details: [
+              'Rain/Storm → Wet Weather Gear (OCP, ECWS, Water source)',
+              'Below 40°F → Fleece Jacket + Watch Cap',
+              '40-45°F → Fleece Jacket + Patrol Cap',
+              'Twilight/Nighttime → Reflective Belt + Light Source (auto-added)',
+              'High Wind (>20mph) → Secured headgear note',
+            ],
+          },
+          {
+            category: 'Push Notifications',
+            details: [
+              'Single unified notification when UOTD posts are created',
+              'Includes uniform name, items, and auto-added accessories',
+              'Weather and meal slot labels',
+            ],
+          },
+          {
+            category: 'UI Improvements',
+            details: [
+              'Red BETA label on UOTD cards',
+              'Warning banner for source of truth',
+              'Weather condition icons on UOTD cards',
+              'Weather labels (Wet, Snow, Cold, Cool, Hot)',
+              'Meal slot labels (Breakfast, Lunch, Dinner)',
+            ],
+          },
+          {
+            category: 'Infrastructure',
+            details: [
+              'Personnel roster import foundation (CSV/Excel)',
+              'Cleaning details management',
+              'CQ (Charge of Quarters) tracker foundation',
+              'Duplicate UOTD prevention system',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Fixed',
+        items: [
+          { details: ['Duplicate UOTD notifications issue resolved'] },
+          { details: ['Weather recommendations now use forecast data instead of current conditions'] },
+        ],
+      },
+    ],
+  },
+]
+
+const planned = [
+  'Personnel roster management UI',
+  'Cleaning details assignment and tracking',
+  'CQ status board with DA Form generation',
+  'Remove BETA label when system is validated',
+]
+
+export default function Changelog() {
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-6">
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Changelog</h1>
+            <p className="text-gray-600">What's new in WOTS App</p>
+          </div>
+          <Link
+            to="/profile"
+            className="text-sm text-primary-600 hover:text-primary-800"
+          >
+            ← Back to Profile
+          </Link>
+        </div>
+      </div>
+
+      {/* Current Version Banner */}
+      <div className="mb-6 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-1 text-xs font-bold rounded bg-primary-600 text-white">
+            CURRENT
+          </span>
+          <span className="font-semibold text-primary-900">v{APP_VERSION}</span>
+        </div>
+      </div>
+
+      {/* Changelog Entries */}
+      {changelog.map((release) => (
+        <div key={release.version} className="mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-xl font-bold text-gray-900">v{release.version}</h2>
+            <span className="text-sm text-gray-500">{release.date}</span>
+          </div>
+
+          {release.sections.map((section) => (
+            <div key={section.title} className="mb-4">
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                {section.title === 'Added' && (
+                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                )}
+                {section.title === 'Fixed' && (
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                )}
+                {section.title === 'Changed' && (
+                  <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                )}
+                {section.title}
+              </h3>
+
+              <div className="space-y-3">
+                {section.items.map((item, idx) => (
+                  <div key={idx} className="bg-white rounded-lg border border-gray-200 p-4">
+                    {item.category && (
+                      <h4 className="font-medium text-gray-900 mb-2">{item.category}</h4>
+                    )}
+                    <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
+                      {item.details.map((detail, i) => (
+                        <li key={i}>{detail}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+
+      {/* Planned Features */}
+      <div className="mt-8 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+        <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+          Planned
+        </h3>
+        <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
+          {planned.map((item, idx) => (
+            <li key={idx}>{item}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}

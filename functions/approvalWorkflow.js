@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getExistingUotdPost } = require("./utils/uotdUtils");
 
 /**
  * Approve a weather recommendation and create a UOTD post
@@ -46,6 +47,26 @@ exports.approveRecommendation = onCall(async (request) => {
       "failed-precondition",
       `Recommendation is already ${recommendation.status}`,
     );
+  }
+
+  // Check if a UOTD post already exists for this slot (defense in depth)
+  if (recommendation.targetDate && recommendation.targetSlot) {
+    const existingPost = await getExistingUotdPost(
+      db,
+      recommendation.targetDate,
+      recommendation.targetSlot,
+    );
+    if (existingPost) {
+      // Mark recommendation as superseded and return error
+      await recRef.update({
+        status: "superseded",
+        supersededReason: "Post already exists",
+      });
+      throw new HttpsError(
+        "already-exists",
+        `UOTD already posted for ${recommendation.targetSlot} on ${recommendation.targetDate}`,
+      );
+    }
   }
 
   // Get uniform details
@@ -337,6 +358,28 @@ exports.autoPublishPendingRecommendations = onSchedule(
         }
 
         const uniform = uniformDoc.data();
+
+        // Check if a UOTD post already exists for this slot (defense in depth)
+        if (recommendation.targetDate && recommendation.targetSlot) {
+          const existingPost = await getExistingUotdPost(
+            db,
+            recommendation.targetDate,
+            recommendation.targetSlot,
+          );
+          if (existingPost) {
+            console.log(
+              `Post already exists for ${recommendation.targetDate} ${recommendation.targetSlot}, marking recommendation as superseded`,
+            );
+            await db
+              .collection("weatherRecommendations")
+              .doc(recommendationId)
+              .update({
+                status: "superseded",
+                supersededReason: "Post already exists",
+              });
+            continue;
+          }
+        }
 
         // Build post title and content (same as manual approval)
         const title = `Uniform #${uniform.number} - ${uniform.name}`;

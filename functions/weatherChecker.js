@@ -1,8 +1,9 @@
 const { onSchedule } = require('firebase-functions/v2/scheduler')
 const { onCall, HttpsError } = require('firebase-functions/v2/https')
 const { getFirestore, FieldValue } = require('firebase-admin/firestore')
-const { getWeatherData } = require('./utils/openweather')
+const { getWeatherData, getForecastForTimeWindow, getTwilightStatus } = require('./utils/openweather')
 const { findMatchingRule } = require('./utils/ruleEvaluator')
+const { evaluateAccessoryRules, getAccessoryRules } = require('./utils/accessoryRecommender')
 const {
   getConfiguredTimezone,
   getCurrentTimeInTimezone,
@@ -78,13 +79,20 @@ async function performWeatherCheck(db, triggeredBy, userId = null, targetSlot = 
   const rules = rulesData.rules || []
   const defaultUniformId = rulesData.defaultUniformId
 
-  // Fetch current weather
+  // Fetch current weather and forecast
   const weather = await getWeatherData(lat, lon, units)
 
-  // Update weather cache
+  // Get forecast for 30-90 minutes ahead (when students will actually be outside)
+  const forecastWindow = getForecastForTimeWindow(weather.forecast.hourly, 30, 90)
+
+  // Get twilight status for accessory recommendations
+  const twilightStatus = getTwilightStatus(weather.astronomy)
+
+  // Update weather cache (include astronomy data)
   await db.doc('settings/weatherCache').set({
     current: weather.current,
     forecast: weather.forecast,
+    astronomy: weather.astronomy,
     location: {
       ...weather.location,
       name: location.coordinates.resolvedAddress,
@@ -93,8 +101,26 @@ async function performWeatherCheck(db, triggeredBy, userId = null, targetSlot = 
     expiresAt: weather.expiresAt,
   })
 
-  // Find matching rule
-  const matchedRule = findMatchingRule(rules, weather)
+  // Use forecast data for rule matching (30-90 minutes ahead)
+  // Fall back to current weather if forecast not available
+  const weatherForRules = forecastWindow
+    ? {
+        current: {
+          temperature: forecastWindow.temperature,
+          humidity: forecastWindow.humidity,
+          windSpeed: forecastWindow.windSpeed,
+          weatherMain: forecastWindow.weatherMain,
+          // UV index not available hourly, use current or daily max
+          uvIndex: weather.current.uvIndex,
+        },
+        forecast: {
+          precipitationChance: forecastWindow.precipitationChance,
+        },
+      }
+    : weather
+
+  // Find matching rule using forecast data
+  const matchedRule = findMatchingRule(rules, weatherForRules)
   const uniformId = matchedRule?.uniformId || defaultUniformId
 
   if (!uniformId) {
@@ -116,6 +142,35 @@ async function performWeatherCheck(db, triggeredBy, userId = null, targetSlot = 
   const slot = targetSlot || determineTargetSlot(tz)
   const targetDate = getTodayInTimezone(tz)
 
+  // Evaluate accessory rules (PT belt, fleece, watch cap, etc.)
+  const accessoryRules = await getAccessoryRules(db)
+  const weatherForAccessories = forecastWindow
+    ? {
+        temperature: forecastWindow.temperature,
+        humidity: forecastWindow.humidity,
+        windSpeed: forecastWindow.windSpeed,
+        weatherMain: forecastWindow.weatherMain,
+        precipitationChance: forecastWindow.precipitationChance,
+      }
+    : {
+        temperature: weather.current.temperature,
+        humidity: weather.current.humidity,
+        windSpeed: weather.current.windSpeed,
+        weatherMain: weather.current.weatherMain,
+        precipitationChance: weather.forecast.precipitationChance,
+      }
+  const accessoryRecommendation = evaluateAccessoryRules(
+    weatherForAccessories,
+    twilightStatus,
+    accessoryRules
+  )
+
+  console.log(
+    `Accessory recommendation: ${accessoryRecommendation.accessories.length} accessories, ` +
+      `uniform override: ${accessoryRecommendation.uniformOverride?.name || 'none'}, ` +
+      `twilight: ${twilightStatus?.isTwilight}, nighttime: ${twilightStatus?.isNighttime}`
+  )
+
   // Check for existing recommendation
   const existingRec = await getExistingRecommendation(db, targetDate, slot)
   if (existingRec) {
@@ -135,22 +190,78 @@ async function performWeatherCheck(db, triggeredBy, userId = null, targetSlot = 
     }
   }
 
-  // Create pending recommendation
+  // Create pending recommendation using forecast data (30-90 min ahead)
+  // This reflects the weather students will experience, not current conditions
+  const forecastWeather = forecastWindow
+    ? {
+        temperature: forecastWindow.temperature,
+        humidity: forecastWindow.humidity,
+        windSpeed: forecastWindow.windSpeed,
+        uvIndex: weather.current.uvIndex, // UV not available hourly
+        weatherMain: forecastWindow.weatherMain,
+        precipitationChance: forecastWindow.precipitationChance,
+        // Forecast metadata
+        forecastTime: forecastWindow.forecastTime,
+        forecastWindowStart: forecastWindow.windowStart,
+        forecastWindowEnd: forecastWindow.windowEnd,
+        hoursUsed: forecastWindow.hoursUsed,
+        isForecast: true,
+      }
+    : {
+        temperature: weather.current.temperature,
+        humidity: weather.current.humidity,
+        windSpeed: weather.current.windSpeed,
+        uvIndex: weather.current.uvIndex,
+        weatherMain: weather.current.weatherMain,
+        precipitationChance: weather.forecast.precipitationChance,
+        isForecast: false,
+      }
+
+  // Determine final uniform (may be overridden by accessory rules like ECWS for rain)
+  const finalUniformId = accessoryRecommendation.uniformOverride
+    ? null // Will use override name instead of ID
+    : uniformId
+  const finalUniformName = accessoryRecommendation.uniformOverride
+    ? accessoryRecommendation.uniformOverride.name
+    : uniform.name
+  const finalUniformNumber = accessoryRecommendation.uniformOverride
+    ? null // Override uniforms may not have a number
+    : uniform.number
+
   const recommendationData = {
+    // Forecast weather (30-90 min ahead) - primary for decision making
     weather: {
+      ...forecastWeather,
+      fetchedAt: weather.fetchedAt,
+    },
+    // Current weather for reference/display
+    currentWeather: {
       temperature: weather.current.temperature,
       humidity: weather.current.humidity,
       windSpeed: weather.current.windSpeed,
       uvIndex: weather.current.uvIndex,
       weatherMain: weather.current.weatherMain,
-      precipitationChance: weather.forecast.precipitationChance,
-      fetchedAt: weather.fetchedAt,
+      precipitation: weather.current.precipitation,
     },
-    uniformId,
-    uniformNumber: uniform.number,
-    uniformName: uniform.name,
+    // Astronomy data for twilight display
+    astronomy: weather.astronomy,
+    twilightStatus: {
+      isTwilight: twilightStatus?.isTwilight || false,
+      isNighttime: twilightStatus?.isNighttime || false,
+      sunrise: twilightStatus?.sunrise || null,
+      sunset: twilightStatus?.sunset || null,
+    },
+    // Uniform recommendation
+    uniformId: finalUniformId,
+    uniformNumber: finalUniformNumber,
+    uniformName: finalUniformName,
+    uniformOverride: accessoryRecommendation.uniformOverride || null,
     matchedRuleId: matchedRule?.id || null,
     matchedRuleName: matchedRule?.name || 'Default',
+    // Accessory recommendations
+    accessories: accessoryRecommendation.accessories,
+    accessoryMatchedRules: accessoryRecommendation.matchedRules,
+    // Status and metadata
     status: 'pending',
     targetSlot: slot,
     targetDate,
@@ -165,19 +276,38 @@ async function performWeatherCheck(db, triggeredBy, userId = null, targetSlot = 
     createdBy: triggeredBy === 'manual' ? userId : 'system',
   }
 
+  // Log which weather data was used
+  if (forecastWindow) {
+    console.log(
+      `Using forecast for ${forecastWindow.windowStart} to ${forecastWindow.windowEnd}: ` +
+        `${forecastWindow.temperature}°, ${forecastWindow.precipitationChance}% precip`
+    )
+  } else {
+    console.log('Forecast window not available, using current weather')
+  }
+
   const docRef = await db.collection('weatherRecommendations').add(recommendationData)
 
   return {
     success: true,
-    message: 'Weather recommendation created',
+    message: forecastWindow
+      ? 'Weather recommendation created (based on 30-90 min forecast)'
+      : 'Weather recommendation created (forecast unavailable, used current)',
     recommendationId: docRef.id,
     weather: weather.current,
+    forecastWeather: forecastWindow || null,
+    astronomy: weather.astronomy,
     recommendation: {
-      uniformNumber: uniform.number,
-      uniformName: uniform.name,
+      uniformNumber: finalUniformNumber,
+      uniformName: finalUniformName,
+      uniformOverride: accessoryRecommendation.uniformOverride || null,
+      accessories: accessoryRecommendation.accessories,
       matchedRule: matchedRule?.name || 'Default',
       targetSlot: slot,
       targetDate,
+      usedForecast: !!forecastWindow,
+      twilight: twilightStatus?.isTwilight || false,
+      nighttime: twilightStatus?.isNighttime || false,
     },
   }
 }
@@ -284,6 +414,7 @@ exports.getCurrentWeather = onCall(async (request) => {
         success: true,
         weather: cache.current,
         forecast: cache.forecast,
+        astronomy: cache.astronomy || null,
         location: cache.location,
         cached: true,
         fetchedAt: cache.fetchedAt,
@@ -308,6 +439,7 @@ exports.getCurrentWeather = onCall(async (request) => {
     await db.doc('settings/weatherCache').set({
       current: weather.current,
       forecast: weather.forecast,
+      astronomy: weather.astronomy,
       location: {
         ...weather.location,
         name: location.coordinates.resolvedAddress,
@@ -320,6 +452,7 @@ exports.getCurrentWeather = onCall(async (request) => {
       success: true,
       weather: weather.current,
       forecast: weather.forecast,
+      astronomy: weather.astronomy,
       location: {
         ...weather.location,
         name: location.coordinates.resolvedAddress,

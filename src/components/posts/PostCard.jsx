@@ -41,7 +41,11 @@ function getWeatherIcon(condition) {
   if (lowerCondition.includes("cloud") || lowerCondition.includes("overcast")) {
     return "☁️";
   }
-  if (lowerCondition.includes("fog") || lowerCondition.includes("mist") || lowerCondition.includes("haze")) {
+  if (
+    lowerCondition.includes("fog") ||
+    lowerCondition.includes("mist") ||
+    lowerCondition.includes("haze")
+  ) {
     return "🌫️";
   }
   if (lowerCondition.includes("clear") || lowerCondition.includes("sunny")) {
@@ -119,6 +123,11 @@ export default function PostCard({ post }) {
     <article className="card">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
+          {post.type === "uotd" && (
+            <span className="inline-flex px-2 py-0.5 text-xs font-bold rounded-full bg-red-600 text-white">
+              BETA
+            </span>
+          )}
           <span className={typeBadgeClasses[post.type] || "badge-general"}>
             {typeLabels[post.type] || post.type}
           </span>
@@ -127,14 +136,21 @@ export default function PostCard({ post }) {
               {slotLabels[post.targetSlot] || post.targetSlot}
             </span>
           )}
-          {post.type === "uotd" && post.weatherCondition && (() => {
-            const badge = getWeatherBadge(post.weatherCondition, post.weatherTemp);
-            return badge ? (
-              <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${badge.className}`}>
-                {badge.label}
-              </span>
-            ) : null;
-          })()}
+          {post.type === "uotd" &&
+            post.weatherCondition &&
+            (() => {
+              const badge = getWeatherBadge(
+                post.weatherCondition,
+                post.weatherTemp,
+              );
+              return badge ? (
+                <span
+                  className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${badge.className}`}
+                >
+                  {badge.label}
+                </span>
+              ) : null;
+            })()}
         </div>
         <time className="text-xs text-gray-500">
           {"Posted at"}{" "}
@@ -145,6 +161,12 @@ export default function PostCard({ post }) {
       </div>
 
       <h2 className="text-lg font-semibold text-gray-900 mb-2">{post.title}</h2>
+
+      {post.type === "uotd" && (
+        <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+          ⚠️ Use Williams' Signal posts as source of truth!
+        </div>
+      )}
 
       <div className="text-gray-700 whitespace-pre-wrap">
         {post.type === "uotd" && post.weatherCondition

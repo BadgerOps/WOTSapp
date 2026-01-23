@@ -36,6 +36,15 @@ messaging.onBackgroundMessage((payload) => {
     badge: '/icon-192x192.png',
     tag: payload.data?.postId || payload.data?.recommendationId || 'wots-notification',
     data: payload.data,
+    requireInteraction: payload.data?.type === 'weather_recommendation',
+  }
+
+  // Add action buttons for weather recommendations
+  if (payload.data?.type === 'weather_recommendation') {
+    notificationOptions.actions = [
+      { action: 'approve', title: '✓ Approve' },
+      { action: 'edit', title: '✏️ Edit' },
+    ]
   }
 
   console.log('[SW] Showing data-only notification:', notificationTitle)
@@ -45,19 +54,60 @@ messaging.onBackgroundMessage((payload) => {
 // Handle notification click
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked:', event)
+  console.log('[SW] Action:', event.action)
+  console.log('[SW] Notification data:', event.notification.data)
+
   event.notification.close()
 
+  const data = event.notification.data || {}
+  const recommendationId = data.recommendationId
+
+  // Handle action buttons
+  if (event.action === 'approve' && recommendationId) {
+    console.log('[SW] Approve action clicked for:', recommendationId)
+    // Open app with approve action
+    event.waitUntil(
+      clients.openWindow(`/?action=approve&recommendationId=${recommendationId}`)
+    )
+    return
+  }
+
+  if (event.action === 'edit' && recommendationId) {
+    console.log('[SW] Edit action clicked for:', recommendationId)
+    // Open app with edit action
+    event.waitUntil(
+      clients.openWindow(`/?action=edit&recommendationId=${recommendationId}`)
+    )
+    return
+  }
+
+  // Default click behavior - open/focus the app
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If app is already open, focus it
+      // Build URL based on notification type
+      let targetUrl = '/'
+      if (data.type === 'weather_recommendation' && recommendationId) {
+        targetUrl = `/?action=review&recommendationId=${recommendationId}`
+      }
+
+      // If app is already open, focus it and navigate
       for (const client of clientList) {
         if (client.url.includes(self.location.origin) && 'focus' in client) {
-          return client.focus()
+          client.focus()
+          // Post message to navigate to the recommendation
+          if (recommendationId) {
+            client.postMessage({
+              type: 'NOTIFICATION_CLICK',
+              action: 'review',
+              recommendationId,
+            })
+          }
+          return client
         }
       }
       // Otherwise open a new window
       if (clients.openWindow) {
-        return clients.openWindow('/')
+        return clients.openWindow(targetUrl)
       }
     })
   )

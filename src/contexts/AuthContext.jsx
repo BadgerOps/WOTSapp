@@ -5,7 +5,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
 import { auth, db } from '../config/firebase'
 import { authLog } from '../lib/authDebugger'
 
@@ -93,6 +93,51 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function autoLinkPersonnelRecord(user) {
+    authLog('Auth', 'Auto-linking personnel record', { email: user.email, uid: user.uid })
+    try {
+      const personnelQuery = query(
+        collection(db, 'personnel'),
+        where('email', '==', user.email.toLowerCase())
+      )
+      const snapshot = await getDocs(personnelQuery)
+
+      if (snapshot.empty) {
+        authLog('Auth', 'No personnel record found for auto-link', { email: user.email })
+        return
+      }
+
+      const personnelDoc = snapshot.docs[0]
+      const personnelData = personnelDoc.data()
+
+      // Only link if not already linked
+      if (!personnelData.userId) {
+        authLog('Auth', 'Linking personnel record', {
+          personnelId: personnelDoc.id,
+          email: user.email,
+          uid: user.uid,
+        })
+        await updateDoc(doc(db, 'personnel', personnelDoc.id), {
+          userId: user.uid,
+          linkedAt: serverTimestamp(),
+        })
+        authLog('Auth', 'Personnel record linked successfully')
+      } else if (personnelData.userId !== user.uid) {
+        authLog('Auth', 'Personnel record already linked to different user', {
+          personnelId: personnelDoc.id,
+          existingUserId: personnelData.userId,
+          attemptedUserId: user.uid,
+        })
+      } else {
+        authLog('Auth', 'Personnel record already linked to this user')
+      }
+    } catch (error) {
+      authLog('Auth', 'Error auto-linking personnel record', { error: error.message })
+      console.error('[Auth] Error auto-linking personnel:', error)
+      // Don't throw - this is a non-critical operation
+    }
+  }
+
   async function signInWithGoogle() {
     const provider = new GoogleAuthProvider()
     authLog('Auth', 'Starting Google sign-in', {
@@ -121,6 +166,11 @@ export function AuthProvider({ children }) {
 
       authLog('Auth', 'Creating/updating user document...')
       await createUserDocument(result.user)
+
+      // Auto-link personnel record to Firebase user
+      authLog('Auth', 'Auto-linking personnel record...')
+      await autoLinkPersonnelRecord(result.user)
+
       authLog('Auth', 'Sign-in complete', { uid: result.user.uid })
       return result.user
     } catch (error) {
