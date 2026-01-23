@@ -5,7 +5,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth'
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, collection, query, where, getDocs, writeBatch } from 'firebase/firestore'
 import { auth, db } from '../config/firebase'
 import { authLog } from '../lib/authDebugger'
 import { ROLES, PERMISSIONS, hasPermission, normalizeRole } from '../lib/roles'
@@ -127,6 +127,37 @@ export function AuthProvider({ children }) {
           linkedAt: serverTimestamp(),
         })
         authLog('Auth', 'Personnel record linked successfully')
+
+        // Migrate any status document from personnel doc ID to Auth UID
+        try {
+          const oldStatusRef = doc(db, 'personnelStatus', personnelDoc.id)
+          const oldStatusSnap = await getDoc(oldStatusRef)
+          if (oldStatusSnap.exists()) {
+            const newStatusRef = doc(db, 'personnelStatus', user.uid)
+            const newStatusSnap = await getDoc(newStatusRef)
+
+            // Only migrate if no status exists at Auth UID
+            if (!newStatusSnap.exists()) {
+              authLog('Auth', 'Migrating status from personnel doc ID to Auth UID', {
+                from: personnelDoc.id,
+                to: user.uid,
+              })
+              const oldData = oldStatusSnap.data()
+              await setDoc(newStatusRef, {
+                ...oldData,
+                personnelId: user.uid,
+                migratedFrom: personnelDoc.id,
+                migratedAt: serverTimestamp(),
+              })
+              await deleteDoc(oldStatusRef)
+              authLog('Auth', 'Status migrated successfully')
+            }
+          }
+        } catch (migrationError) {
+          // Non-critical - log but don't fail the linking
+          authLog('Auth', 'Status migration failed (non-critical)', { error: migrationError.message })
+          console.error('[Auth] Status migration error:', migrationError)
+        }
 
         // If personnel has a pre-assigned role, sync it to the user document
         if (personnelRole && personnelRole !== ROLES.USER) {

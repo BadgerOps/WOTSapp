@@ -115,12 +115,20 @@ export function usePersonnelStatus() {
 
 /**
  * Hook to get the current user's status
+ * Checks multiple sources: Auth UID, personnel doc ID, and email match
+ * This handles cases where status was created before account linking
  */
 export function useMyStatus() {
   const { user } = useAuth();
+  const { personnel } = usePersonnel();
   const [myStatus, setMyStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Find user's personnel record
+  const myPersonnelRecord = personnel.find(
+    (p) => p.userId === user?.uid || p.email === user?.email
+  );
 
   useEffect(() => {
     if (!user) {
@@ -128,14 +136,42 @@ export function useMyStatus() {
       return;
     }
 
+    // Subscribe to all personnelStatus documents and find the best match
+    const q = query(collection(db, "personnelStatus"));
     const unsubscribe = onSnapshot(
-      doc(db, "personnelStatus", user.uid),
+      q,
       (snapshot) => {
-        if (snapshot.exists()) {
-          setMyStatus({
-            id: snapshot.id,
-            ...snapshot.data(),
-          });
+        const statuses = {};
+        snapshot.docs.forEach((doc) => {
+          statuses[doc.id] = { id: doc.id, ...doc.data() };
+        });
+
+        // Priority order for finding user's status:
+        // 1. Auth UID (self-service uses this)
+        // 2. Personnel doc ID (companion sign-out before account linking)
+        // 3. Email match (fallback)
+        let foundStatus = null;
+
+        // Check Auth UID first
+        if (statuses[user.uid]) {
+          foundStatus = statuses[user.uid];
+        }
+        // Check personnel doc ID if no Auth UID status or Auth UID shows present
+        else if (myPersonnelRecord && statuses[myPersonnelRecord.id]) {
+          foundStatus = statuses[myPersonnelRecord.id];
+        }
+        // Check email match as last resort
+        else if (user.email) {
+          const emailMatch = Object.values(statuses).find(
+            (s) => s.userEmail?.toLowerCase() === user.email.toLowerCase()
+          );
+          if (emailMatch) {
+            foundStatus = emailMatch;
+          }
+        }
+
+        if (foundStatus) {
+          setMyStatus(foundStatus);
         } else {
           setMyStatus({
             status: "present",
@@ -152,7 +188,7 @@ export function useMyStatus() {
     );
 
     return unsubscribe;
-  }, [user]);
+  }, [user, myPersonnelRecord]);
 
   return { myStatus, loading, error };
 }
