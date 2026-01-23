@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react'
 import { usePersonnelActions } from '../../hooks/usePersonnel'
 import { useAppConfig } from '../../hooks/useAppConfig'
+import { useAuth } from '../../contexts/AuthContext'
 import { isValidEmail, isValidPhoneNumber, isValidClassFormat } from '../../lib/personnelCsvParser'
+import { ROLES, ROLE_INFO, ROLE_HIERARCHY } from '../../lib/roles'
 
 export default function PersonnelEditModal({ person, onClose }) {
-  const { updatePersonnel, loading } = usePersonnelActions()
+  const { updatePersonnel, updatePersonnelRole, loading } = usePersonnelActions()
   const { config } = useAppConfig()
+  const { canManageRoles } = useAuth()
   const [formData, setFormData] = useState({
     rosterId: '',
     email: '',
@@ -15,6 +18,7 @@ export default function PersonnelEditModal({ person, onClose }) {
     phoneNumber: '',
     class: '',
     flight: '',
+    role: ROLES.USER,
   })
   const [errors, setErrors] = useState({})
   const [saveError, setSaveError] = useState(null)
@@ -30,6 +34,7 @@ export default function PersonnelEditModal({ person, onClose }) {
         phoneNumber: person.phoneNumber || '',
         class: person.class || '',
         flight: person.flight || '',
+        role: person.role || ROLES.USER,
       })
     }
   }, [person])
@@ -85,6 +90,7 @@ export default function PersonnelEditModal({ person, onClose }) {
     if (!validate()) return
 
     try {
+      // Update basic personnel info
       await updatePersonnel(person.id, {
         rosterId: parseInt(formData.rosterId, 10),
         email: formData.email.trim().toLowerCase(),
@@ -95,6 +101,12 @@ export default function PersonnelEditModal({ person, onClose }) {
         class: formData.class.trim(),
         flight: formData.flight,
       })
+
+      // Update role separately if changed and user has permission
+      if (canManageRoles && formData.role !== (person.role || ROLES.USER)) {
+        await updatePersonnelRole(person.id, formData.role, person.userId)
+      }
+
       onClose()
     } catch (err) {
       setSaveError(err.message)
@@ -277,6 +289,33 @@ export default function PersonnelEditModal({ person, onClose }) {
                 </select>
               </div>
             </div>
+
+            {/* Role - Only visible to admins */}
+            {canManageRoles && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <select
+                  name="role"
+                  value={formData.role}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  {ROLE_HIERARCHY.map(role => {
+                    const info = ROLE_INFO[role]
+                    return (
+                      <option key={role} value={role}>
+                        {info.label} - {info.description}
+                      </option>
+                    )
+                  })}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {person.userId
+                    ? 'Role change will be synced to the linked user account.'
+                    : 'Role will be applied when this person links their account.'}
+                </p>
+              </div>
+            )}
 
             <div className="flex gap-3 pt-4">
               <button
