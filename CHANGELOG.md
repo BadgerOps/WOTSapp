@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `MANAGE_CQ` - Manage CQ shifts
 - `MANAGE_CONFIG` - Manage app configuration
 
+### Fixed
+- Companion pass sign-out ID mismatch: When signing out with companions, their status documents now use Auth UID instead of personnel doc ID, ensuring group sign-in correctly updates all members' status
+
 ### Changed
 - AuthContext now uses centralized role constants from `lib/roles.js`
 - Personnel CSV import supports role field
