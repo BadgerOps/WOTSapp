@@ -78,13 +78,17 @@ export function usePersonnelStatus() {
   }, []);
 
   // Merge personnel with their status
-  // Check personnel document ID, linked userId, or match by email in status records
+  // Priority: Auth UID (userId) > personnel doc ID > email match
+  // Auth UID takes priority because that's what self-service actions use
   const personnelWithStatus = personnel.map((person) => {
-    // First try to find status by personnel document ID
-    let statusRecord = statuses[person.id];
-    // If not found and person has a linked userId, try that
-    if (!statusRecord && person.userId) {
+    let statusRecord = null;
+    // First try Auth UID if person has a linked account (self-service uses this)
+    if (person.userId) {
       statusRecord = statuses[person.userId];
+    }
+    // If not found, try personnel document ID (for admin-created status)
+    if (!statusRecord) {
+      statusRecord = statuses[person.id];
     }
     // If still not found, try to match by email (for self-signout before account linking)
     if (!statusRecord && person.email) {
