@@ -24,6 +24,7 @@ import CQScheduleManager from '../components/cq/CQScheduleManager'
 import PersonnelStatusTracker from '../components/cq/PersonnelStatusTracker'
 import CQNotesLog from '../components/cq/CQNotesLog'
 import CQAuditLog from '../components/cq/CQAuditLog'
+import StatusCleanupTool from '../components/cq/StatusCleanupTool'
 import { usePendingCount } from '../hooks/useWeatherRecommendations'
 import { usePendingDetailApprovals } from '../hooks/useDetailAssignments'
 import { useActiveShift } from '../hooks/useCQShifts'
@@ -332,6 +333,16 @@ export default function Admin() {
             >
               Audit Log
             </button>
+            <button
+              onClick={() => setCqSubTab('maintenance')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cqSubTab === 'maintenance'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Maintenance
+            </button>
           </div>
 
           {cqSubTab === 'dashboard' && <CQDashboard />}
@@ -340,6 +351,7 @@ export default function Admin() {
           {cqSubTab === 'status' && <PersonnelStatusTracker />}
           {cqSubTab === 'notes' && <CQNotesLog />}
           {cqSubTab === 'audit' && <CQAuditLog />}
+          {cqSubTab === 'maintenance' && <StatusCleanupTool />}
         </div>
       )}
 
