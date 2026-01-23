@@ -150,7 +150,7 @@ export default function SelfSignOutForm() {
         contactNumber,
         notes,
         companions: companions.map((c) => ({
-          id: c.id,
+          id: c.userId || c.id, // Prefer Auth UID if account is linked
           name: `${c.firstName} ${c.lastName}`,
           rank: c.rank,
         })),
