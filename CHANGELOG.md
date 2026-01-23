@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-01-23
+
+### Added
+
+#### Role-Based Access Control (RBAC)
+- Centralized role constants and permissions system (`src/lib/roles.js`)
+- Three role levels: User, Uniform Admin, Admin
+- Role management UI in Personnel tab
+  - Role column with color-coded badges (User=gray, Uniform Admin=blue, Admin=purple)
+  - Inline role editing for admins via dropdown
+- Permission-based access control via `AuthContext.can(permission)` method
+- Role sync between personnel and users collections
+- Cloud Function (`syncPersonnelRoleToUser`) to sync role changes to linked user accounts
+- Pre-assignment of roles on personnel records before user links their account
+
+#### New Permissions
+- `VIEW_ASSIGNED_DETAILS` - View assigned cleaning details
+- `SIGN_OTHERS_ON_PASS` - Sign others out on pass
+- `VIEW_UPDATES` - View updates and announcements
+- `MODIFY_UOTD` - Create/edit UOTD posts
+- `APPROVE_WEATHER_UOTD` - Approve weather recommendations
+- `MODIFY_UNIFORMS` - Manage uniform catalog
+- `MANAGE_POSTS` - Create/edit/delete posts
+- `MANAGE_DOCUMENTS` - Manage document uploads
+- `MANAGE_PERSONNEL` - Manage personnel records
+- `MANAGE_ROLES` - Change user roles (admin only)
+- `MANAGE_DETAILS` - Manage cleaning details
+- `MANAGE_CQ` - Manage CQ shifts
+- `MANAGE_CONFIG` - Manage app configuration
+
+### Changed
+- AuthContext now uses centralized role constants from `lib/roles.js`
+- Personnel CSV import supports role field
+- PersonnelEditModal includes role dropdown (visible to admins only)
+- PersonnelRosterTable displays role column with inline editing
+
+---
+
 ## [0.1.0] - 2026-01-23
 
 ### Added
@@ -57,7 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Personnel roster management UI
 - Cleaning details assignment and tracking
 - CQ status board with DA Form generation
 - Remove BETA label when system is validated

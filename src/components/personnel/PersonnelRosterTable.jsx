@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { usePersonnel, usePersonnelActions } from '../../hooks/usePersonnel'
 import { useAuth } from '../../contexts/AuthContext'
 import PersonnelEditModal from './PersonnelEditModal'
+import PersonnelRoleCell from './PersonnelRoleCell'
 
 export default function PersonnelRosterTable() {
-  const { user } = useAuth()
+  const { user, canManageRoles } = useAuth()
   const { personnel, loading, error } = usePersonnel()
-  const { updatePersonnel, deletePersonnel } = usePersonnelActions()
+  const { updatePersonnel, deletePersonnel, updatePersonnelRole } = usePersonnelActions()
   const [editingPerson, setEditingPerson] = useState(null)
   const [updatingId, setUpdatingId] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -201,6 +202,9 @@ export default function PersonnelRosterTable() {
               <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 CQ
               </th>
+              <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
+                Role
+              </th>
               <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
@@ -283,6 +287,13 @@ export default function PersonnelRosterTable() {
                       </svg>
                     )}
                   </button>
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-center hidden sm:table-cell">
+                  <PersonnelRoleCell
+                    person={person}
+                    onRoleChange={updatePersonnelRole}
+                    disabled={!canManageRoles}
+                  />
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-right">
                   <div className="flex items-center justify-end gap-2">

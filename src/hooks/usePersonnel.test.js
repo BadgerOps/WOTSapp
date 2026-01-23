@@ -176,6 +176,67 @@ describe('usePersonnelActions', () => {
     expect(result.current.error).toBeNull();
   });
 
+  describe('updatePersonnelRole', () => {
+    it('should update role on personnel record only when no linked user', async () => {
+      const { updateDoc } = await import('firebase/firestore');
+      updateDoc.mockClear();
+
+      await result.current.updatePersonnelRole('personnel-id', 'admin', undefined);
+
+      // Should only be called once (for personnel record)
+      expect(updateDoc).toHaveBeenCalledTimes(1);
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBeNull();
+    });
+
+    it('should update role on both personnel and user when linked', async () => {
+      const { updateDoc } = await import('firebase/firestore');
+      updateDoc.mockClear();
+
+      await result.current.updatePersonnelRole('personnel-id', 'admin', 'linked-user-id');
+
+      // Should be called twice (personnel + user)
+      expect(updateDoc).toHaveBeenCalledTimes(2);
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBeNull();
+    });
+
+    it('should normalize role to lowercase', async () => {
+      const { updateDoc } = await import('firebase/firestore');
+      updateDoc.mockClear();
+
+      await result.current.updatePersonnelRole('personnel-id', 'ADMIN', undefined);
+
+      // The role should be normalized to lowercase
+      expect(updateDoc).toHaveBeenCalled();
+      expect(result.current.error).toBeNull();
+    });
+
+    it('should handle invalid roles by defaulting to user', async () => {
+      const { updateDoc } = await import('firebase/firestore');
+      updateDoc.mockClear();
+
+      await result.current.updatePersonnelRole('personnel-id', 'invalid_role', undefined);
+
+      // Should still complete without error (normalizeRole returns 'user' for invalid)
+      expect(updateDoc).toHaveBeenCalled();
+      expect(result.current.error).toBeNull();
+    });
+
+    it('should handle errors during role update', async () => {
+      const { updateDoc } = await import('firebase/firestore');
+      updateDoc.mockRejectedValueOnce(new Error('Role update failed'));
+
+      await expect(
+        result.current.updatePersonnelRole('personnel-id', 'admin', undefined)
+      ).rejects.toThrow('Role update failed');
+
+      await waitFor(() => {
+        expect(result.current.error).toBe('Role update failed');
+      });
+    });
+  });
+
   it('should handle errors during operations', async () => {
     const { addDoc } = await import('firebase/firestore');
 

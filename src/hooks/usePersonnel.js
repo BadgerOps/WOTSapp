@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
+import { normalizeRole } from '../lib/roles';
 
 /**
  * Hook to fetch all personnel records with real-time updates
@@ -240,12 +241,51 @@ export function usePersonnelActions() {
     }
   }
 
+  /**
+   * Update a personnel's role and sync to their linked user account if applicable
+   * @param {string} personnelId - The personnel document ID
+   * @param {string} newRole - The new role to assign
+   * @param {string|undefined} linkedUserId - The linked Firebase Auth user ID (if any)
+   */
+  async function updatePersonnelRole(personnelId, newRole, linkedUserId) {
+    setLoading(true);
+    setError(null);
+
+    const normalizedRole = normalizeRole(newRole);
+
+    try {
+      // Update personnel record
+      await updateDoc(doc(db, 'personnel', personnelId), {
+        role: normalizedRole,
+        roleUpdatedAt: serverTimestamp(),
+        roleUpdatedBy: user.uid,
+        updatedAt: serverTimestamp(),
+      });
+
+      // If personnel is linked to a user account, also update the user document
+      if (linkedUserId) {
+        await updateDoc(doc(db, 'users', linkedUserId), {
+          role: normalizedRole,
+          roleUpdatedAt: serverTimestamp(),
+        });
+      }
+
+      setLoading(false);
+    } catch (err) {
+      console.error('Error updating personnel role:', err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
   return {
     createPersonnel,
     updatePersonnel,
     deletePersonnel,
     importPersonnel,
     linkPersonnelToUser,
+    updatePersonnelRole,
     loading,
     error,
   };

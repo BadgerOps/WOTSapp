@@ -30,6 +30,9 @@ const {
 // Import personnel auth functions
 const { onPersonnelCreated } = require("./personnelAuth");
 
+// Import role sync functions
+const { syncPersonnelRoleToUser } = require("./roleSync");
+
 // Import timezone utilities
 const {
   getConfiguredTimezone,
@@ -64,6 +67,9 @@ exports.autoPublishPendingRecommendations = autoPublishPendingRecommendations;
 
 // Export personnel auth trigger
 exports.onPersonnelCreated = onPersonnelCreated;
+
+// Export role sync trigger
+exports.syncPersonnelRoleToUser = syncPersonnelRoleToUser;
 
 // Send push notification when a new post is created
 exports.onPostCreated = onDocumentCreated("posts/{postId}", async (event) => {

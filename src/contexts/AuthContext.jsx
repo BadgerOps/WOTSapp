@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react'
+import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react'
 import {
   GoogleAuthProvider,
   signInWithPopup,
@@ -8,6 +8,7 @@ import {
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
 import { auth, db } from '../config/firebase'
 import { authLog } from '../lib/authDebugger'
+import { ROLES, PERMISSIONS, hasPermission, normalizeRole } from '../lib/roles'
 
 const AuthContext = createContext()
 
@@ -38,20 +39,20 @@ export function AuthProvider({ children }) {
     try {
       const userDoc = await getDoc(doc(db, 'users', uid))
       if (userDoc.exists()) {
-        const role = userDoc.data().role || 'user'
+        const role = normalizeRole(userDoc.data().role)
         authLog('Auth', 'User role fetched', { uid, role })
         return role
       }
       authLog('Auth', 'User doc does not exist, defaulting to user role', { uid })
-      return 'user'
+      return ROLES.USER
     } catch (error) {
       authLog('Auth', 'ERROR fetching user role', { uid, error: error.message })
       console.error('Error fetching user role:', error)
-      return 'user'
+      return ROLES.USER
     }
   }
 
-  async function createUserDocument(user) {
+  async function createUserDocument(user, preAssignedRole = null) {
     console.log('[Auth] Creating user document for:', user.uid)
     try {
       const userRef = doc(db, 'users', user.uid)
@@ -59,15 +60,17 @@ export function AuthProvider({ children }) {
 
       if (!userSnap.exists()) {
         console.log('[Auth] User document does not exist, creating...')
+        // Use pre-assigned role from personnel record if available, otherwise default to user
+        const role = preAssignedRole ? normalizeRole(preAssignedRole) : ROLES.USER
         await setDoc(userRef, {
           email: user.email,
           displayName: user.displayName,
           photoURL: user.photoURL,
-          role: 'user',
+          role,
           createdAt: serverTimestamp(),
           lastLogin: serverTimestamp(),
         })
-        console.log('[Auth] User document created successfully')
+        console.log('[Auth] User document created successfully with role:', role)
       } else {
         console.log('[Auth] User document exists, updating lastLogin...')
         await setDoc(userRef, { lastLogin: serverTimestamp() }, { merge: true })
@@ -104,11 +107,12 @@ export function AuthProvider({ children }) {
 
       if (snapshot.empty) {
         authLog('Auth', 'No personnel record found for auto-link', { email: user.email })
-        return
+        return { linked: false, role: null }
       }
 
       const personnelDoc = snapshot.docs[0]
       const personnelData = personnelDoc.data()
+      const personnelRole = personnelData.role ? normalizeRole(personnelData.role) : null
 
       // Only link if not already linked
       if (!personnelData.userId) {
@@ -116,25 +120,43 @@ export function AuthProvider({ children }) {
           personnelId: personnelDoc.id,
           email: user.email,
           uid: user.uid,
+          personnelRole,
         })
         await updateDoc(doc(db, 'personnel', personnelDoc.id), {
           userId: user.uid,
           linkedAt: serverTimestamp(),
         })
         authLog('Auth', 'Personnel record linked successfully')
+
+        // If personnel has a pre-assigned role, sync it to the user document
+        if (personnelRole && personnelRole !== ROLES.USER) {
+          authLog('Auth', 'Syncing pre-assigned role from personnel to user', {
+            uid: user.uid,
+            role: personnelRole,
+          })
+          await updateDoc(doc(db, 'users', user.uid), {
+            role: personnelRole,
+          })
+          authLog('Auth', 'Role synced successfully')
+        }
+
+        return { linked: true, role: personnelRole }
       } else if (personnelData.userId !== user.uid) {
         authLog('Auth', 'Personnel record already linked to different user', {
           personnelId: personnelDoc.id,
           existingUserId: personnelData.userId,
           attemptedUserId: user.uid,
         })
+        return { linked: false, role: null }
       } else {
         authLog('Auth', 'Personnel record already linked to this user')
+        return { linked: true, role: personnelRole }
       }
     } catch (error) {
       authLog('Auth', 'Error auto-linking personnel record', { error: error.message })
       console.error('[Auth] Error auto-linking personnel:', error)
       // Don't throw - this is a non-critical operation
+      return { linked: false, role: null }
     }
   }
 
@@ -164,12 +186,12 @@ export function AuthProvider({ children }) {
         throw new Error('Access denied. You must be registered in the personnel roster to use this application.')
       }
 
-      authLog('Auth', 'Creating/updating user document...')
-      await createUserDocument(result.user)
-
-      // Auto-link personnel record to Firebase user
+      // Auto-link personnel record to Firebase user first to get pre-assigned role
       authLog('Auth', 'Auto-linking personnel record...')
-      await autoLinkPersonnelRecord(result.user)
+      const { role: preAssignedRole } = await autoLinkPersonnelRecord(result.user)
+
+      authLog('Auth', 'Creating/updating user document...')
+      await createUserDocument(result.user, preAssignedRole)
 
       authLog('Auth', 'Sign-in complete', { uid: result.user.uid })
       return result.user
@@ -232,7 +254,7 @@ export function AuthProvider({ children }) {
           setUserRole(role)
         } catch (error) {
           authLog('Auth', 'ERROR during role fetch', { error: error.message })
-          setUserRole('user')
+          setUserRole(ROLES.USER)
         }
       } else {
         authLog('Auth', 'No user, clearing role')
@@ -249,13 +271,40 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  // Memoized permission check function
+  const can = useCallback(
+    (permission) => hasPermission(userRole, permission),
+    [userRole]
+  )
+
   const value = {
     user,
     userRole,
     loading,
-    isAdmin: userRole === 'admin',
-    isUniformAdmin: userRole === 'uniform_admin' || userRole === 'admin',
-    canManageWeather: userRole === 'uniform_admin' || userRole === 'admin',
+
+    // Legacy computed properties (keep for backward compatibility)
+    isAdmin: userRole === ROLES.ADMIN,
+    isUniformAdmin: userRole === ROLES.UNIFORM_ADMIN || userRole === ROLES.ADMIN,
+    canManageWeather: userRole === ROLES.UNIFORM_ADMIN || userRole === ROLES.ADMIN,
+
+    // New permission-based check function
+    can,
+
+    // Convenience permission checks
+    canViewAssignedDetails: hasPermission(userRole, PERMISSIONS.VIEW_ASSIGNED_DETAILS),
+    canSignOthersOnPass: hasPermission(userRole, PERMISSIONS.SIGN_OTHERS_ON_PASS),
+    canViewUpdates: hasPermission(userRole, PERMISSIONS.VIEW_UPDATES),
+    canModifyUOTD: hasPermission(userRole, PERMISSIONS.MODIFY_UOTD),
+    canApproveWeatherUOTD: hasPermission(userRole, PERMISSIONS.APPROVE_WEATHER_UOTD),
+    canModifyUniforms: hasPermission(userRole, PERMISSIONS.MODIFY_UNIFORMS),
+    canManagePosts: hasPermission(userRole, PERMISSIONS.MANAGE_POSTS),
+    canManageDocuments: hasPermission(userRole, PERMISSIONS.MANAGE_DOCUMENTS),
+    canManagePersonnel: hasPermission(userRole, PERMISSIONS.MANAGE_PERSONNEL),
+    canManageRoles: hasPermission(userRole, PERMISSIONS.MANAGE_ROLES),
+    canManageDetails: hasPermission(userRole, PERMISSIONS.MANAGE_DETAILS),
+    canManageCQ: hasPermission(userRole, PERMISSIONS.MANAGE_CQ),
+    canManageConfig: hasPermission(userRole, PERMISSIONS.MANAGE_CONFIG),
+
     signInWithGoogle,
     logout,
   }
