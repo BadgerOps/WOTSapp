@@ -1,8 +1,94 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.5'
+const APP_VERSION = '0.4.7'
 
 const changelog = [
+  {
+    version: '0.4.7',
+    date: '2026-01-24',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Full Shift Swap Support',
+            details: [
+              'Users can now swap entire shifts (both people) with another shift',
+              'Choose between "Individual" (replace one person) or "Full Shift" swap types',
+              'Select target shift from upcoming schedule dates',
+              'Approval queue shows swap type with distinct badge for full shift swaps',
+            ],
+          },
+          {
+            category: 'CQ Schedule Editing for Candidate Leadership',
+            details: [
+              'Candidate Leadership role can now edit CQ shift assignments',
+              'Edit buttons visible to both Admin and Candidate Leadership in schedule view',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Changed',
+        items: [
+          { details: ['Firestore rules updated to allow candidate_leadership to update cqSchedule'] },
+          { details: ['Swap requests now support swapType field (individual or fullShift)'] },
+        ],
+      },
+      {
+        title: 'Fixed',
+        items: [
+          { details: ['Weather approval workflow crash when approving uniform overrides (e.g., wet weather gear)'] },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.4.6',
+    date: '2026-01-24',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'CQ Shift Editing (Admin)',
+            details: [
+              'Admins can now edit imported CQ shift assignments directly',
+              'Edit button next to each person in schedule view',
+              'Search and select from personnel roster to swap users',
+              'Real-time updates to shift assignments',
+            ],
+          },
+          {
+            category: 'CQ Shift Swap Requests',
+            details: [
+              'Users can request to swap their CQ shifts with another person',
+              '"Request Swap" button on MyCQShiftCard for assigned shifts',
+              'Select replacement personnel and provide reason for swap',
+              'Pending swap request indicator on shift card',
+            ],
+          },
+          {
+            category: 'Shift Swap Approval Workflow',
+            details: [
+              'New "Swap Requests" sub-tab in CQ admin section with pending count badge',
+              'Candidate Leadership and Admin roles can approve/reject swap requests',
+              'Bulk approve/reject functionality for multiple requests',
+              'Rejection modal with optional reason',
+              'Approved swaps automatically update the schedule',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Changed',
+        items: [
+          { details: ['Added cqSwapRequests Firestore collection with security rules'] },
+          { details: ['useCQScheduleActions now includes updateShiftAssignment function'] },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.5',
     date: '2026-01-24',
@@ -23,9 +109,9 @@ const changelog = [
           {
             category: 'CQ Shift Card Enhancement',
             details: [
-              'MyCQShiftCard now shows shifts the day before for overnight shifts',
-              'Shift 2 displays the evening before since it starts after midnight',
-              '"Tonight" badge (blue) for upcoming overnight shifts',
+              'MyCQShiftCard shows today\'s shifts and tomorrow\'s shifts as preview',
+              '"Today" badge (purple) for today\'s shift before it starts',
+              '"Tomorrow" badge (blue) for upcoming shift on next day',
               'Partner name display for each shift',
             ],
           },
@@ -34,7 +120,7 @@ const changelog = [
       {
         title: 'Changed',
         items: [
-          { details: ['useMyCQShift hook now queries both today and tomorrow to catch overnight shifts'] },
+          { details: ['useMyCQShift hook queries both today and tomorrow for shift preview'] },
           { details: ['Updated Firestore rules for cqSchedule, cqRoster, and cqSkips collections'] },
         ],
       },

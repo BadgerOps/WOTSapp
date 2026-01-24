@@ -72,16 +72,31 @@ exports.approveRecommendation = onCall(wrapCallable(async (request) => {
   }
 
   // Get uniform details
-  const uniformDoc = await db
-    .collection("uniforms")
-    .doc(recommendation.uniformId)
-    .get();
+  // Note: uniformId may be null if there's a uniformOverride (e.g., wet weather gear)
+  let uniform = null;
+  if (recommendation.uniformId) {
+    const uniformDoc = await db
+      .collection("uniforms")
+      .doc(recommendation.uniformId)
+      .get();
 
-  if (!uniformDoc.exists) {
-    throw new HttpsError("not-found", "Associated uniform not found");
+    if (!uniformDoc.exists) {
+      throw new HttpsError("not-found", "Associated uniform not found");
+    }
+    uniform = uniformDoc.data();
+  } else if (recommendation.uniformOverride || recommendation.uniformName) {
+    // Use the override info or recommendation's stored name when no specific uniform ID
+    uniform = {
+      name: recommendation.uniformOverride?.name || recommendation.uniformName,
+      number: recommendation.uniformNumber || "N/A",
+      description: recommendation.uniformOverride?.description || "",
+    };
+  } else {
+    throw new HttpsError(
+      "invalid-argument",
+      "Recommendation has no uniformId or uniformOverride"
+    );
   }
-
-  const uniform = uniformDoc.data();
 
   // Get approver's name
   const approverName =
@@ -349,19 +364,34 @@ exports.autoPublishPendingRecommendations = onSchedule(
     } of toAutoPublish) {
       try {
         // Get uniform details
-        const uniformDoc = await db
-          .collection("uniforms")
-          .doc(recommendation.uniformId)
-          .get();
+        // Note: uniformId may be null if there's a uniformOverride (e.g., wet weather gear)
+        let uniform = null;
+        if (recommendation.uniformId) {
+          const uniformDoc = await db
+            .collection("uniforms")
+            .doc(recommendation.uniformId)
+            .get();
 
-        if (!uniformDoc.exists) {
+          if (!uniformDoc.exists) {
+            console.log(
+              `Uniform ${recommendation.uniformId} not found, skipping recommendation ${recommendationId}`,
+            );
+            continue;
+          }
+          uniform = uniformDoc.data();
+        } else if (recommendation.uniformOverride || recommendation.uniformName) {
+          // Use the override info or recommendation's stored name when no specific uniform ID
+          uniform = {
+            name: recommendation.uniformOverride?.name || recommendation.uniformName,
+            number: recommendation.uniformNumber || "N/A",
+            description: recommendation.uniformOverride?.description || "",
+          };
+        } else {
           console.log(
-            `Uniform ${recommendation.uniformId} not found, skipping recommendation ${recommendationId}`,
+            `Recommendation ${recommendationId} has no uniformId or uniformOverride, skipping`,
           );
           continue;
         }
-
-        const uniform = uniformDoc.data();
 
         // Check if a UOTD post already exists for this slot (defense in depth)
         if (recommendation.targetDate && recommendation.targetSlot) {

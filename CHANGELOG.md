@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.7] - 2026-01-24
+
+### Added
+
+#### Full Shift Swap Support
+- Users can now swap entire shifts (both people) with another shift
+- Choose between "Individual" (replace one person) or "Full Shift" swap types
+- Select target shift from upcoming schedule dates
+- Approval queue shows swap type with distinct badge for full shift swaps
+
+#### CQ Schedule Editing for Candidate Leadership
+- Candidate Leadership role can now edit CQ shift assignments
+- Edit buttons visible to both Admin and Candidate Leadership in schedule view
+
+### Changed
+- Firestore rules updated to allow candidate_leadership to update cqSchedule
+- Swap requests now support swapType field (individual or fullShift)
+
+### Fixed
+- Weather approval workflow crash when approving uniform overrides (e.g., wet weather gear) - uniformId was null causing Firestore path error (Sentry #7216023775)
+
+---
+
+## [0.4.6] - 2026-01-24
+
+### Added
+
+#### CQ Shift Editing (Admin)
+- Admins can now edit imported CQ shift assignments directly
+- Edit button next to each person in schedule view
+- Search and select from personnel roster to swap users
+- Real-time updates to shift assignments
+
+#### CQ Shift Swap Requests
+- Users can request to swap their CQ shifts with another person
+- "Request Swap" button on MyCQShiftCard for assigned shifts
+- Select replacement personnel and provide reason for swap
+- Pending swap request indicator on shift card
+
+#### Shift Swap Approval Workflow
+- New "Swap Requests" sub-tab in CQ admin section with pending count badge
+- Candidate Leadership and Admin roles can approve/reject swap requests
+- Bulk approve/reject functionality for multiple requests
+- Rejection modal with optional reason
+- Approved swaps automatically update the schedule
+
+### Changed
+- Added cqSwapRequests Firestore collection with security rules
+- useCQScheduleActions now includes updateShiftAssignment function
+
+---
+
 ## [0.4.5] - 2026-01-24
 
 ### Added

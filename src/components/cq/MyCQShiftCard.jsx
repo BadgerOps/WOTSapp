@@ -1,11 +1,18 @@
+import { useState } from 'react'
 import { useMyCQShift, useCQScheduleActions, CQ_SHIFT_TIMES } from '../../hooks/useCQSchedule'
 import { useAppConfig } from '../../hooks/useAppConfig'
+import { useMySwapRequests } from '../../hooks/useCQSwapRequests'
+import { useAuth } from '../../contexts/AuthContext'
 import { format } from 'date-fns'
+import RequestSwapModal from './RequestSwapModal'
 
 export default function MyCQShiftCard() {
+  const { user } = useAuth()
   const { myShift, loading, error } = useMyCQShift()
   const { config } = useAppConfig()
   const { startShift, completeShift, loading: actionLoading, error: actionError } = useCQScheduleActions()
+  const { requests: mySwapRequests } = useMySwapRequests()
+  const [showSwapModal, setShowSwapModal] = useState(false)
 
   if (loading) return null
 
@@ -17,9 +24,9 @@ export default function MyCQShiftCard() {
   const isShift1 = myShift.myShiftType === 'shift1'
   const isActive = myShift.status === 'active'
   const isScheduled = myShift.status === 'scheduled'
-  const isOvernightPreview = myShift.isOvernightPreview // Tomorrow's shift 2 showing today
+  const isOvernightPreview = myShift.shiftContext === 'tomorrow' // Tomorrow's shift (overnight preview)
 
-  // Determine if current time is within the shift window
+  // Determine if current time is within the shift window (only for today's shifts)
   const now = new Date()
   const currentHours = now.getHours()
   const currentMinutes = now.getMinutes()
@@ -102,6 +109,14 @@ export default function MyCQShiftCard() {
     : `Shift 2 (${CQ_SHIFT_TIMES.shift2.label})`
   const partner = myShift.myPartnerName
 
+  // Check if there's a pending swap request for this shift
+  const pendingSwapRequest = mySwapRequests.find(
+    (req) => req.scheduleId === myShift.id && req.status === 'pending'
+  )
+
+  // Can request swap if shift is scheduled (not active or completed) and no pending request
+  const canRequestSwap = isScheduled && !pendingSwapRequest
+
   return (
     <div className={`rounded-lg border p-4 mb-6 ${getStatusColor()}`}>
       <div className="flex flex-col gap-4">
@@ -123,15 +138,12 @@ export default function MyCQShiftCard() {
               <div className="text-gray-700">
                 <span className="font-medium">Time:</span>{' '}
                 {formatTime(myShift.myShiftStart)} - {formatTime(myShift.myShiftEnd)}
-                {isOvernightPreview && (
-                  <span className="ml-2 text-blue-600 font-medium">(starts after midnight)</span>
-                )}
               </div>
               <div className="text-gray-700">
                 <span className="font-medium">Date:</span>{' '}
                 {format(new Date(myShift.date + 'T12:00:00'), 'EEEE, MMMM d, yyyy')}
                 {isOvernightPreview && (
-                  <span className="ml-1 text-gray-500">(tomorrow)</span>
+                  <span className="ml-1 text-blue-600 font-medium">(starts after midnight)</span>
                 )}
               </div>
               {partner && (
@@ -197,7 +209,29 @@ export default function MyCQShiftCard() {
 
           {isOvernightPreview && (
             <div className="text-sm text-blue-600 italic">
-              CQ duty tonight - shift starts at {formatTime(myShift.myShiftStart)} (after midnight)
+              CQ duty tonight - shift starts at {formatTime(myShift.myShiftStart)}
+            </div>
+          )}
+
+          {/* Request Swap Button */}
+          {canRequestSwap && (
+            <button
+              onClick={() => setShowSwapModal(true)}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+            >
+              Request Swap
+            </button>
+          )}
+
+          {/* Pending Swap Request Indicator */}
+          {pendingSwapRequest && (
+            <div className="px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+              <span className="text-yellow-700 font-medium">Swap Request Pending</span>
+              <span className="text-yellow-600 ml-1">
+                {pendingSwapRequest.swapType === 'fullShift'
+                  ? `- Full shift swap with ${new Date(pendingSwapRequest.targetScheduleDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  : `- Proposed: ${pendingSwapRequest.proposedPersonnelName}`}
+              </span>
             </div>
           )}
         </div>
@@ -208,6 +242,17 @@ export default function MyCQShiftCard() {
           </div>
         )}
       </div>
+
+      {/* Swap Request Modal */}
+      {showSwapModal && (
+        <RequestSwapModal
+          shift={{ ...myShift, requesterId: user?.uid }}
+          onClose={() => setShowSwapModal(false)}
+          onSuccess={() => {
+            // Could add a success toast here
+          }}
+        />
+      )}
     </div>
   )
 }

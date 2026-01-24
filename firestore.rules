@@ -185,8 +185,10 @@ service cloud.firestore {
     match /cqSchedule/{scheduleId} {
       // Anyone authenticated can read schedule
       allow read: if isAuthenticated();
-      // Only admins can manage schedule (import, update, delete)
-      allow write: if isAdmin();
+      // Candidate leadership can update (edit assignments)
+      allow update: if isCandidateLeadership();
+      // Only admins can create or delete schedule entries
+      allow create, delete: if isAdmin();
     }
 
     // CQ Roster collection (legacy roster-based scheduling)
@@ -203,6 +205,27 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       // Only admins can manage skips
       allow write: if isAdmin();
+    }
+
+    // CQ Swap Requests collection (user-proposed shift swaps)
+    match /cqSwapRequests/{requestId} {
+      // Users can read their own requests
+      allow read: if isAuthenticated() &&
+        resource.data.requesterId == request.auth.uid;
+      // Candidate leadership and admins can read all requests
+      allow read: if isCandidateLeadership();
+      // Authenticated users can create their own requests
+      allow create: if isAuthenticated() &&
+        request.resource.data.requesterId == request.auth.uid;
+      // Users can cancel their own pending requests
+      allow update: if isAuthenticated() &&
+        resource.data.requesterId == request.auth.uid &&
+        resource.data.status == 'pending' &&
+        request.resource.data.status == 'cancelled';
+      // Candidate leadership can update (approve/reject)
+      allow update: if isCandidateLeadership();
+      // Only admins can delete
+      allow delete: if isAdmin();
     }
 
     // Pass Approval Requests collection
