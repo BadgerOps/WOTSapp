@@ -1,8 +1,64 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.3.0'
+const APP_VERSION = '0.4.1'
 
 const changelog = [
+  {
+    version: '0.4.1',
+    date: '2026-01-23',
+    sections: [
+      {
+        title: 'Fixed',
+        items: [
+          {
+            details: [
+              'CQ Shifts permission error: Non-admin users can now view CQ shifts (read access opened to all authenticated users, write access remains admin-only)',
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.4.0',
+    date: '2026-01-23',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Surveys, Quizzes & Polls',
+            details: [
+              'Complete survey system allowing any authenticated user to create and manage surveys',
+              'Six question types: Single Choice, Multiple Choice, Short Text, Long Text, Rating, Open Contribution',
+              'Three survey types: Survey, Quiz, Poll',
+              'Survey options: Allow anonymous responses, allow multiple responses per user',
+              'Survey lifecycle: Draft → Published → Closed',
+              'Results viewing with Summary View (aggregated stats) and Individual View (per-respondent)',
+              'Export to CSV, JSON, and PDF formats',
+            ],
+          },
+          {
+            category: 'Navigation & Access',
+            details: [
+              'New "Surveys" link in main navigation (available to all users)',
+              'New "Surveys" tab in Admin dashboard with Create and Manage sub-tabs',
+              'Public Surveys page for users to view and complete surveys',
+              'Completion status shown on survey cards',
+            ],
+          },
+          {
+            category: 'Security & Infrastructure',
+            details: [
+              'Firestore security rules for surveys and surveyResponses collections',
+              'Creators can edit/delete their own surveys, admins can manage all',
+              'Composite Firestore indexes for survey queries',
+            ],
+          },
+        ],
+      },
+    ],
+  },
   {
     version: '0.3.0',
     date: '2026-01-23',

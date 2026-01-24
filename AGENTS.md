@@ -165,3 +165,4 @@ firebase deploy --only hosting
 4. **Error handling:** Wrap Firebase calls in try/catch and show user-friendly errors
 5. **Terraform:** Changes to infrastructure should go in `./terraform/`
 6. **Secrets:** Never commit `.env`, `terraform.tfvars`, or files in `.secrets/`
+7. **Changelog updates:** When updating `CHANGELOG.md`, also update the in-app changelog at `src/pages/Changelog.jsx` (update `APP_VERSION` and add the new version entry to the `changelog` array)
