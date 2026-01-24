@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.1'
+const APP_VERSION = '0.4.2'
 
 const changelog = [
   {
-    version: '0.4.1',
+    version: '0.4.2',
     date: '2026-01-24',
     sections: [
       {
@@ -20,6 +20,12 @@ const changelog = [
           },
         ],
       },
+    ],
+  },
+  {
+    version: '0.4.1',
+    date: '2026-01-24',
+    sections: [
       {
         title: 'Fixed',
         items: [
