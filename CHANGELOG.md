@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auth popup errors filtered out (user-closed, blocked, cancelled)
 - Network errors filtered (offline, timeouts)
 - Expected permission-denied errors filtered
+- Service worker load failures filtered (transient PWA errors)
+- Firebase Auth API transient errors filtered
 - Sensitive data scrubbed from headers and URLs
 
 ### Changed
