@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pending survey card on Home page: Shows unanswered surveys, disappears after user responds
 - Push notifications for new surveys: Users receive notifications when surveys are published
 
+### Changed
+- nix-shell prompt now shows git branch and status indicators (* for uncommitted changes, ? for untracked files)
+
 ---
 
 ## [0.4.1] - 2026-01-24
