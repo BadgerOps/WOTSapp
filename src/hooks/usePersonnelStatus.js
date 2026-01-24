@@ -151,14 +151,17 @@ export function useMyStatus() {
         // 2. Personnel doc ID (companion sign-out before account linking)
         // 3. Email match (fallback)
         let foundStatus = null;
+        let matchSource = null;
 
         // Check Auth UID first
         if (statuses[user.uid]) {
           foundStatus = statuses[user.uid];
+          matchSource = "authUid";
         }
-        // Check personnel doc ID if no Auth UID status or Auth UID shows present
+        // Check personnel doc ID if no Auth UID status
         else if (myPersonnelRecord && statuses[myPersonnelRecord.id]) {
           foundStatus = statuses[myPersonnelRecord.id];
+          matchSource = "personnelDocId";
         }
         // Check email match as last resort
         else if (user.email) {
@@ -167,8 +170,22 @@ export function useMyStatus() {
           );
           if (emailMatch) {
             foundStatus = emailMatch;
+            matchSource = "email";
           }
         }
+
+        // Debug logging
+        console.log("[useMyStatus] Status lookup:", {
+          userUid: user.uid,
+          userEmail: user.email,
+          personnelRecordId: myPersonnelRecord?.id,
+          personnelRecordUserId: myPersonnelRecord?.userId,
+          totalStatuses: Object.keys(statuses).length,
+          statusAtAuthUid: statuses[user.uid]?.status,
+          statusAtPersonnelId: myPersonnelRecord ? statuses[myPersonnelRecord.id]?.status : "N/A",
+          foundStatus: foundStatus?.status,
+          matchSource,
+        });
 
         if (foundStatus) {
           setMyStatus(foundStatus);
@@ -723,15 +740,20 @@ export function useSelfSignOut() {
       }
 
       // Update own status - remove group link but keep pass status
+      // Use set with merge and include groupUpdate flag for security rules
+      // (needed when status doc ID doesn't match Auth UID)
       const statusRef = doc(db, "personnelStatus", myStatusId);
-      batch.update(statusRef, {
+      batch.set(statusRef, {
         withPersonId: null,
         withPersonName: null,
         groupSignOut: null,
+        updatedBy: user.uid,
+        updatedByName: user.displayName || user.email,
         updatedAt: serverTimestamp(),
-      });
+        groupUpdate: true, // Required by security rules when not owner
+      }, { merge: true });
 
-      // Add to history
+      // Add to history (include groupUpdate flag for security rules)
       const historyRef = doc(collection(db, "personnelStatusHistory"));
       batch.set(historyRef, {
         personnelId: myStatusId,
@@ -744,7 +766,7 @@ export function useSelfSignOut() {
         updatedBy: user.uid,
         updatedByName: user.displayName || user.email,
         timestamp: serverTimestamp(),
-        selfUpdated: true,
+        groupUpdate: true, // Required by security rules when personnelId != auth.uid
       });
 
       // Remove self from the primary person's companions list
