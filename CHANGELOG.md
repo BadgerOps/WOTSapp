@@ -45,6 +45,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Admins can manage all surveys and delete any responses
 - Response ownership validation for updates
 
+#### Infrastructure
+- Composite Firestore indexes for survey queries (status, createdBy, createdAt)
+- Composite Firestore indexes for survey response queries (surveyId, submittedAt, respondentId)
+
 ---
 
 ## [0.3.0] - 2026-01-23
