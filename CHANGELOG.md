@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Survey response editing: Users can now edit/update their previously submitted survey responses from both the main Surveys page and Admin dashboard
+- Survey results viewing: Users who have responded can view aggregated results from the main Surveys page
 
 ### Fixed
 - CQ Shifts permission error: Non-admin users can now view CQ shifts (read access opened to all authenticated users, write access remains admin-only)

@@ -13,6 +13,7 @@ const changelog = [
           {
             details: [
               'Survey response editing: Users can now edit/update their previously submitted survey responses from both the main Surveys page and Admin dashboard',
+              'Survey results viewing: Users who have responded can view aggregated results from the main Surveys page',
             ],
           },
         ],

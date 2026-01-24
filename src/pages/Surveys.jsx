@@ -1,13 +1,22 @@
 import { useState } from 'react'
 import SurveyList from '../components/surveys/SurveyList'
 import SurveyTaker from '../components/surveys/SurveyTaker'
+import SurveyResults from '../components/surveys/SurveyResults'
 
 export default function Surveys() {
   const [activeSurvey, setActiveSurvey] = useState(null)
+  const [viewingResults, setViewingResults] = useState(null)
   const [completed, setCompleted] = useState(false)
 
   function handleTakeSurvey(survey) {
     setActiveSurvey(survey)
+    setViewingResults(null)
+    setCompleted(false)
+  }
+
+  function handleViewResults(survey) {
+    setViewingResults(survey)
+    setActiveSurvey(null)
     setCompleted(false)
   }
 
@@ -17,18 +26,29 @@ export default function Surveys() {
 
   function handleBack() {
     setActiveSurvey(null)
+    setViewingResults(null)
     setCompleted(false)
   }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
-      {!activeSurvey ? (
+      {viewingResults ? (
+        <div>
+          <button
+            onClick={handleBack}
+            className="mb-4 text-sm text-primary-600 hover:text-primary-700 flex items-center gap-1"
+          >
+            ← Back to Surveys
+          </button>
+          <SurveyResults survey={viewingResults} onBack={handleBack} />
+        </div>
+      ) : !activeSurvey ? (
         <>
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900">Surveys</h1>
             <p className="text-gray-600">Complete surveys and share your feedback</p>
           </div>
-          <SurveyList onTakeSurvey={handleTakeSurvey} />
+          <SurveyList onTakeSurvey={handleTakeSurvey} onViewResults={handleViewResults} />
         </>
       ) : completed ? (
         <div className="card text-center py-12">
