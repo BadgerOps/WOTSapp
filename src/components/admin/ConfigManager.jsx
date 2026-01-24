@@ -248,6 +248,28 @@ export default function ConfigManager() {
           </p>
         </div>
 
+        {/* Training Start Date */}
+        <div>
+          <label
+            htmlFor="trainingStartDate"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Training Start Date
+          </label>
+          <input
+            id="trainingStartDate"
+            type="date"
+            value={config.trainingStartDate || ''}
+            onChange={(e) =>
+              setConfig({ ...config, trainingStartDate: e.target.value })
+            }
+            className="input"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Used to calculate &quot;Week of Training&quot; on signout rosters
+          </p>
+        </div>
+
         {/* Classes */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">

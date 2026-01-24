@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-23
+
+### Added
+
+#### CQ Signout Roster PDF Export
+- Export pass audit log as PDF matching military DA Form signout roster format
+- Columns: Date (DDMMMYY), Name (Last, First), Room #, Flight, Week of Training, Destination, Contact #, Time Out, Expected Return, Initials, Actual Time In, CQ Initials
+- Export with data populated from audit log entries
+- Export blank roster form for printing
+- Auto-calculate initials from personnel name (first initial + last initial)
+- Calculate week of training from configurable training start date
+- Training Start Date added to app configuration settings
+- Room and flight info pulled from personnel records
+
+### Dependencies
+- Added jspdf (^4.0.0) for PDF generation
+- Added jspdf-autotable (^5.0.7) for table formatting
+
+---
+
 ## [0.2.0] - 2026-01-23
 
 ### Added

@@ -6,6 +6,7 @@ export const DEFAULT_CONFIG = {
   timezone: 'America/New_York',
   classNumber: '',
   graduationDate: '', // YYYY-MM-DD format
+  trainingStartDate: '', // YYYY-MM-DD format - for calculating week of training
   flights: [],
   classes: [], // Available class options (e.g., ['26-01', '26-02'])
   // CQ Shift Configuration
