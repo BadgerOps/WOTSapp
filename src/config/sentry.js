@@ -26,12 +26,19 @@ export function initSentry() {
     integrations: [
       // Browser tracing for performance monitoring
       Sentry.browserTracingIntegration(),
+      // Send console.log, console.warn, and console.error calls as logs to Sentry
+      Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'error'] }),
       // Session replay for debugging (only in production)
       ...(!isDev ? [Sentry.replayIntegration({
         maskAllText: false,
         blockAllMedia: false,
       })] : []),
     ],
+
+    // Enable logs to be sent to Sentry
+    _experiments: {
+      enableLogs: true,
+    },
 
     // Performance monitoring sample rates
     // Lower in production to reduce costs

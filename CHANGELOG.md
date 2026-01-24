@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic user context (uid, email, role) attached to error reports
 - Performance monitoring with configurable sample rates
 - Source map upload support for readable stack traces in production
+- Console logging integration sends console.log/warn/error to Sentry Logs
 
 #### Sentry Wrappers for Cloud Functions
 - `wrapCallable()` - Wraps callable functions with error tracking and user context

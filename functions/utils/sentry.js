@@ -22,6 +22,17 @@ function initSentry() {
     dsn,
     environment,
 
+    // Integrations
+    integrations: [
+      // Send console.log, console.warn, and console.error calls as logs to Sentry
+      Sentry.consoleIntegration({ levels: ['log', 'warn', 'error'] }),
+    ],
+
+    // Enable logs to be sent to Sentry
+    _experiments: {
+      enableLogs: true,
+    },
+
     // Performance monitoring (lower sample rate in production)
     tracesSampleRate: environment === 'production' ? 0.1 : 1.0,
 
