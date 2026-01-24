@@ -35,6 +35,12 @@ const changelog = [
           { details: ['Swap requests now support swapType field (individual or fullShift)'] },
         ],
       },
+      {
+        title: 'Fixed',
+        items: [
+          { details: ['Weather approval workflow crash when approving uniform overrides (e.g., wet weather gear)'] },
+        ],
+      },
     ],
   },
   {
