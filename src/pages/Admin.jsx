@@ -25,6 +25,9 @@ import PersonnelStatusTracker from '../components/cq/PersonnelStatusTracker'
 import CQNotesLog from '../components/cq/CQNotesLog'
 import CQAuditLog from '../components/cq/CQAuditLog'
 import StatusCleanupTool from '../components/cq/StatusCleanupTool'
+import SurveyComposer from '../components/surveys/SurveyComposer'
+import SurveyManager from '../components/surveys/SurveyManager'
+import SurveyResults from '../components/surveys/SurveyResults'
 import { usePendingCount } from '../hooks/useWeatherRecommendations'
 import { usePendingDetailApprovals } from '../hooks/useDetailAssignments'
 import { useActiveShift } from '../hooks/useCQShifts'
@@ -37,6 +40,9 @@ export default function Admin() {
   const [detailsSubTab, setDetailsSubTab] = useState('templates')
   const [cqSubTab, setCqSubTab] = useState('dashboard')
   const [personnelSubTab, setPersonnelSubTab] = useState('roster')
+  const [surveySubTab, setSurveySubTab] = useState('create')
+  const [editingSurvey, setEditingSurvey] = useState(null)
+  const [viewingSurveyResults, setViewingSurveyResults] = useState(null)
   const { count: pendingCount } = usePendingCount()
   const { count: pendingDetailsCount } = usePendingDetailApprovals()
   const { activeShift } = useActiveShift()
@@ -47,6 +53,7 @@ export default function Admin() {
     { id: 'approvals', label: 'Approvals', badge: pendingCount > 0 ? pendingCount : null },
     { id: 'details', label: 'Cleaning Details' },
     { id: 'cq', label: 'CQ', badge: activeShift ? '!' : null },
+    { id: 'surveys', label: 'Surveys' },
     { id: 'documents', label: 'Documents' },
     { id: 'personnel', label: 'Personnel' },
     { id: 'config', label: 'Config' },
@@ -352,6 +359,66 @@ export default function Admin() {
           {cqSubTab === 'notes' && <CQNotesLog />}
           {cqSubTab === 'audit' && <CQAuditLog />}
           {cqSubTab === 'maintenance' && <StatusCleanupTool />}
+        </div>
+      )}
+
+      {activeTab === 'surveys' && (
+        <div className="space-y-6">
+          {/* Survey Sub-tabs */}
+          {!viewingSurveyResults && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setSurveySubTab('create')
+                  setEditingSurvey(null)
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  surveySubTab === 'create'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Create Survey
+              </button>
+              <button
+                onClick={() => {
+                  setSurveySubTab('manage')
+                  setEditingSurvey(null)
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  surveySubTab === 'manage'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Manage Surveys
+              </button>
+            </div>
+          )}
+
+          {viewingSurveyResults ? (
+            <SurveyResults
+              survey={viewingSurveyResults}
+              onBack={() => setViewingSurveyResults(null)}
+            />
+          ) : surveySubTab === 'create' ? (
+            <SurveyComposer
+              editSurvey={editingSurvey}
+              onCancel={editingSurvey ? () => setEditingSurvey(null) : undefined}
+              onSaved={() => {
+                setEditingSurvey(null)
+                setSurveySubTab('manage')
+              }}
+            />
+          ) : (
+            <SurveyManager
+              onEdit={(survey) => {
+                setEditingSurvey(survey)
+                setSurveySubTab('create')
+              }}
+              onViewResults={(survey) => setViewingSurveyResults(survey)}
+            />
+          )}
         </div>
       )}
 

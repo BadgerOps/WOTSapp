@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-01-23
+
+### Added
+
+#### Surveys, Quizzes & Polls
+- Complete survey system allowing any authenticated user to create and manage surveys
+- Six question types supported:
+  - **Single Choice** - Radio button selection (one answer)
+  - **Multiple Choice** - Checkbox selection (multiple answers)
+  - **Short Text** - Single line text input
+  - **Long Text** - Paragraph text input
+  - **Rating** - 1-5 or 1-10 scale rating
+  - **Open Contribution** - Everyone adds their own answer (e.g., "What's your favorite song?")
+- Three survey types: Survey, Quiz, Poll
+- Survey options:
+  - Allow anonymous responses
+  - Allow multiple responses per user
+- Survey lifecycle: Draft → Published → Closed
+- Results viewing with two modes:
+  - **Summary View** - Aggregated statistics with bar charts for choices, averages for ratings, and collected text responses
+  - **Individual View** - See each respondent's complete answers
+- Export functionality:
+  - **CSV** - Spreadsheet-compatible format with all responses
+  - **JSON** - Full data export including survey definition and aggregated results
+  - **PDF** - Formatted report with summary statistics and response table
+
+#### Navigation & Access
+- New "Surveys" link in main navigation (available to all users)
+- New "Surveys" tab in Admin dashboard with sub-tabs:
+  - Create Survey - Build new surveys with drag-and-drop question ordering
+  - Manage Surveys - List, edit, publish, close, and delete surveys
+- Public Surveys page (`/surveys`) for users to view and complete surveys
+- Completion status shown on survey cards (prevents duplicate submissions unless allowed)
+
+#### Security
+- Firestore security rules for `surveys` and `surveyResponses` collections
+- Creators can edit/delete their own surveys
+- Admins can manage all surveys and delete any responses
+- Response ownership validation for updates
+
+#### Infrastructure
+- Composite Firestore indexes for survey queries (status, createdBy, createdAt)
+- Composite Firestore indexes for survey response queries (surveyId, submittedAt, respondentId)
+
+---
+
 ## [0.3.0] - 2026-01-23
 
 ### Added
