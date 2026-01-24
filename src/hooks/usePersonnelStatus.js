@@ -371,8 +371,38 @@ export function usePersonnelStatusActions() {
  */
 export function useSelfSignOut() {
   const { user } = useAuth();
+  const { personnel } = usePersonnel();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Find user's personnel record to get potential alternate status ID
+  const myPersonnelRecord = personnel.find(
+    (p) => p.userId === user?.uid || p.email === user?.email
+  );
+
+  /**
+   * Find the user's actual status document.
+   * Checks Auth UID first, then personnel doc ID.
+   * Returns { docId, data } or { docId: user.uid, data: null } if none found.
+   */
+  async function findMyStatusDoc() {
+    // First try Auth UID (primary for self-service)
+    const authUidDoc = await getDoc(doc(db, "personnelStatus", user.uid));
+    if (authUidDoc.exists()) {
+      return { docId: user.uid, data: authUidDoc.data() };
+    }
+
+    // If not found, try personnel doc ID (for companions signed out before linking)
+    if (myPersonnelRecord && myPersonnelRecord.id !== user.uid) {
+      const personnelIdDoc = await getDoc(doc(db, "personnelStatus", myPersonnelRecord.id));
+      if (personnelIdDoc.exists()) {
+        return { docId: myPersonnelRecord.id, data: personnelIdDoc.data() };
+      }
+    }
+
+    // No status found
+    return { docId: user.uid, data: null };
+  }
 
   async function signOut(signOutData) {
     setLoading(true);
@@ -486,18 +516,13 @@ export function useSelfSignOut() {
     try {
       const batch = writeBatch(db);
 
-      // Get current status for history
-      const currentStatusDoc = await getDoc(
-        doc(db, "personnelStatus", user.uid),
-      );
-      const currentData = currentStatusDoc.exists()
-        ? currentStatusDoc.data()
-        : {};
-      const previousStatus = currentData.status || "pass";
-      const previousStage = currentData.passStage || null;
-      const companions = currentData.companions || [];
+      // Find the user's actual status document (could be at Auth UID or personnel doc ID)
+      const { docId: myStatusId, data: currentData } = await findMyStatusDoc();
+      const previousStatus = currentData?.status || "pass";
+      const previousStage = currentData?.passStage || null;
+      const companions = currentData?.companions || [];
 
-      // Update current status to present
+      // Update current status to present (always write to Auth UID for consistency)
       const statusRef = doc(db, "personnelStatus", user.uid);
       batch.set(statusRef, {
         personnelId: user.uid,
@@ -514,6 +539,11 @@ export function useSelfSignOut() {
         updatedAt: serverTimestamp(),
         selfUpdated: true,
       });
+
+      // If status was at a different ID (personnel doc ID), delete the old one
+      if (myStatusId !== user.uid) {
+        batch.delete(doc(db, "personnelStatus", myStatusId));
+      }
 
       // Add to history
       const historyRef = doc(collection(db, "personnelStatusHistory"));
@@ -589,19 +619,16 @@ export function useSelfSignOut() {
     try {
       const batch = writeBatch(db);
 
-      // Get current status
-      const currentStatusDoc = await getDoc(
-        doc(db, "personnelStatus", user.uid),
-      );
-      if (!currentStatusDoc.exists()) {
+      // Find the user's actual status document (could be at Auth UID or personnel doc ID)
+      const { docId: myStatusId, data: currentData } = await findMyStatusDoc();
+      if (!currentData) {
         throw new Error("No status record found");
       }
-      const currentData = currentStatusDoc.data();
       const previousStage = currentData.passStage || "enroute_to";
       const companions = currentData.companions || [];
 
       // Update status with new stage
-      const statusRef = doc(db, "personnelStatus", user.uid);
+      const statusRef = doc(db, "personnelStatus", myStatusId);
       batch.update(statusRef, {
         passStage: newStage,
         updatedAt: serverTimestamp(),
@@ -610,7 +637,7 @@ export function useSelfSignOut() {
       // Add to history
       const historyRef = doc(collection(db, "personnelStatusHistory"));
       batch.set(historyRef, {
-        personnelId: user.uid,
+        personnelId: myStatusId,
         personnelName: user.displayName || user.email,
         status: "pass",
         passStage: newStage,
@@ -684,14 +711,11 @@ export function useSelfSignOut() {
     try {
       const batch = writeBatch(db);
 
-      // Get current status
-      const currentStatusDoc = await getDoc(
-        doc(db, "personnelStatus", user.uid),
-      );
-      if (!currentStatusDoc.exists()) {
+      // Find the user's actual status document (could be at Auth UID or personnel doc ID)
+      const { docId: myStatusId, data: currentData } = await findMyStatusDoc();
+      if (!currentData) {
         throw new Error("No status record found");
       }
-      const currentData = currentStatusDoc.data();
       const withPersonId = currentData.withPersonId;
 
       if (!withPersonId) {
@@ -699,7 +723,7 @@ export function useSelfSignOut() {
       }
 
       // Update own status - remove group link but keep pass status
-      const statusRef = doc(db, "personnelStatus", user.uid);
+      const statusRef = doc(db, "personnelStatus", myStatusId);
       batch.update(statusRef, {
         withPersonId: null,
         withPersonName: null,
@@ -710,7 +734,7 @@ export function useSelfSignOut() {
       // Add to history
       const historyRef = doc(collection(db, "personnelStatusHistory"));
       batch.set(historyRef, {
-        personnelId: user.uid,
+        personnelId: myStatusId,
         personnelName: user.displayName || user.email,
         status: currentData.status,
         passStage: currentData.passStage || null,
@@ -724,13 +748,14 @@ export function useSelfSignOut() {
       });
 
       // Remove self from the primary person's companions list
+      // Check both Auth UID and personnel doc ID since either could be stored
       const primaryStatusDoc = await getDoc(
         doc(db, "personnelStatus", withPersonId),
       );
       if (primaryStatusDoc.exists()) {
         const primaryData = primaryStatusDoc.data();
         const updatedCompanions = (primaryData.companions || []).filter(
-          (c) => c.id !== user.uid,
+          (c) => c.id !== user.uid && c.id !== myStatusId,
         );
         const primaryStatusRef = doc(db, "personnelStatus", withPersonId);
         batch.update(primaryStatusRef, {
