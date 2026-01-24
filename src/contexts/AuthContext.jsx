@@ -275,10 +275,25 @@ export function AuthProvider({ children }) {
         })
       }
 
-      setUser(currentUser)
-
       if (currentUser) {
-        authLog('Auth', 'User authenticated, fetching role...')
+        // Verify user is in personnel collection (security check)
+        authLog('Auth', 'Verifying user is in personnel collection...')
+        const isPersonnel = await checkPersonnelExists(currentUser.email)
+
+        if (!isPersonnel) {
+          authLog('Auth', 'User NOT in personnel collection, signing out', {
+            email: currentUser.email,
+            uid: currentUser.uid,
+          })
+          await signOut(auth)
+          setUser(null)
+          setUserRole(null)
+          setLoading(false)
+          return
+        }
+
+        setUser(currentUser)
+        authLog('Auth', 'User verified in personnel, fetching role...')
         try {
           const role = await fetchUserRole(currentUser.uid)
           authLog('Auth', 'Role fetch complete, setting state', { role })
@@ -288,6 +303,7 @@ export function AuthProvider({ children }) {
           setUserRole(ROLES.USER)
         }
       } else {
+        setUser(null)
         authLog('Auth', 'No user, clearing role')
         setUserRole(null)
       }
