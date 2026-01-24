@@ -4,8 +4,11 @@ import { authLog, isDebugEnabled, setDebugEnabled } from '../lib/authDebugger'
 import DebugPanel from '../components/common/DebugPanel'
 
 export default function Login() {
-  const { signInWithGoogle } = useAuth()
+  const { signInWithGoogle, authError, clearAuthError } = useAuth()
   const [error, setError] = useState(null)
+
+  // Combine local error and auth context error
+  const displayError = error || authError
   const [loading, setLoading] = useState(false)
   const [debugEnabled, setDebugEnabledState] = useState(false)
   const [showDebugPanel, setShowDebugPanel] = useState(false)
@@ -33,6 +36,7 @@ export default function Login() {
 
   async function handleGoogleSignIn() {
     setError(null)
+    clearAuthError() // Clear any previous auth errors from context
     setLoading(true)
     authLog('Login', 'Sign-in button clicked')
 
@@ -68,9 +72,9 @@ export default function Login() {
             Welcome
           </h2>
 
-          {error && (
+          {displayError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-              {error}
+              {displayError}
             </div>
           )}
 
