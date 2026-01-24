@@ -86,6 +86,11 @@ export function initSentry() {
         return null
       }
 
+      // Ignore Firestore internal assertion errors (Firebase SDK bug, not actionable)
+      if (errorMessage.includes('INTERNAL ASSERTION FAILED') || errorMessage.includes('Unexpected state')) {
+        return null
+      }
+
       // Scrub sensitive data from headers
       if (event.request?.headers) {
         delete event.request.headers['Authorization']
