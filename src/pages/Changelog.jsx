@@ -13,10 +13,11 @@ const changelog = [
           {
             category: 'Pass Approval System',
             details: [
-              'Users can submit pass requests with destination, expected return, and companions',
-              'Candidate Leadership can approve/reject pass requests',
+              'Users submit pass requests for leadership approval before signing out',
+              'Admins and Candidate Leadership can sign out directly without approval',
               'Push notifications sent to leadership when pass requests are created',
-              'Approval automatically signs out requester and companions',
+              'Pending request status shown with cancel option',
+              'Recent rejection notices displayed with reason',
               'Bulk approve/reject functionality for multiple requests',
             ],
           },

@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pass request history tracked in personnelStatusHistory
 - PassApprovalQueue component for leadership to manage pending requests
 - Bulk approve/reject functionality
+- SelfSignOutForm integrates pass approval workflow for regular users
+- Admins and candidate leadership can still sign out directly without approval
+- Pending request status shown with cancel option
+- Recent rejection notices displayed with reason
 
 #### New Role: Candidate Leadership
 - New `candidate_leadership` role between uniform_admin and admin
