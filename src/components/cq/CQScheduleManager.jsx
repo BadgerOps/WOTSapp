@@ -4,10 +4,11 @@ import {
   useCQSchedule,
   useCQSkips,
   useCQScheduleActions,
+  CQ_SHIFT_TIMES,
 } from '../../hooks/useCQSchedule'
 import { usePersonnel } from '../../hooks/usePersonnel'
 import Loading from '../common/Loading'
-import { format, addDays } from 'date-fns'
+import { format, addDays, parse } from 'date-fns'
 
 export default function CQScheduleManager() {
   const { roster, loading: rosterLoading } = useCQRoster()
@@ -15,6 +16,7 @@ export default function CQScheduleManager() {
   const { skips, loading: skipsLoading } = useCQSkips()
   const { personnel } = usePersonnel()
   const {
+    importSchedule,
     importRoster,
     generateSchedule,
     skipDate,
@@ -73,6 +75,11 @@ export default function CQScheduleManager() {
     e.target.value = ''
   }
 
+  /**
+   * Detect CSV format and parse accordingly
+   * New format: Date, Day, Shift 1 (2000–0100), Shift 2 (0100–0600)
+   * Legacy format: Order, LastName, Shift
+   */
   function parseCSV(csvText) {
     const lines = csvText.trim().split('\n')
     if (lines.length < 2) {
@@ -80,12 +87,171 @@ export default function CQScheduleManager() {
     }
 
     const header = lines[0].split(',').map((h) => h.trim().toLowerCase())
+
+    // Detect format by checking for 'date' column (new format) vs 'order' column (legacy)
+    const dateIndex = header.findIndex((h) => h === 'date')
+    const dayIndex = header.findIndex((h) => h === 'day')
+    const shift1Index = header.findIndex((h) => h.includes('shift 1') || h.includes('2000'))
+    const shift2Index = header.findIndex((h) => h.includes('shift 2') || h.includes('0100'))
+
+    const isNewFormat = dateIndex !== -1 && shift1Index !== -1 && shift2Index !== -1
+
+    if (isNewFormat) {
+      return parseNewFormatCSV(lines, { dateIndex, dayIndex, shift1Index, shift2Index })
+    } else {
+      return parseLegacyCSV(lines, header)
+    }
+  }
+
+  /**
+   * Parse new format CSV: Date, Day, Shift 1, Shift 2
+   * Each shift has 2 people separated by "/"
+   * Asterisks (*) indicate candidate leadership (potential skip days)
+   */
+  function parseNewFormatCSV(lines, indices) {
+    const { dateIndex, dayIndex, shift1Index, shift2Index } = indices
+    const entries = []
+    const currentYear = new Date().getFullYear()
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim()
+      if (!line) continue
+
+      // Handle CSV with quoted fields
+      const values = parseCSVLine(line)
+
+      const dateStr = values[dateIndex]?.trim()
+      const dayOfWeek = values[dayIndex]?.trim() || ''
+      const shift1Raw = values[shift1Index]?.trim() || ''
+      const shift2Raw = values[shift2Index]?.trim() || ''
+
+      if (!dateStr) continue
+
+      // Parse date (format: "12-Jan" or "1-Feb")
+      const parsedDate = parseDateString(dateStr, currentYear)
+      if (!parsedDate) continue
+
+      // Parse shift personnel (format: "Name1/Name2" or "Name1*/Name2*")
+      const shift1Personnel = parseShiftPersonnel(shift1Raw)
+      const shift2Personnel = parseShiftPersonnel(shift2Raw)
+
+      // Detect if any name has asterisk (likely skip day / candidate leadership)
+      const hasAsterisk = shift1Raw.includes('*') || shift2Raw.includes('*')
+
+      // Match to personnel database
+      const matchPersonnel = (name) => {
+        if (!name) return { name, id: null, matched: false }
+        const cleanName = name.replace(/\*/g, '').trim()
+        const person = personnel.find(
+          (p) => p.lastName?.toLowerCase() === cleanName.toLowerCase()
+        )
+        return {
+          name: person
+            ? `${person.rank || ''} ${person.lastName}`.trim()
+            : cleanName,
+          id: person?.userId || person?.id || null,
+          matched: !!person,
+        }
+      }
+
+      const p1s1 = matchPersonnel(shift1Personnel.person1)
+      const p2s1 = matchPersonnel(shift1Personnel.person2)
+      const p1s2 = matchPersonnel(shift2Personnel.person1)
+      const p2s2 = matchPersonnel(shift2Personnel.person2)
+
+      entries.push({
+        date: parsedDate,
+        dayOfWeek,
+        shift1Person1Name: p1s1.name,
+        shift1Person1Id: p1s1.id,
+        shift1Person2Name: p2s1.name,
+        shift1Person2Id: p2s1.id,
+        shift2Person1Name: p1s2.name,
+        shift2Person1Id: p1s2.id,
+        shift2Person2Name: p2s2.name,
+        shift2Person2Id: p2s2.id,
+        isLikelySkipDay: hasAsterisk,
+        skipDayReason: hasAsterisk ? 'Candidate Leadership' : null,
+        // Track matching status for preview
+        _matchStatus: {
+          shift1: [p1s1.matched, p2s1.matched],
+          shift2: [p1s2.matched, p2s2.matched],
+        },
+        _format: 'new',
+      })
+    }
+
+    return entries.sort((a, b) => a.date.localeCompare(b.date))
+  }
+
+  /**
+   * Parse a single CSV line handling quoted fields
+   */
+  function parseCSVLine(line) {
+    const result = []
+    let current = ''
+    let inQuotes = false
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      if (char === '"') {
+        inQuotes = !inQuotes
+      } else if (char === ',' && !inQuotes) {
+        result.push(current)
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    result.push(current)
+    return result
+  }
+
+  /**
+   * Parse date string like "12-Jan" or "1-Feb" into YYYY-MM-DD
+   */
+  function parseDateString(dateStr, year) {
+    try {
+      // Handle format: "12-Jan", "1-Feb", etc.
+      const parsed = parse(dateStr, 'd-MMM', new Date(year, 0, 1))
+      if (isNaN(parsed.getTime())) return null
+
+      // Adjust year if the month has passed (handle year rollover)
+      const now = new Date()
+      if (parsed < now && (now.getMonth() - parsed.getMonth()) > 6) {
+        parsed.setFullYear(year + 1)
+      }
+
+      return format(parsed, 'yyyy-MM-dd')
+    } catch (e) {
+      return null
+    }
+  }
+
+  /**
+   * Parse shift personnel string like "Hansen/Bare" or "Smith* /Adams*"
+   * (asterisks indicate candidate leadership)
+   */
+  function parseShiftPersonnel(shiftStr) {
+    if (!shiftStr) return { person1: null, person2: null }
+
+    const parts = shiftStr.split('/')
+    return {
+      person1: parts[0]?.trim() || null,
+      person2: parts[1]?.trim() || null,
+    }
+  }
+
+  /**
+   * Parse legacy format CSV: Order, LastName, Shift
+   */
+  function parseLegacyCSV(lines, header) {
     const orderIndex = header.indexOf('order')
     const lastNameIndex = header.indexOf('lastname')
     const shiftIndex = header.indexOf('shift')
 
     if (orderIndex === -1 || lastNameIndex === -1) {
-      throw new Error('CSV must have "Order" and "LastName" columns')
+      throw new Error('CSV must have "Order" and "LastName" columns (legacy format) or "Date", "Shift 1", "Shift 2" columns (new format)')
     }
 
     const entries = []
@@ -114,6 +280,7 @@ export default function CQScheduleManager() {
           ? `${person.rank || ''} ${person.lastName}, ${person.firstName}`.trim()
           : lastName,
         matched: !!person,
+        _format: 'legacy',
       })
     }
 
@@ -124,9 +291,18 @@ export default function CQScheduleManager() {
     if (!importPreview) return
 
     try {
-      await importRoster(importPreview)
-      setImportPreview(null)
-      setSuccess('Roster imported successfully!')
+      // Check format and use appropriate import method
+      const isNewFormat = importPreview[0]?._format === 'new'
+
+      if (isNewFormat) {
+        await importSchedule(importPreview)
+        setImportPreview(null)
+        setSuccess(`Schedule imported successfully! ${importPreview.length} days added.`)
+      } else {
+        await importRoster(importPreview)
+        setImportPreview(null)
+        setSuccess('Roster imported successfully!')
+      }
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setImportError(err.message)
@@ -309,50 +485,72 @@ export default function CQScheduleManager() {
             </h3>
             {upcomingSchedule.length === 0 ? (
               <p className="text-sm text-gray-500 italic">
-                No upcoming schedule. Generate a schedule from the roster.
+                No upcoming schedule. Import a CSV schedule or generate from roster.
               </p>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {upcomingSchedule.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className={`p-3 rounded-lg border ${
-                      entry.date === today
-                        ? 'bg-yellow-50 border-yellow-200'
-                        : 'bg-gray-50 border-gray-200'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {format(new Date(entry.date + 'T12:00:00'), 'EEEE, MMM d, yyyy')}
-                          {entry.date === today && (
-                            <span className="ml-2 text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full">
-                              Today
-                            </span>
-                          )}
+                {upcomingSchedule.map((entry) => {
+                  // Support both new format (shift1/shift2) and legacy format (firstShift/secondShift)
+                  const isNewFormat = entry.shift1Person1Name !== undefined
+                  const shift1Display = isNewFormat
+                    ? [entry.shift1Person1Name, entry.shift1Person2Name].filter(Boolean).join(' / ')
+                    : entry.firstShiftName
+                  const shift2Display = isNewFormat
+                    ? [entry.shift2Person1Name, entry.shift2Person2Name].filter(Boolean).join(' / ')
+                    : entry.secondShiftName
+
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`p-3 rounded-lg border ${
+                        entry.isLikelySkipDay
+                          ? 'bg-purple-50 border-purple-200'
+                          : entry.date === today
+                          ? 'bg-yellow-50 border-yellow-200'
+                          : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900 flex flex-wrap items-center gap-2">
+                            {format(new Date(entry.date + 'T12:00:00'), 'EEEE, MMM d, yyyy')}
+                            {entry.date === today && (
+                              <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full">
+                                Today
+                              </span>
+                            )}
+                            {entry.isLikelySkipDay && (
+                              <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">
+                                {entry.skipDayReason || 'Candidate Leadership'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-600 mt-2 space-y-1">
+                            <div>
+                              <span className="font-medium text-gray-700">Shift 1 ({CQ_SHIFT_TIMES.shift1.label}):</span>{' '}
+                              {shift1Display || '-'}
+                            </div>
+                            <div>
+                              <span className="font-medium text-gray-700">Shift 2 ({CQ_SHIFT_TIMES.shift2.label}):</span>{' '}
+                              {shift2Display || '-'}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-600 mt-1">
-                          <span className="font-medium">1st Shift:</span> {entry.firstShiftName || '-'}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          <span className="font-medium">2nd Shift:</span> {entry.secondShiftName || '-'}
-                        </div>
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
+                            entry.status === 'active'
+                              ? 'bg-green-100 text-green-700'
+                              : entry.status === 'completed'
+                              ? 'bg-gray-100 text-gray-600'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}
+                        >
+                          {entry.status}
+                        </span>
                       </div>
-                      <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          entry.status === 'active'
-                            ? 'bg-green-100 text-green-700'
-                            : entry.status === 'completed'
-                            ? 'bg-gray-100 text-gray-600'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}
-                      >
-                        {entry.status}
-                      </span>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -364,21 +562,40 @@ export default function CQScheduleManager() {
                 Recent History
               </h3>
               <div className="space-y-2">
-                {pastSchedule.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="p-2 bg-gray-50 rounded border border-gray-100 text-sm"
-                  >
-                    <div className="flex justify-between">
-                      <span className="text-gray-700">
-                        {format(new Date(entry.date + 'T12:00:00'), 'MMM d, yyyy')}
-                      </span>
-                      <span className="text-gray-500">
-                        {entry.firstShiftName} / {entry.secondShiftName}
-                      </span>
+                {pastSchedule.map((entry) => {
+                  // Support both formats
+                  const isNewFormat = entry.shift1Person1Name !== undefined
+                  const shift1Display = isNewFormat
+                    ? [entry.shift1Person1Name, entry.shift1Person2Name].filter(Boolean).join('/')
+                    : entry.firstShiftName
+                  const shift2Display = isNewFormat
+                    ? [entry.shift2Person1Name, entry.shift2Person2Name].filter(Boolean).join('/')
+                    : entry.secondShiftName
+
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`p-2 rounded border text-sm ${
+                        entry.isLikelySkipDay
+                          ? 'bg-purple-50 border-purple-100'
+                          : 'bg-gray-50 border-gray-100'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="text-gray-700">
+                          {format(new Date(entry.date + 'T12:00:00'), 'MMM d, yyyy')}
+                          {entry.isLikelySkipDay && (
+                            <span className="ml-1 text-xs text-purple-600">(CL)</span>
+                          )}
+                        </span>
+                        <div className="text-right text-gray-500 text-xs">
+                          <div>S1: {shift1Display || '-'}</div>
+                          <div>S2: {shift2Display || '-'}</div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
@@ -388,12 +605,15 @@ export default function CQScheduleManager() {
       {/* Roster Tab */}
       {activeTab === 'roster' && (
         <div className="space-y-4">
-          {/* Import Roster */}
+          {/* Import Schedule/Roster */}
           <div className="card">
-            <h3 className="text-md font-semibold text-gray-900 mb-3">Import CQ Roster</h3>
+            <h3 className="text-md font-semibold text-gray-900 mb-3">Import CQ Schedule</h3>
             <p className="text-xs text-gray-600 mb-3">
-              Upload a CSV with columns: Order, LastName, Shift (first/second).
-              Each order number represents one day's worth of CQ assignments.
+              <strong>New format (recommended):</strong> CSV with columns: Date, Day, Shift 1 (2000–0100), Shift 2 (0100–0600).
+              Each shift has 2 people separated by "/". Names with * indicate candidate leadership days.
+            </p>
+            <p className="text-xs text-gray-500 mb-3">
+              <em>Legacy format:</em> Order, LastName, Shift (first/second).
             </p>
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -407,42 +627,87 @@ export default function CQScheduleManager() {
           {importPreview && (
             <div className="card">
               <h3 className="text-md font-semibold text-gray-900 mb-3">
-                Import Preview ({importPreview.length} entries)
+                Import Preview ({importPreview.length} {importPreview[0]?._format === 'new' ? 'days' : 'entries'})
               </h3>
+              {importPreview[0]?._format === 'new' && (
+                <div className="mb-3 p-2 bg-blue-50 border border-blue-200 text-blue-700 rounded text-sm">
+                  Detected new schedule format with 2 people per shift.
+                </div>
+              )}
               {importError && (
                 <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 rounded text-sm">
                   {importError}
                 </div>
               )}
               <div className="max-h-64 overflow-y-auto mb-3">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Order</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Name</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Shift</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {importPreview.map((entry, idx) => (
-                      <tr key={idx}>
-                        <td className="px-3 py-2">{entry.order}</td>
-                        <td className="px-3 py-2">{entry.name}</td>
-                        <td className="px-3 py-2 capitalize">{entry.shift}</td>
-                        <td className="px-3 py-2">
-                          <span
-                            className={`text-xs ${
-                              entry.matched ? 'text-green-600' : 'text-yellow-600'
-                            }`}
-                          >
-                            {entry.matched ? 'Matched' : 'Not found'}
-                          </span>
-                        </td>
+                {importPreview[0]?._format === 'new' ? (
+                  /* New format preview */
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">Date</th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">Shift 1 (2000-0100)</th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">Shift 2 (0100-0600)</th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">Flag</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {importPreview.map((entry, idx) => (
+                        <tr key={idx} className={entry.isLikelySkipDay ? 'bg-purple-50' : ''}>
+                          <td className="px-2 py-2 whitespace-nowrap">
+                            {format(new Date(entry.date + 'T12:00:00'), 'MMM d')}
+                            <span className="text-gray-400 ml-1 text-xs">{entry.dayOfWeek}</span>
+                          </td>
+                          <td className="px-2 py-2">
+                            <div>{entry.shift1Person1Name || '-'}</div>
+                            <div>{entry.shift1Person2Name || '-'}</div>
+                          </td>
+                          <td className="px-2 py-2">
+                            <div>{entry.shift2Person1Name || '-'}</div>
+                            <div>{entry.shift2Person2Name || '-'}</div>
+                          </td>
+                          <td className="px-2 py-2">
+                            {entry.isLikelySkipDay && (
+                              <span className="text-xs bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded">
+                                CL
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  /* Legacy format preview */
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Order</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Name</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Shift</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {importPreview.map((entry, idx) => (
+                        <tr key={idx}>
+                          <td className="px-3 py-2">{entry.order}</td>
+                          <td className="px-3 py-2">{entry.name}</td>
+                          <td className="px-3 py-2 capitalize">{entry.shift}</td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`text-xs ${
+                                entry.matched ? 'text-green-600' : 'text-yellow-600'
+                              }`}
+                            >
+                              {entry.matched ? 'Matched' : 'Not found'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
               <div className="flex gap-2">
                 <button
