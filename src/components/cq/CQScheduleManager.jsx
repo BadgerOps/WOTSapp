@@ -77,7 +77,7 @@ export default function CQScheduleManager() {
 
   /**
    * Detect CSV format and parse accordingly
-   * New format: Date, Day, Shift 1 (2000–0100), Shift 2 (0100–0600)
+   * New format: date,shift,user1,user2,isPotentialSkip (one row per shift)
    * Legacy format: Order, LastName, Shift
    */
   function parseCSV(csvText) {
@@ -88,29 +88,29 @@ export default function CQScheduleManager() {
 
     const header = lines[0].split(',').map((h) => h.trim().toLowerCase())
 
-    // Detect format by checking for 'date' column (new format) vs 'order' column (legacy)
+    // Detect new format: date,shift,user1,user2
     const dateIndex = header.findIndex((h) => h === 'date')
-    const dayIndex = header.findIndex((h) => h === 'day')
-    const shift1Index = header.findIndex((h) => h.includes('shift 1') || h.includes('2000'))
-    const shift2Index = header.findIndex((h) => h.includes('shift 2') || h.includes('0100'))
+    const shiftIndex = header.findIndex((h) => h === 'shift')
+    const user1Index = header.findIndex((h) => h === 'user1')
+    const user2Index = header.findIndex((h) => h === 'user2')
+    const isPotentialSkipIndex = header.findIndex((h) => h === 'ispotentialskip')
 
-    const isNewFormat = dateIndex !== -1 && shift1Index !== -1 && shift2Index !== -1
+    const isNewFormat = dateIndex !== -1 && shiftIndex !== -1 && user1Index !== -1 && user2Index !== -1
 
     if (isNewFormat) {
-      return parseNewFormatCSV(lines, { dateIndex, dayIndex, shift1Index, shift2Index })
+      return parseNewFormatCSV(lines, { dateIndex, shiftIndex, user1Index, user2Index, isPotentialSkipIndex })
     } else {
       return parseLegacyCSV(lines, header)
     }
   }
 
   /**
-   * Parse new format CSV: Date, Day, Shift 1, Shift 2
-   * Each shift has 2 people separated by "/"
-   * Asterisks (*) indicate potential skip days (before quizzes/PT tests) - label but still schedule
+   * Parse new format CSV: date,shift,user1,user2,isPotentialSkip
+   * Each row is a single shift assignment
    */
   function parseNewFormatCSV(lines, indices) {
-    const { dateIndex, dayIndex, shift1Index, shift2Index } = indices
-    const entries = []
+    const { dateIndex, shiftIndex, user1Index, user2Index, isPotentialSkipIndex } = indices
+    const shiftsByDate = new Map() // Group shifts by date
     const currentYear = new Date().getFullYear()
 
     for (let i = 1; i < lines.length; i++) {
@@ -121,27 +121,23 @@ export default function CQScheduleManager() {
       const values = parseCSVLine(line)
 
       const dateStr = values[dateIndex]?.trim()
-      const dayOfWeek = values[dayIndex]?.trim() || ''
-      const shift1Raw = values[shift1Index]?.trim() || ''
-      const shift2Raw = values[shift2Index]?.trim() || ''
+      const shiftNum = values[shiftIndex]?.trim()
+      const user1 = values[user1Index]?.trim() || ''
+      const user2 = values[user2Index]?.trim() || ''
+      const isPotentialSkip = isPotentialSkipIndex !== -1
+        ? values[isPotentialSkipIndex]?.trim().toLowerCase() === 'true'
+        : false
 
-      if (!dateStr) continue
+      if (!dateStr || !shiftNum) continue
 
       // Parse date (format: "12-Jan" or "1-Feb")
       const parsedDate = parseDateString(dateStr, currentYear)
       if (!parsedDate) continue
 
-      // Detect if any name has asterisk (potential skip day - before quiz/PT test)
-      const hasAsterisk = shift1Raw.includes('*') || shift2Raw.includes('*')
-
-      // Parse shift personnel (format: "Name1/Name2" or "Name1*/Name2*")
-      const shift1Personnel = parseShiftPersonnel(shift1Raw)
-      const shift2Personnel = parseShiftPersonnel(shift2Raw)
-
       // Match to personnel database
       const matchPersonnel = (name) => {
         if (!name) return { name, id: null, matched: false }
-        const cleanName = name.replace(/\*/g, '').trim()
+        const cleanName = name.trim()
         const person = personnel.find(
           (p) => p.lastName?.toLowerCase() === cleanName.toLowerCase()
         )
@@ -154,34 +150,55 @@ export default function CQScheduleManager() {
         }
       }
 
-      const p1s1 = matchPersonnel(shift1Personnel.person1)
-      const p2s1 = matchPersonnel(shift1Personnel.person2)
-      const p1s2 = matchPersonnel(shift2Personnel.person1)
-      const p2s2 = matchPersonnel(shift2Personnel.person2)
+      const p1 = matchPersonnel(user1)
+      const p2 = matchPersonnel(user2)
 
-      entries.push({
-        date: parsedDate,
-        dayOfWeek,
-        shift1Person1Name: p1s1.name,
-        shift1Person1Id: p1s1.id,
-        shift1Person2Name: p2s1.name,
-        shift1Person2Id: p2s1.id,
-        shift2Person1Name: p1s2.name,
-        shift2Person1Id: p1s2.id,
-        shift2Person2Name: p2s2.name,
-        shift2Person2Id: p2s2.id,
-        isPotentialSkipDay: hasAsterisk,
-        skipDayReason: hasAsterisk ? 'Potential Skip (Quiz/PT Test)' : null,
-        // Track matching status for preview
-        _matchStatus: {
-          shift1: [p1s1.matched, p2s1.matched],
-          shift2: [p1s2.matched, p2s2.matched],
-        },
-        _format: 'new',
-      })
+      // Get or create entry for this date
+      if (!shiftsByDate.has(parsedDate)) {
+        shiftsByDate.set(parsedDate, {
+          date: parsedDate,
+          dayOfWeek: '',
+          shift1Person1Name: null,
+          shift1Person1Id: null,
+          shift1Person2Name: null,
+          shift1Person2Id: null,
+          shift2Person1Name: null,
+          shift2Person1Id: null,
+          shift2Person2Name: null,
+          shift2Person2Id: null,
+          isPotentialSkipDay: false,
+          skipDayReason: null,
+          _matchStatus: { shift1: [false, false], shift2: [false, false] },
+          _format: 'new',
+        })
+      }
+
+      const entry = shiftsByDate.get(parsedDate)
+
+      // Populate the appropriate shift
+      if (shiftNum === '1') {
+        entry.shift1Person1Name = p1.name
+        entry.shift1Person1Id = p1.id
+        entry.shift1Person2Name = p2.name
+        entry.shift1Person2Id = p2.id
+        entry._matchStatus.shift1 = [p1.matched, p2.matched]
+      } else if (shiftNum === '2') {
+        entry.shift2Person1Name = p1.name
+        entry.shift2Person1Id = p1.id
+        entry.shift2Person2Name = p2.name
+        entry.shift2Person2Id = p2.id
+        entry._matchStatus.shift2 = [p1.matched, p2.matched]
+      }
+
+      // Mark as potential skip if any shift for this date has the flag
+      if (isPotentialSkip) {
+        entry.isPotentialSkipDay = true
+        entry.skipDayReason = 'Potential Skip (Quiz/PT Test)'
+      }
     }
 
-    return entries.sort((a, b) => a.date.localeCompare(b.date))
+    // Convert map to sorted array
+    return Array.from(shiftsByDate.values()).sort((a, b) => a.date.localeCompare(b.date))
   }
 
   /**
@@ -225,20 +242,6 @@ export default function CQScheduleManager() {
       return format(parsed, 'yyyy-MM-dd')
     } catch (e) {
       return null
-    }
-  }
-
-  /**
-   * Parse shift personnel string like "Hansen/Bare" or "Smith* /Adams*"
-   * (asterisks indicate candidate leadership)
-   */
-  function parseShiftPersonnel(shiftStr) {
-    if (!shiftStr) return { person1: null, person2: null }
-
-    const parts = shiftStr.split('/')
-    return {
-      person1: parts[0]?.trim() || null,
-      person2: parts[1]?.trim() || null,
     }
   }
 
@@ -615,8 +618,8 @@ export default function CQScheduleManager() {
           <div className="card">
             <h3 className="text-md font-semibold text-gray-900 mb-3">Import CQ Schedule</h3>
             <p className="text-xs text-gray-600 mb-3">
-              <strong>New format (recommended):</strong> CSV with columns: Date, Day, Shift 1 (2000–0100), Shift 2 (0100–0600).
-              Each shift has 2 people separated by "/". Names with * indicate candidate leadership days.
+              <strong>New format (recommended):</strong> CSV with columns: date, shift, user1, user2, isPotentialSkip.
+              Each row is one shift assignment (shift 1 or 2). Set isPotentialSkip to true for quiz/PT test days.
             </p>
             <p className="text-xs text-gray-500 mb-3">
               <em>Legacy format:</em> Order, LastName, Shift (first/second).
