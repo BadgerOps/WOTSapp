@@ -1,8 +1,38 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.3'
+const APP_VERSION = '0.4.4'
 
 const changelog = [
+  {
+    version: '0.4.4',
+    date: '2026-01-24',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Pass Approval System',
+            details: [
+              'Users submit pass requests for leadership approval before signing out',
+              'Admins and Candidate Leadership can sign out directly without approval',
+              'Push notifications sent to leadership when pass requests are created',
+              'Pending request status shown with cancel option',
+              'Recent rejection notices displayed with reason',
+              'Bulk approve/reject functionality for multiple requests',
+            ],
+          },
+          {
+            category: 'New Role: Candidate Leadership',
+            details: [
+              'New role between Uniform Admin and Admin',
+              'Can approve pass requests and manage CQ operations',
+              'Added APPROVE_PASS_REQUESTS permission',
+            ],
+          },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.3',
     date: '2026-01-24',

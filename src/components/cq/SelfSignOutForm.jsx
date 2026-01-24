@@ -5,14 +5,14 @@ import {
   STATUS_TYPES,
   PASS_STAGES,
 } from "../../hooks/usePersonnelStatus";
+import {
+  useMyPassRequests,
+  usePassRequestActions,
+  PASS_REQUEST_STATUS,
+} from "../../hooks/usePassApproval";
 import { usePersonnel } from "../../hooks/usePersonnel";
 import { useAuth } from "../../contexts/AuthContext";
 import Loading from "../common/Loading";
-
-const SIGN_OUT_TYPES = [
-  { value: "pass", label: "Pass", color: "yellow" },
-  { value: "sick_call", label: "Sick Call", color: "orange" },
-];
 
 const DESTINATION_OPTIONS = [
   { value: "shoppette", label: "Shoppette" },
@@ -30,7 +30,7 @@ const TIME_PRESETS = [
 ];
 
 export default function SelfSignOutForm() {
-  const { user } = useAuth();
+  const { user, isAdmin, isCandidateLeadership } = useAuth();
   const {
     myStatus,
     loading: statusLoading,
@@ -45,13 +45,21 @@ export default function SelfSignOutForm() {
     loading: actionLoading,
     error: actionError,
   } = useSelfSignOut();
+  const {
+    requests: myPassRequests,
+    loading: requestsLoading,
+  } = useMyPassRequests();
+  const {
+    createPassRequest,
+    cancelPassRequest,
+    loading: requestActionLoading,
+    error: requestError,
+  } = usePassRequestActions();
   const { personnel } = usePersonnel();
   const [showForm, setShowForm] = useState(false);
   const [signOutType, setSignOutType] = useState("pass");
   const [destinationType, setDestinationType] = useState("");
   const [customDestination, setCustomDestination] = useState("");
-  const [timeOutMode, setTimeOutMode] = useState("now"); // 'now' or 'exact'
-  const [timeOutExact, setTimeOutExact] = useState("");
   const [timeMode, setTimeMode] = useState("preset"); // 'preset' or 'exact'
   const [selectedPreset, setSelectedPreset] = useState(null);
   const [exactTime, setExactTime] = useState("");
@@ -61,6 +69,9 @@ export default function SelfSignOutForm() {
   const [companionSearch, setCompanionSearch] = useState("");
   const [showCompanionDropdown, setShowCompanionDropdown] = useState(false);
 
+  // Can this user sign out directly without approval?
+  const canSignOutDirectly = isAdmin || isCandidateLeadership;
+
   // Find current user's personnel record
   const myPersonnelRecord = useMemo(() => {
     if (!user || !personnel.length) return null;
@@ -68,6 +79,21 @@ export default function SelfSignOutForm() {
       (p) => p.userId === user.uid || p.email === user.email,
     );
   }, [user, personnel]);
+
+  // Get pending pass request (most recent)
+  const pendingRequest = useMemo(() => {
+    return myPassRequests.find((r) => r.status === "pending");
+  }, [myPassRequests]);
+
+  // Get most recent rejected request (within last hour)
+  const recentRejectedRequest = useMemo(() => {
+    const oneHourAgo = Date.now() - (60 * 60 * 1000);
+    return myPassRequests.find((r) => {
+      if (r.status !== "rejected") return false;
+      const rejectedAt = r.rejectedAt?.toDate?.()?.getTime() || 0;
+      return rejectedAt > oneHourAgo;
+    });
+  }, [myPassRequests]);
 
   // Auto-populate phone number from personnel record
   useEffect(() => {
@@ -94,7 +120,7 @@ export default function SelfSignOutForm() {
       .slice(0, 5); // Limit results
   }, [companionSearch, personnel, companions, user]);
 
-  if (statusLoading) return <Loading />;
+  if (statusLoading || requestsLoading) return <Loading />;
 
   if (statusError) {
     return (
@@ -109,6 +135,9 @@ export default function SelfSignOutForm() {
   const isOut = isOnPass || isOnSickCall;
   const isCompanion = !!myStatus?.withPersonId;
 
+  const loading = actionLoading || requestActionLoading;
+  const error = actionError || requestError;
+
   function getDestination() {
     if (destinationType === "other") {
       return customDestination;
@@ -117,46 +146,67 @@ export default function SelfSignOutForm() {
     return option?.label || "";
   }
 
-  function getTimeOut() {
-    if (timeOutMode === "exact" && timeOutExact) {
-      return new Date(timeOutExact).toISOString();
-    }
-    return new Date().toISOString();
-  }
-
   function getExpectedReturn() {
     if (timeMode === "exact") {
       return exactTime;
     }
     if (selectedPreset) {
-      // Base expected return on time out, not current time
-      const baseTime =
-        timeOutMode === "exact" && timeOutExact
-          ? new Date(timeOutExact)
-          : new Date();
+      const baseTime = new Date();
       baseTime.setMinutes(baseTime.getMinutes() + selectedPreset);
       return baseTime.toISOString();
     }
     return "";
   }
 
-  async function handleSignOut(e) {
+  // Submit pass request for approval
+  async function handleRequestPass(e) {
     e.preventDefault();
     try {
       const formData = {
-        timeOut: getTimeOut(),
         destination: getDestination(),
         expectedReturn: getExpectedReturn(),
         contactNumber,
         notes,
         companions: companions.map((c) => ({
-          id: c.userId || c.id, // Prefer Auth UID if account is linked
+          id: c.userId || c.id,
+          name: `${c.firstName} ${c.lastName}`,
+          rank: c.rank,
+        })),
+      };
+      await createPassRequest(formData);
+      resetForm();
+    } catch (err) {
+      // Error handled by hook
+    }
+  }
+
+  // Direct sign out (for leadership/admin)
+  async function handleDirectSignOut(e) {
+    e.preventDefault();
+    try {
+      const formData = {
+        timeOut: new Date().toISOString(),
+        destination: getDestination(),
+        expectedReturn: getExpectedReturn(),
+        contactNumber,
+        notes,
+        companions: companions.map((c) => ({
+          id: c.userId || c.id,
           name: `${c.firstName} ${c.lastName}`,
           rank: c.rank,
         })),
       };
       await signOut(formData);
       resetForm();
+    } catch (err) {
+      // Error handled by hook
+    }
+  }
+
+  async function handleCancelRequest() {
+    if (!pendingRequest) return;
+    try {
+      await cancelPassRequest(pendingRequest.id);
     } catch (err) {
       // Error handled by hook
     }
@@ -188,8 +238,6 @@ export default function SelfSignOutForm() {
     setSignOutType("pass");
     setDestinationType("");
     setCustomDestination("");
-    setTimeOutMode("now");
-    setTimeOutExact("");
     setTimeMode("preset");
     setSelectedPreset(null);
     setExactTime("");
@@ -293,9 +341,73 @@ export default function SelfSignOutForm() {
         )}
       </div>
 
-      {actionError && (
+      {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-700 text-sm">{actionError}</p>
+          <p className="text-red-700 text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Recent Rejection Notice */}
+      {recentRejectedRequest && !isOut && !pendingRequest && !showForm && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-red-700 text-sm font-medium">Pass Request Rejected</p>
+              {recentRejectedRequest.rejectionReason && (
+                <p className="text-red-600 text-sm mt-1">
+                  Reason: {recentRejectedRequest.rejectionReason}
+                </p>
+              )}
+              <p className="text-red-600 text-xs mt-1">
+                By {recentRejectedRequest.rejectedByName}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Request Status */}
+      {pendingRequest && !isOut && !showForm && (
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="animate-pulse w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <span className="font-medium text-yellow-800">Pass Request Pending</span>
+              </div>
+              <div className="mt-2 text-sm text-yellow-700 space-y-1">
+                <p><span className="font-medium">Destination:</span> {pendingRequest.destination}</p>
+                {pendingRequest.expectedReturn && (
+                  <p>
+                    <span className="font-medium">Expected Return:</span>{" "}
+                    {new Date(pendingRequest.expectedReturn).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                )}
+                {pendingRequest.companions?.length > 0 && (
+                  <p>
+                    <span className="font-medium">With:</span>{" "}
+                    {pendingRequest.companions.map((c) => c.name).join(", ")}
+                  </p>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-yellow-600">
+                Waiting for leadership approval...
+              </p>
+            </div>
+            <button
+              onClick={handleCancelRequest}
+              disabled={loading}
+              className="text-yellow-700 hover:text-yellow-900 text-sm font-medium"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
@@ -303,10 +415,10 @@ export default function SelfSignOutForm() {
       {isOnSickCall && !showForm && (
         <button
           onClick={handleSignIn}
-          disabled={actionLoading}
+          disabled={loading}
           className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium"
         >
-          {actionLoading ? "Signing In..." : "Sign Back In"}
+          {loading ? "Signing In..." : "Sign Back In"}
         </button>
       )}
 
@@ -352,10 +464,10 @@ export default function SelfSignOutForm() {
           {isCompanion && (
             <button
               onClick={breakFree}
-              disabled={actionLoading}
+              disabled={loading}
               className="w-full px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm"
             >
-              {actionLoading ? "Updating..." : "Go Solo (separate from group)"}
+              {loading ? "Updating..." : "Go Solo (separate from group)"}
             </button>
           )}
 
@@ -363,10 +475,10 @@ export default function SelfSignOutForm() {
           {myStatus?.passStage === "enroute_to" && (
             <button
               onClick={() => updateStage("arrived")}
-              disabled={actionLoading}
+              disabled={loading}
               className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 font-medium"
             >
-              {actionLoading
+              {loading
                 ? "Updating..."
                 : `Arrived at ${myStatus.destination}`}
             </button>
@@ -375,20 +487,20 @@ export default function SelfSignOutForm() {
           {myStatus?.passStage === "arrived" && (
             <button
               onClick={() => updateStage("enroute_back")}
-              disabled={actionLoading}
+              disabled={loading}
               className="w-full px-4 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 font-medium"
             >
-              {actionLoading ? "Updating..." : "Heading Back to Barracks"}
+              {loading ? "Updating..." : "Heading Back to Barracks"}
             </button>
           )}
 
           {myStatus?.passStage === "enroute_back" && (
             <button
               onClick={handleSignIn}
-              disabled={actionLoading}
+              disabled={loading}
               className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium"
             >
-              {actionLoading ? "Signing In..." : "Arrived at Barracks"}
+              {loading ? "Signing In..." : "Arrived at Barracks"}
             </button>
           )}
 
@@ -396,17 +508,17 @@ export default function SelfSignOutForm() {
           {!myStatus?.passStage && (
             <button
               onClick={handleSignIn}
-              disabled={actionLoading}
+              disabled={loading}
               className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium"
             >
-              {actionLoading ? "Signing In..." : "Sign Back In"}
+              {loading ? "Signing In..." : "Sign Back In"}
             </button>
           )}
         </div>
       )}
 
-      {/* Sign Out Buttons (when present) */}
-      {!isOut && !showForm && (
+      {/* Sign Out Buttons (when present and no pending request) */}
+      {!isOut && !showForm && !pendingRequest && (
         <div className="space-y-2">
           <button
             onClick={() => {
@@ -415,7 +527,7 @@ export default function SelfSignOutForm() {
             }}
             className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
-            Sign Out on Pass
+            {canSignOutDirectly ? "Sign Out on Pass" : "Request Pass"}
           </button>
           <button
             onClick={() => {
@@ -477,68 +589,26 @@ export default function SelfSignOutForm() {
             </button>
             <button
               type="submit"
-              disabled={actionLoading || !contactNumber.trim()}
+              disabled={loading || !contactNumber.trim()}
               className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
             >
-              {actionLoading ? "Signing Out..." : "Sick Call"}
+              {loading ? "Signing Out..." : "Sick Call"}
             </button>
           </div>
         </form>
       )}
 
-      {/* Pass Sign Out Form */}
+      {/* Pass Request/Sign Out Form */}
       {showForm && signOutType === "pass" && (
-        <form onSubmit={handleSignOut} className="space-y-4">
+        <form onSubmit={canSignOutDirectly ? handleDirectSignOut : handleRequestPass} className="space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-yellow-100 text-yellow-800">
-              Pass
+              {canSignOutDirectly ? "Pass" : "Pass Request"}
             </span>
-          </div>
-
-          {/* Time Out */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Time Out
-            </label>
-            <div className="flex gap-2 mb-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setTimeOutMode("now");
-                  setTimeOutExact("");
-                }}
-                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                  timeOutMode === "now"
-                    ? "bg-primary-100 text-primary-700 font-medium"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                Now
-              </button>
-              <button
-                type="button"
-                onClick={() => setTimeOutMode("exact")}
-                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                  timeOutMode === "exact"
-                    ? "bg-primary-100 text-primary-700 font-medium"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                Exact Time
-              </button>
-            </div>
-            {timeOutMode === "exact" && (
-              <input
-                type="datetime-local"
-                value={timeOutExact}
-                onChange={(e) => setTimeOutExact(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
-            )}
-            {timeOutMode === "now" && (
-              <p className="text-sm text-gray-500">
-                Departure time will be recorded as now
-              </p>
+            {!canSignOutDirectly && (
+              <span className="text-xs text-gray-500">
+                (Requires leadership approval)
+              </span>
             )}
           </div>
 
@@ -572,10 +642,10 @@ export default function SelfSignOutForm() {
             )}
           </div>
 
-          {/* Time Back */}
+          {/* Expected Return Time */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Time Back <span className="text-red-500">*</span>
+              Expected Return <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-2 mb-2">
               <button
@@ -747,10 +817,12 @@ export default function SelfSignOutForm() {
             </button>
             <button
               type="submit"
-              disabled={actionLoading || !isFormValid}
+              disabled={loading || !isFormValid}
               className="flex-1 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50"
             >
-              {actionLoading ? "Signing Out..." : "Sign Out"}
+              {loading
+                ? (canSignOutDirectly ? "Signing Out..." : "Submitting...")
+                : (canSignOutDirectly ? "Sign Out" : "Request Pass")}
             </button>
           </div>
         </form>

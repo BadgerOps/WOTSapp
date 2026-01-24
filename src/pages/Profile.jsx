@@ -7,7 +7,7 @@ import { db } from '../config/firebase'
 import Loading from '../components/common/Loading'
 import DebugPanel from '../components/common/DebugPanel'
 
-const APP_VERSION = '0.4.3'
+const APP_VERSION = '0.4.4'
 
 export default function Profile() {
   const { user } = useAuth()

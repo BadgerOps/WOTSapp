@@ -119,10 +119,11 @@ describe('PersonnelRoleCell', () => {
       await user.click(screen.getByRole('button'));
       const options = screen.getAllByRole('option');
 
-      expect(options).toHaveLength(3);
+      expect(options).toHaveLength(4);
       expect(options[0]).toHaveTextContent('User');
       expect(options[1]).toHaveTextContent('Uniform Admin');
-      expect(options[2]).toHaveTextContent('Admin');
+      expect(options[2]).toHaveTextContent('Candidate Leadership');
+      expect(options[3]).toHaveTextContent('Admin');
     });
 
     it('has current role selected in dropdown', async () => {

@@ -22,6 +22,12 @@ service cloud.firestore {
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
     }
 
+    function isCandidateLeadership() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'candidate_leadership' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
     // Users collection
     match /users/{userId} {
       // Users can read their own document
@@ -171,8 +177,24 @@ service cloud.firestore {
     match /cqShifts/{shiftId} {
       // Anyone authenticated can read shifts
       allow read: if isAuthenticated();
-      // Only admins can create, update, delete shifts
-      allow write: if isAdmin();
+      // Candidate leadership and admins can manage shifts
+      allow write: if isCandidateLeadership();
+    }
+
+    // Pass Approval Requests collection
+    match /passApprovalRequests/{requestId} {
+      // Anyone authenticated can read their own requests
+      allow read: if isAuthenticated() &&
+        resource.data.requesterId == request.auth.uid;
+      // Candidate leadership and admins can read all requests
+      allow read: if isCandidateLeadership();
+      // Authenticated users can create their own requests
+      allow create: if isAuthenticated() &&
+        request.resource.data.requesterId == request.auth.uid;
+      // Candidate leadership can update (approve/reject)
+      allow update: if isCandidateLeadership();
+      // Only admins can delete
+      allow delete: if isAdmin();
     }
 
     // Personnel Status collection (rolling current status)
@@ -185,18 +207,18 @@ service cloud.firestore {
         (request.resource.data.groupSignOut == true ||
          request.resource.data.groupSignIn == true ||
          request.resource.data.groupUpdate == true);
-      // Admins can read and write all
-      allow read, write: if isAdmin();
+      // Candidate leadership and admins can read and write all
+      allow read, write: if isCandidateLeadership();
       // Anyone authenticated can read all status (for status display)
       allow read: if isAuthenticated();
     }
 
     // Personnel Status History collection
     match /personnelStatusHistory/{logId} {
-      // Admins can read all history
-      allow read: if isAdmin();
-      // Admins can create history entries
-      allow create: if isAdmin();
+      // Candidate leadership and admins can read all history
+      allow read: if isCandidateLeadership();
+      // Candidate leadership and admins can create history entries
+      allow create: if isCandidateLeadership();
       // Users can create their own history entries (for self sign-out)
       allow create: if isAuthenticated() &&
         request.resource.data.personnelId == request.auth.uid &&
@@ -213,7 +235,7 @@ service cloud.firestore {
 
     // CQ Notes collection
     match /cqNotes/{noteId} {
-      allow read, write: if isAdmin();
+      allow read, write: if isCandidateLeadership();
     }
 
     // DA Forms collection (generated server-side)
