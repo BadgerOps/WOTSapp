@@ -26,6 +26,14 @@ export const SWAP_REQUEST_STATUS = {
 }
 
 /**
+ * Swap types
+ */
+export const SWAP_TYPES = {
+  individual: 'individual', // Swap single position
+  fullShift: 'fullShift', // Swap entire shift (both positions)
+}
+
+/**
  * Hook to fetch pending swap requests (for candidate leadership/admin)
  */
 export function usePendingSwapRequests() {
@@ -121,9 +129,13 @@ export function useSwapRequestActions() {
    * @param {string} requestData.scheduleId - The cqSchedule document ID
    * @param {string} requestData.scheduleDate - YYYY-MM-DD format
    * @param {string} requestData.currentShiftType - 'shift1' or 'shift2'
-   * @param {number} requestData.currentPosition - 1 or 2
-   * @param {string} requestData.proposedPersonnelId - User ID of person to swap with
-   * @param {string} requestData.proposedPersonnelName - Name of person to swap with
+   * @param {number} requestData.currentPosition - 1 or 2 (only for individual swaps)
+   * @param {string} requestData.swapType - 'individual' or 'fullShift'
+   * @param {string} requestData.proposedPersonnelId - User ID of person to swap with (individual swap only)
+   * @param {string} requestData.proposedPersonnelName - Name of person to swap with (individual swap only)
+   * @param {string} requestData.targetScheduleId - Target schedule ID (for full shift swap)
+   * @param {string} requestData.targetScheduleDate - Target schedule date (for full shift swap)
+   * @param {string} requestData.targetShiftType - Target shift type (for full shift swap)
    * @param {string} requestData.reason - Reason for swap request
    */
   async function createSwapRequest(requestData) {
@@ -131,20 +143,34 @@ export function useSwapRequestActions() {
     setError(null)
 
     try {
-      const docRef = await addDoc(collection(db, 'cqSwapRequests'), {
+      const swapType = requestData.swapType || SWAP_TYPES.individual
+
+      const docData = {
         requesterId: user.uid,
         requesterName: user.displayName || user.email,
         scheduleId: requestData.scheduleId,
         scheduleDate: requestData.scheduleDate,
         currentShiftType: requestData.currentShiftType,
-        currentPosition: requestData.currentPosition,
-        proposedPersonnelId: requestData.proposedPersonnelId,
-        proposedPersonnelName: requestData.proposedPersonnelName,
+        swapType,
         reason: requestData.reason || null,
         status: 'pending',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      })
+      }
+
+      if (swapType === SWAP_TYPES.individual) {
+        // Individual position swap
+        docData.currentPosition = requestData.currentPosition
+        docData.proposedPersonnelId = requestData.proposedPersonnelId
+        docData.proposedPersonnelName = requestData.proposedPersonnelName
+      } else if (swapType === SWAP_TYPES.fullShift) {
+        // Full shift swap
+        docData.targetScheduleId = requestData.targetScheduleId
+        docData.targetScheduleDate = requestData.targetScheduleDate
+        docData.targetShiftType = requestData.targetShiftType
+      }
+
+      const docRef = await addDoc(collection(db, 'cqSwapRequests'), docData)
 
       setLoading(false)
       return { success: true, requestId: docRef.id }
@@ -237,7 +263,7 @@ export function useSwapApprovalActions() {
         throw new Error('Request is no longer pending')
       }
 
-      // Get the schedule document
+      // Get the source schedule document
       const scheduleRef = doc(db, 'cqSchedule', request.scheduleId)
       const scheduleDoc = await getDoc(scheduleRef)
 
@@ -245,16 +271,66 @@ export function useSwapApprovalActions() {
         throw new Error('Schedule not found')
       }
 
-      // Determine field names
-      const currentFieldPrefix = `${request.currentShiftType}Person${request.currentPosition}`
+      const scheduleData = scheduleDoc.data()
+      const swapType = request.swapType || SWAP_TYPES.individual
 
-      // Update the schedule to swap the user
-      batch.update(scheduleRef, {
-        [`${currentFieldPrefix}Name`]: request.proposedPersonnelName,
-        [`${currentFieldPrefix}Id`]: request.proposedPersonnelId,
-        updatedBy: user.uid,
-        updatedAt: serverTimestamp(),
-      })
+      if (swapType === SWAP_TYPES.individual) {
+        // Individual position swap - just replace one person
+        const currentFieldPrefix = `${request.currentShiftType}Person${request.currentPosition}`
+
+        batch.update(scheduleRef, {
+          [`${currentFieldPrefix}Name`]: request.proposedPersonnelName,
+          [`${currentFieldPrefix}Id`]: request.proposedPersonnelId,
+          updatedBy: user.uid,
+          updatedAt: serverTimestamp(),
+        })
+      } else if (swapType === SWAP_TYPES.fullShift) {
+        // Full shift swap - swap all personnel between two shifts
+        const targetScheduleRef = doc(db, 'cqSchedule', request.targetScheduleId)
+        const targetScheduleDoc = await getDoc(targetScheduleRef)
+
+        if (!targetScheduleDoc.exists()) {
+          throw new Error('Target schedule not found')
+        }
+
+        const targetScheduleData = targetScheduleDoc.data()
+
+        // Get current shift personnel
+        const currentShift = {
+          person1Name: scheduleData[`${request.currentShiftType}Person1Name`],
+          person1Id: scheduleData[`${request.currentShiftType}Person1Id`],
+          person2Name: scheduleData[`${request.currentShiftType}Person2Name`],
+          person2Id: scheduleData[`${request.currentShiftType}Person2Id`],
+        }
+
+        // Get target shift personnel
+        const targetShift = {
+          person1Name: targetScheduleData[`${request.targetShiftType}Person1Name`],
+          person1Id: targetScheduleData[`${request.targetShiftType}Person1Id`],
+          person2Name: targetScheduleData[`${request.targetShiftType}Person2Name`],
+          person2Id: targetScheduleData[`${request.targetShiftType}Person2Id`],
+        }
+
+        // Update current schedule with target's personnel
+        batch.update(scheduleRef, {
+          [`${request.currentShiftType}Person1Name`]: targetShift.person1Name,
+          [`${request.currentShiftType}Person1Id`]: targetShift.person1Id,
+          [`${request.currentShiftType}Person2Name`]: targetShift.person2Name,
+          [`${request.currentShiftType}Person2Id`]: targetShift.person2Id,
+          updatedBy: user.uid,
+          updatedAt: serverTimestamp(),
+        })
+
+        // Update target schedule with current's personnel
+        batch.update(targetScheduleRef, {
+          [`${request.targetShiftType}Person1Name`]: currentShift.person1Name,
+          [`${request.targetShiftType}Person1Id`]: currentShift.person1Id,
+          [`${request.targetShiftType}Person2Name`]: currentShift.person2Name,
+          [`${request.targetShiftType}Person2Id`]: currentShift.person2Id,
+          updatedBy: user.uid,
+          updatedAt: serverTimestamp(),
+        })
+      }
 
       // Update the request status
       batch.update(requestRef, {

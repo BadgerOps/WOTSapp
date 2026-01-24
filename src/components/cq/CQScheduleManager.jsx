@@ -7,10 +7,12 @@ import {
   CQ_SHIFT_TIMES,
 } from '../../hooks/useCQSchedule'
 import { usePersonnel } from '../../hooks/usePersonnel'
+import { useAuth } from '../../contexts/AuthContext'
 import Loading from '../common/Loading'
 import { format, addDays, parse } from 'date-fns'
 
 export default function CQScheduleManager() {
+  const { isAdmin, isCandidateLeadership } = useAuth()
   const { roster, loading: rosterLoading } = useCQRoster()
   const { schedule, loading: scheduleLoading } = useCQSchedule()
   const { skips, loading: skipsLoading } = useCQSkips()
@@ -25,6 +27,9 @@ export default function CQScheduleManager() {
     loading: actionLoading,
     error: actionError,
   } = useCQScheduleActions()
+
+  // Check if user can edit shifts (admin or candidate leadership)
+  const canEditShifts = isAdmin || isCandidateLeadership
 
   const [activeTab, setActiveTab] = useState('schedule')
   const [importPreview, setImportPreview] = useState(null)
@@ -588,21 +593,25 @@ export default function CQScheduleManager() {
                                 <div className="ml-4 mt-1 space-y-1">
                                   <div className="flex items-center gap-2">
                                     <span>{entry.shift1Person1Name || '-'}</span>
-                                    <button
-                                      onClick={() => openEditModal(entry.id, 'shift1', 1, entry.shift1Person1Name, entry.shift1Person1Id)}
-                                      className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
-                                    >
-                                      Edit
-                                    </button>
+                                    {canEditShifts && (
+                                      <button
+                                        onClick={() => openEditModal(entry.id, 'shift1', 1, entry.shift1Person1Name, entry.shift1Person1Id)}
+                                        className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+                                      >
+                                        Edit
+                                      </button>
+                                    )}
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <span>{entry.shift1Person2Name || '-'}</span>
-                                    <button
-                                      onClick={() => openEditModal(entry.id, 'shift1', 2, entry.shift1Person2Name, entry.shift1Person2Id)}
-                                      className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
-                                    >
-                                      Edit
-                                    </button>
+                                    {canEditShifts && (
+                                      <button
+                                        onClick={() => openEditModal(entry.id, 'shift1', 2, entry.shift1Person2Name, entry.shift1Person2Id)}
+                                        className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+                                      >
+                                        Edit
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               ) : (
@@ -615,21 +624,25 @@ export default function CQScheduleManager() {
                                 <div className="ml-4 mt-1 space-y-1">
                                   <div className="flex items-center gap-2">
                                     <span>{entry.shift2Person1Name || '-'}</span>
-                                    <button
-                                      onClick={() => openEditModal(entry.id, 'shift2', 1, entry.shift2Person1Name, entry.shift2Person1Id)}
-                                      className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
-                                    >
-                                      Edit
-                                    </button>
+                                    {canEditShifts && (
+                                      <button
+                                        onClick={() => openEditModal(entry.id, 'shift2', 1, entry.shift2Person1Name, entry.shift2Person1Id)}
+                                        className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+                                      >
+                                        Edit
+                                      </button>
+                                    )}
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <span>{entry.shift2Person2Name || '-'}</span>
-                                    <button
-                                      onClick={() => openEditModal(entry.id, 'shift2', 2, entry.shift2Person2Name, entry.shift2Person2Id)}
-                                      className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
-                                    >
-                                      Edit
-                                    </button>
+                                    {canEditShifts && (
+                                      <button
+                                        onClick={() => openEditModal(entry.id, 'shift2', 2, entry.shift2Person2Name, entry.shift2Person2Id)}
+                                        className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+                                      >
+                                        Edit
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               ) : (

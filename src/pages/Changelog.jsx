@@ -1,8 +1,42 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.6'
+const APP_VERSION = '0.4.7'
 
 const changelog = [
+  {
+    version: '0.4.7',
+    date: '2026-01-24',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Full Shift Swap Support',
+            details: [
+              'Users can now swap entire shifts (both people) with another shift',
+              'Choose between "Individual" (replace one person) or "Full Shift" swap types',
+              'Select target shift from upcoming schedule dates',
+              'Approval queue shows swap type with distinct badge for full shift swaps',
+            ],
+          },
+          {
+            category: 'CQ Schedule Editing for Candidate Leadership',
+            details: [
+              'Candidate Leadership role can now edit CQ shift assignments',
+              'Edit buttons visible to both Admin and Candidate Leadership in schedule view',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Changed',
+        items: [
+          { details: ['Firestore rules updated to allow candidate_leadership to update cqSchedule'] },
+          { details: ['Swap requests now support swapType field (individual or fullShift)'] },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.6',
     date: '2026-01-24',

@@ -3,6 +3,7 @@ import {
   usePendingSwapRequests,
   useSwapApprovalActions,
   SWAP_REQUEST_STATUS,
+  SWAP_TYPES,
 } from '../../hooks/useCQSwapRequests'
 import { CQ_SHIFT_TIMES } from '../../hooks/useCQSchedule'
 import Loading from '../common/Loading'
@@ -255,10 +256,17 @@ export default function CQSwapApprovalQueue() {
             {requests.map((request) => {
               const isSelected = selectedIds.has(request.id)
               const isExpanded = expandedId === request.id
+              const swapType = request.swapType || SWAP_TYPES.individual
+              const isFullShift = swapType === SWAP_TYPES.fullShift
               const shiftLabel =
                 request.currentShiftType === 'shift1'
                   ? `Shift 1 (${CQ_SHIFT_TIMES.shift1.label})`
                   : `Shift 2 (${CQ_SHIFT_TIMES.shift2.label})`
+              const targetShiftLabel = request.targetShiftType
+                ? (request.targetShiftType === 'shift1'
+                    ? `Shift 1 (${CQ_SHIFT_TIMES.shift1.label})`
+                    : `Shift 2 (${CQ_SHIFT_TIMES.shift2.label})`)
+                : ''
 
               return (
                 <div
@@ -285,6 +293,11 @@ export default function CQSwapApprovalQueue() {
                             <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
                               {shiftLabel}
                             </span>
+                            {isFullShift && (
+                              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                                Full Shift Swap
+                              </span>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-2 mt-1 text-sm text-gray-600">
                             <span>{formatRelativeTime(request.createdAt)}</span>
@@ -302,10 +315,19 @@ export default function CQSwapApprovalQueue() {
 
                       {/* Quick Info */}
                       <div className="flex flex-wrap gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-500">Swap with:</span>{' '}
-                          <span className="font-medium">{request.proposedPersonnelName}</span>
-                        </div>
+                        {isFullShift ? (
+                          <div>
+                            <span className="text-gray-500">Swap with:</span>{' '}
+                            <span className="font-medium">
+                              {formatDate(request.targetScheduleDate)} - {targetShiftLabel}
+                            </span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="text-gray-500">Swap with:</span>{' '}
+                            <span className="font-medium">{request.proposedPersonnelName}</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Expanded Details */}
@@ -317,19 +339,33 @@ export default function CQSwapApprovalQueue() {
                           </div>
 
                           <div>
-                            <span className="text-sm font-medium text-gray-700">Shift Date: </span>
-                            <span className="text-sm text-gray-600">{formatDate(request.scheduleDate)}</span>
+                            <span className="text-sm font-medium text-gray-700">Swap Type: </span>
+                            <span className="text-sm text-gray-600">
+                              {isFullShift ? 'Full Shift (both people swap)' : 'Individual (replace one person)'}
+                            </span>
                           </div>
 
                           <div>
-                            <span className="text-sm font-medium text-gray-700">Shift: </span>
-                            <span className="text-sm text-gray-600">{shiftLabel}, Position {request.currentPosition}</span>
+                            <span className="text-sm font-medium text-gray-700">Current Shift: </span>
+                            <span className="text-sm text-gray-600">
+                              {formatDate(request.scheduleDate)} - {shiftLabel}
+                              {!isFullShift && `, Position ${request.currentPosition}`}
+                            </span>
                           </div>
 
-                          <div>
-                            <span className="text-sm font-medium text-gray-700">Proposed Replacement: </span>
-                            <span className="text-sm text-gray-600">{request.proposedPersonnelName}</span>
-                          </div>
+                          {isFullShift ? (
+                            <div>
+                              <span className="text-sm font-medium text-gray-700">Target Shift: </span>
+                              <span className="text-sm text-gray-600">
+                                {formatDate(request.targetScheduleDate)} - {targetShiftLabel}
+                              </span>
+                            </div>
+                          ) : (
+                            <div>
+                              <span className="text-sm font-medium text-gray-700">Proposed Replacement: </span>
+                              <span className="text-sm text-gray-600">{request.proposedPersonnelName}</span>
+                            </div>
+                          )}
 
                           {request.reason && (
                             <div>

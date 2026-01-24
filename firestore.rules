@@ -185,8 +185,10 @@ service cloud.firestore {
     match /cqSchedule/{scheduleId} {
       // Anyone authenticated can read schedule
       allow read: if isAuthenticated();
-      // Only admins can manage schedule (import, update, delete)
-      allow write: if isAdmin();
+      // Candidate leadership can update (edit assignments)
+      allow update: if isCandidateLeadership();
+      // Only admins can create or delete schedule entries
+      allow create, delete: if isAdmin();
     }
 
     // CQ Roster collection (legacy roster-based scheduling)

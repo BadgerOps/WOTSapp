@@ -228,7 +228,9 @@ export default function MyCQShiftCard() {
             <div className="px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
               <span className="text-yellow-700 font-medium">Swap Request Pending</span>
               <span className="text-yellow-600 ml-1">
-                - Proposed: {pendingSwapRequest.proposedPersonnelName}
+                {pendingSwapRequest.swapType === 'fullShift'
+                  ? `- Full shift swap with ${new Date(pendingSwapRequest.targetScheduleDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  : `- Proposed: ${pendingSwapRequest.proposedPersonnelName}`}
               </span>
             </div>
           )}
