@@ -34,16 +34,21 @@ export default function MyCQShiftCard() {
   // Handle overnight shifts (end time is next day)
   const isOvernight = shiftEnd < shiftStart
   let isWithinShiftWindow = false
+  let isUpcoming = false // Shift is today but not starting soon
 
   if (isOvernightPreview) {
-    // For tomorrow's shift 2 showing today, it starts after midnight
-    // Don't show as "within window" until after midnight
+    // Tomorrow's shift 2 showing today - it's "tonight" (starts after midnight)
     isWithinShiftWindow = false
+    isUpcoming = false
   } else if (isOvernight) {
     // For overnight shift (e.g., 20:00-01:00), window is 20:00-23:59 OR 00:00-01:00
     isWithinShiftWindow = currentTime >= shiftStart || currentTime <= shiftEnd
+    // "Upcoming" if it's before the shift starts (e.g., before 2000 for shift 1)
+    isUpcoming = !isWithinShiftWindow && currentTime < shiftStart
   } else {
     isWithinShiftWindow = currentTime >= shiftStart && currentTime <= shiftEnd
+    // "Upcoming" if it's before the shift starts
+    isUpcoming = !isWithinShiftWindow && currentTime < shiftStart
   }
 
   // Format times for display
@@ -79,14 +84,16 @@ export default function MyCQShiftCard() {
     if (isActive) return 'bg-green-50 border-green-200'
     if (isWithinShiftWindow) return 'bg-yellow-50 border-yellow-200'
     if (isOvernightPreview) return 'bg-blue-50 border-blue-200'
-    return 'bg-purple-50 border-purple-200'
+    if (isUpcoming) return 'bg-purple-50 border-purple-200'
+    return 'bg-gray-50 border-gray-200'
   }
 
   function getStatusBadge() {
     if (isActive) return { bg: 'bg-green-100', text: 'text-green-800', label: 'On Duty' }
     if (isWithinShiftWindow) return { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Shift Starting' }
     if (isOvernightPreview) return { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Tonight' }
-    return { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Scheduled' }
+    if (isUpcoming) return { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Upcoming' }
+    return { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Scheduled' }
   }
 
   const statusBadge = getStatusBadge()
@@ -176,7 +183,13 @@ export default function MyCQShiftCard() {
             </button>
           )}
 
-          {isScheduled && !isWithinShiftWindow && !isOvernightPreview && (
+          {isScheduled && isUpcoming && (
+            <div className="text-sm text-purple-600 italic">
+              CQ duty today - shift starts at {formatTime(myShift.myShiftStart)}
+            </div>
+          )}
+
+          {isScheduled && !isWithinShiftWindow && !isOvernightPreview && !isUpcoming && (
             <div className="text-sm text-gray-600 italic">
               Shift starts at {formatTime(myShift.myShiftStart)}
             </div>
