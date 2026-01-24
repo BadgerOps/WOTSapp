@@ -103,7 +103,12 @@ export const CQ_SHIFT_TIMES = {
 }
 
 /**
- * Hook to get today's CQ schedule for the current user
+ * Hook to get the current user's CQ shift (today or upcoming overnight shift)
+ *
+ * This hook checks:
+ * 1. Today's shifts - show if user is on shift 1 (2000-0100) or shift 2 (0100-0600) today
+ * 2. Tomorrow's shift 2 - show the day before since shift 2 starts at 0100
+ *    (users need to know they have CQ tonight even though it's "tomorrow's" date)
  */
 export function useMyCQShift() {
   const { user } = useAuth()
@@ -118,54 +123,96 @@ export function useMyCQShift() {
       return
     }
 
-    // Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0]
+    // Get today's and tomorrow's dates in YYYY-MM-DD format
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
+    // Query for both today and tomorrow to catch overnight shifts
     const q = query(
       collection(db, 'cqSchedule'),
-      where('date', '==', today),
+      where('date', 'in', [today, tomorrow]),
       where('status', 'in', ['scheduled', 'active'])
     )
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const todayShifts = snapshot.docs.map((doc) => ({
+        const shifts = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }))
 
-        // Find if user is assigned to any shift today (check all 4 positions)
-        const userShift = todayShifts.find((shift) => {
-          return (
-            shift.shift1Person1Id === user.uid ||
-            shift.shift1Person2Id === user.uid ||
-            shift.shift2Person1Id === user.uid ||
-            shift.shift2Person2Id === user.uid
-          )
-        })
+        // Separate today's and tomorrow's shifts
+        const todayShifts = shifts.filter(s => s.date === today)
+        const tomorrowShifts = shifts.filter(s => s.date === tomorrow)
 
-        if (userShift) {
-          // Determine which shift and position the user is on
-          const isShift1 =
-            userShift.shift1Person1Id === user.uid ||
-            userShift.shift1Person2Id === user.uid
+        // Helper to check if user is assigned to a shift
+        const isUserOnShift1 = (shift) =>
+          shift.shift1Person1Id === user.uid || shift.shift1Person2Id === user.uid
+        const isUserOnShift2 = (shift) =>
+          shift.shift2Person1Id === user.uid || shift.shift2Person2Id === user.uid
+
+        // Priority:
+        // 1. Active shift today (either shift)
+        // 2. Today's shift 1 (2000-0100) - starts tonight
+        // 3. Today's shift 2 (0100-0600) - already past or early morning
+        // 4. Tomorrow's shift 2 (0100-0600) - starts tonight after midnight
+
+        let foundShift = null
+        let shiftContext = null // 'today', 'tonight', 'tomorrow_early'
+
+        // Check today's shifts first
+        for (const shift of todayShifts) {
+          if (isUserOnShift1(shift) || isUserOnShift2(shift)) {
+            foundShift = shift
+            const isShift1 = isUserOnShift1(shift)
+            // Shift 1 starts at 2000 (tonight), Shift 2 is 0100-0600 (early morning today)
+            shiftContext = isShift1 ? 'tonight' : 'today_early'
+            break
+          }
+        }
+
+        // If no shift today, check if user has shift 2 tomorrow (starts tonight after midnight)
+        if (!foundShift) {
+          for (const shift of tomorrowShifts) {
+            if (isUserOnShift2(shift)) {
+              foundShift = shift
+              shiftContext = 'tonight_late' // Shift 2 tomorrow = starts after midnight tonight
+              break
+            }
+          }
+        }
+
+        if (foundShift) {
+          const isShift1 = isUserOnShift1(foundShift)
           const position =
-            userShift.shift1Person1Id === user.uid ||
-            userShift.shift2Person1Id === user.uid
+            foundShift.shift1Person1Id === user.uid ||
+            foundShift.shift2Person1Id === user.uid
               ? 1
               : 2
 
+          // Get partner info based on shift type
+          let partner = null
+          if (isShift1) {
+            partner = position === 1 ? foundShift.shift1Person2Name : foundShift.shift1Person1Name
+          } else {
+            partner = position === 1 ? foundShift.shift2Person2Name : foundShift.shift2Person1Name
+          }
+
           setMyShift({
-            ...userShift,
+            ...foundShift,
             myShiftType: isShift1 ? 'shift1' : 'shift2',
             myPosition: position,
+            myPartnerName: partner,
             myShiftStart: isShift1
               ? config?.cqShift1Start || CQ_SHIFT_TIMES.shift1.start
               : config?.cqShift2Start || CQ_SHIFT_TIMES.shift2.start,
             myShiftEnd: isShift1
               ? config?.cqShift1End || CQ_SHIFT_TIMES.shift1.end
               : config?.cqShift2End || CQ_SHIFT_TIMES.shift2.end,
+            shiftContext, // 'tonight', 'today_early', 'tonight_late'
+            isOvernightPreview: shiftContext === 'tonight_late', // Tomorrow's shift showing today
           })
         } else {
           setMyShift(null)
