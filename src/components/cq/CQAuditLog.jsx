@@ -6,6 +6,9 @@ import {
   groupEntriesByPersonnel,
   generateAuditSummary,
 } from '../../hooks/useCQAuditLog'
+import { usePersonnel } from '../../hooks/usePersonnel'
+import { useAppConfig } from '../../hooks/useAppConfig'
+import { downloadSignoutRosterPdf, downloadBlankSignoutRosterPdf } from '../../lib/signoutRosterPdf'
 import Loading from '../common/Loading'
 
 function formatTime(date) {
@@ -34,6 +37,8 @@ export default function CQAuditLog() {
   const [showExportModal, setShowExportModal] = useState(false)
 
   const { entries, loading, error } = useCQAuditLog(selectedDate)
+  const { personnel } = usePersonnel()
+  const { config } = useAppConfig()
   const summary = entries.length > 0 ? generateAuditSummary(entries) : null
   const groupedEntries = viewMode === 'grouped' ? groupEntriesByPersonnel(entries) : []
 
@@ -247,17 +252,27 @@ export default function CQAuditLog() {
           selectedDate={selectedDate}
           entries={entries}
           onClose={() => setShowExportModal(false)}
+          personnel={personnel}
+          config={config}
         />
       )}
     </div>
   )
 }
 
-function ExportModal({ selectedDate, entries, onClose }) {
+function ExportModal({ selectedDate, entries, onClose, personnel, config }) {
   const { fetchRange, loading } = useCQAuditLogRange()
   const [startDate, setStartDate] = useState(selectedDate)
   const [endDate, setEndDate] = useState(selectedDate)
+  const [trainingStartDate, setTrainingStartDate] = useState(config?.trainingStartDate || '')
   const [exportData, setExportData] = useState(null)
+
+  // Build personnel data map for PDF export
+  const personnelDataMap = (personnel || []).reduce((acc, p) => {
+    acc[p.id] = p
+    if (p.userId) acc[p.userId] = p
+    return acc
+  }, {})
 
   async function handleFetchRange() {
     const data = await fetchRange(startDate, endDate)
@@ -305,6 +320,22 @@ function ExportModal({ selectedDate, entries, onClose }) {
     link.href = URL.createObjectURL(blob)
     link.download = `cq-audit-log-${startDate}${startDate !== endDate ? `-to-${endDate}` : ''}.json`
     link.click()
+  }
+
+  function handleExportPDF() {
+    const data = exportData || entries
+    if (!data.length) return
+
+    downloadSignoutRosterPdf(data, {
+      startDate,
+      endDate,
+      personnelData: personnelDataMap,
+      trainingStartDate: trainingStartDate || undefined
+    })
+  }
+
+  function handleExportBlankPDF() {
+    downloadBlankSignoutRosterPdf(startDate)
   }
 
   return (
@@ -359,24 +390,62 @@ function ExportModal({ selectedDate, entries, onClose }) {
             </div>
           )}
 
+          {/* Data Export Section */}
           <div className="border-t border-gray-200 pt-4">
-            <p className="text-sm text-gray-600 mb-3">
-              Export {exportData?.length || entries.length} entries
+            <p className="text-sm font-medium text-gray-700 mb-2">
+              Export Data ({exportData?.length || entries.length} entries)
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 onClick={handleExportCSV}
                 disabled={!(exportData?.length || entries.length)}
-                className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                className="flex-1 px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
-                Export CSV
+                CSV
               </button>
               <button
                 onClick={handleExportJSON}
                 disabled={!(exportData?.length || entries.length)}
-                className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                className="flex-1 px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
               >
-                Export JSON
+                JSON
+              </button>
+            </div>
+          </div>
+
+          {/* PDF Signout Roster Section */}
+          <div className="border-t border-gray-200 pt-4">
+            <p className="text-sm font-medium text-gray-700 mb-2">
+              Signout Roster (PDF)
+            </p>
+            <p className="text-xs text-gray-500 mb-2">
+              Military-format signout roster matching DA Form style
+            </p>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Training Start Date (for week calculation)
+              </label>
+              <input
+                type="date"
+                value={trainingStartDate}
+                onChange={(e) => setTrainingStartDate(e.target.value)}
+                className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                placeholder="Optional"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleExportPDF}
+                disabled={!(exportData?.length || entries.length)}
+                className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                With Data
+              </button>
+              <button
+                onClick={handleExportBlankPDF}
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Blank Form
               </button>
             </div>
           </div>
