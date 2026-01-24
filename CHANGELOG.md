@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.5] - 2026-01-24
+
+### Added
+
+#### CQ Schedule Management (Dual Shifts)
+- New CQ schedule format with 2 people per shift
+- Shift 1: 2000-0100 (8 PM to 1 AM)
+- Shift 2: 0100-0600 (1 AM to 6 AM)
+- CSV import with format: date, shift, user1, user2, isPotentialSkip
+- Potential skip day labeling (orange highlight) for quiz/PT test days
+- Schedule display shows all 4 assigned personnel per day
+
+#### CQ Shift Card Enhancement
+- MyCQShiftCard now shows shifts the day before for overnight shifts
+- Shift 2 (0100-0600) displays the evening before since it starts after midnight
+- "Tonight" badge (blue) for upcoming overnight shifts
+- "(starts after midnight)" indicator for shift 2 previews
+- Partner name display for each shift
+
+### Changed
+- useMyCQShift hook now queries both today and tomorrow to catch overnight shifts
+- Updated Firestore rules for cqSchedule, cqRoster, and cqSkips collections
+
+---
+
 ## [0.4.4] - 2026-01-24
 
 ### Added
