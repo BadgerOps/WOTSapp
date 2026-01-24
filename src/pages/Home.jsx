@@ -4,6 +4,7 @@ import PostFeed from '../components/posts/PostFeed'
 import MyPassStatusCard from '../components/cq/MyPassStatusCard'
 import MyDetailCard from '../components/details/MyDetailCard'
 import MyCQShiftCard from '../components/cq/MyCQShiftCard'
+import PendingSurveyCard from '../components/surveys/PendingSurveyCard'
 
 /**
  * Calculate the graduation countdown ("X days and a wakeup")
@@ -54,6 +55,9 @@ export default function Home() {
 
       {/* CQ Shift Card - shows if user has CQ duty today */}
       <MyCQShiftCard />
+
+      {/* Pending Survey Card - shows if user has unanswered surveys */}
+      <PendingSurveyCard />
 
       <h2 className="text-lg font-semibold text-gray-900 mb-3">Today's Updates</h2>
       <PostFeed todayOnly={true} />

@@ -197,6 +197,61 @@ export function useSurvey(surveyId) {
 }
 
 /**
+ * Hook to get unanswered published surveys for the current user
+ * Used to show pending survey cards on the home page
+ */
+export function useUnansweredSurveys() {
+  const { user } = useAuth()
+  const { surveys, loading: surveysLoading } = useSurveys('published')
+  const [unansweredSurveys, setUnansweredSurveys] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [respondedIds, setRespondedIds] = useState(new Set())
+
+  // Listen for user's responses to track which surveys they've answered
+  useEffect(() => {
+    if (!user) {
+      setLoading(false)
+      return
+    }
+
+    const q = query(
+      collection(db, 'surveyResponses'),
+      where('respondentId', '==', user.uid)
+    )
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const ids = new Set(snapshot.docs.map((doc) => doc.data().surveyId))
+        setRespondedIds(ids)
+        setLoading(false)
+      },
+      (err) => {
+        console.error('Error fetching user responses:', err)
+        setLoading(false)
+      }
+    )
+
+    return unsubscribe
+  }, [user])
+
+  // Filter surveys to only include unanswered ones (that don't allow multiple responses)
+  useEffect(() => {
+    if (!surveysLoading && !loading) {
+      const unanswered = surveys.filter(
+        (survey) => !respondedIds.has(survey.id) || survey.allowMultipleResponses
+      )
+      setUnansweredSurveys(unanswered)
+    }
+  }, [surveys, respondedIds, surveysLoading, loading])
+
+  return {
+    unansweredSurveys,
+    loading: surveysLoading || loading,
+  }
+}
+
+/**
  * Hook for survey CRUD operations
  */
 export function useSurveyActions() {

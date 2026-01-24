@@ -71,6 +71,154 @@ exports.onPersonnelCreated = onPersonnelCreated;
 // Export role sync trigger
 exports.syncPersonnelRoleToUser = syncPersonnelRoleToUser;
 
+// Send push notification when a survey is published
+exports.onSurveyPublished = onDocumentCreated(
+  "surveys/{surveyId}",
+  async (event) => {
+    const survey = event.data.data();
+
+    // Only send notifications for published surveys
+    if (survey.status !== "published") {
+      console.log("Survey is not published, skipping notification");
+      return null;
+    }
+
+    console.log("New survey published:", survey.title);
+
+    // Get configured timezone for timestamp formatting
+    const timezone = await getConfiguredTimezone(db);
+
+    // Get all users with FCM tokens
+    const usersSnapshot = await db.collection("users").get();
+
+    const tokens = [];
+    usersSnapshot.forEach((doc) => {
+      const userData = doc.data();
+      if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+        tokens.push(...userData.fcmTokens);
+      }
+    });
+
+    if (tokens.length === 0) {
+      console.log("No FCM tokens found, skipping notification");
+      return null;
+    }
+
+    console.log(`Sending survey notification to ${tokens.length} tokens`);
+
+    // Format timestamp
+    const now = new Date();
+    const timeOptions = {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: timezone,
+    };
+    const timeStr = now
+      .toLocaleTimeString("en-US", timeOptions)
+      .replace(":", "");
+
+    const typeLabels = {
+      survey: "Survey",
+      quiz: "Quiz",
+      poll: "Poll",
+    };
+    const typeLabel = typeLabels[survey.type] || "Survey";
+
+    const title = `[${timeStr}] New ${typeLabel}: ${survey.title}`;
+    const body = survey.description
+      ? survey.description.substring(0, 150) +
+        (survey.description.length > 150 ? "..." : "")
+      : `A new ${typeLabel.toLowerCase()} is available. Share your feedback!`;
+
+    const message = {
+      notification: {
+        title,
+        body,
+      },
+      data: {
+        surveyId: event.params.surveyId,
+        type: "survey",
+        title,
+        body,
+      },
+      webpush: {
+        notification: {
+          icon: "/icon-192x192.png",
+          badge: "/icon-192x192.png",
+          tag: `survey-${event.params.surveyId}`,
+          requireInteraction: false,
+        },
+        fcmOptions: {
+          link: "/surveys",
+        },
+      },
+      apns: {
+        payload: {
+          aps: {
+            alert: { title, body },
+            badge: 1,
+            sound: "default",
+          },
+        },
+      },
+      android: {
+        priority: "high",
+        notification: {
+          icon: "ic_notification",
+          color: "#1e3a5f",
+          channelId: "wots_notifications",
+          tag: `survey-${event.params.surveyId}`,
+        },
+      },
+      tokens: tokens,
+    };
+
+    try {
+      const response = await messaging.sendEachForMulticast(message);
+      console.log(`Successfully sent ${response.successCount} notifications`);
+
+      if (response.failureCount > 0) {
+        console.log(`${response.failureCount} notifications failed`);
+        const invalidTokens = [];
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            const errorCode = resp.error?.code;
+            if (
+              errorCode === "messaging/invalid-registration-token" ||
+              errorCode === "messaging/registration-token-not-registered"
+            ) {
+              invalidTokens.push(tokens[idx]);
+            }
+          }
+        });
+
+        if (invalidTokens.length > 0) {
+          console.log(`Removing ${invalidTokens.length} invalid tokens`);
+          const batch = db.batch();
+          usersSnapshot.forEach((doc) => {
+            const userData = doc.data();
+            if (userData.fcmTokens) {
+              const validTokens = userData.fcmTokens.filter(
+                (t) => !invalidTokens.includes(t),
+              );
+              if (validTokens.length !== userData.fcmTokens.length) {
+                batch.update(doc.ref, { fcmTokens: validTokens });
+              }
+            }
+          });
+          await batch.commit();
+        }
+      }
+
+      return response;
+    } catch (error) {
+      console.error("Error sending survey notifications:", error);
+      return null;
+    }
+  },
+);
+
 // Send push notification when a new post is created
 exports.onPostCreated = onDocumentCreated("posts/{postId}", async (event) => {
   const post = event.data.data();
