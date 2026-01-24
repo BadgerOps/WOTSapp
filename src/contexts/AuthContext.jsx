@@ -24,6 +24,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [userRole, setUserRole] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState(null)
   const authStateChangeCount = useRef(0)
   const mountTime = useRef(Date.now())
 
@@ -254,9 +255,10 @@ export function AuthProvider({ children }) {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       authStateChangeCount.current += 1
       const timeSinceMount = Date.now() - mountTime.current
+      const callbackId = authStateChangeCount.current
 
-      authLog('Auth', 'onAuthStateChanged fired', {
-        changeCount: authStateChangeCount.current,
+      authLog('Auth', `onAuthStateChanged[${callbackId}] fired`, {
+        changeCount: callbackId,
         timeSinceMount: `${timeSinceMount}ms`,
         hasUser: !!currentUser,
         uid: currentUser?.uid || null,
@@ -269,47 +271,80 @@ export function AuthProvider({ children }) {
 
       // Check if this is a logout (had user, now don't)
       if (user && !currentUser) {
-        authLog('Auth', 'USER LOGGED OUT - was logged in, now null', {
+        authLog('Auth', `[${callbackId}] USER LOGGED OUT - was logged in, now null`, {
           previousUid: user.uid,
           previousEmail: user.email,
         })
       }
 
       if (currentUser) {
+        // IMPORTANT: Do ALL verification BEFORE setting any user state
+        // This ensures components never see a partially-verified user
+
         // Verify user is in personnel collection (security check)
-        authLog('Auth', 'Verifying user is in personnel collection...')
+        authLog('Auth', `[${callbackId}] Verifying user is in personnel collection...`)
         const isPersonnel = await checkPersonnelExists(currentUser.email)
 
-        if (!isPersonnel) {
-          authLog('Auth', 'User NOT in personnel collection, signing out', {
-            email: currentUser.email,
-            uid: currentUser.uid,
+        // Guard: Check if auth state changed during our async check
+        if (auth.currentUser?.uid !== currentUser.uid) {
+          authLog('Auth', `[${callbackId}] Auth state changed during personnel check, aborting`, {
+            expectedUid: currentUser.uid,
+            actualUid: auth.currentUser?.uid || null,
           })
-          await signOut(auth)
-          setUser(null)
-          setUserRole(null)
-          setLoading(false)
           return
         }
 
-        setUser(currentUser)
-        authLog('Auth', 'User verified in personnel, fetching role...')
-        try {
-          const role = await fetchUserRole(currentUser.uid)
-          authLog('Auth', 'Role fetch complete, setting state', { role })
-          setUserRole(role)
-        } catch (error) {
-          authLog('Auth', 'ERROR during role fetch', { error: error.message })
-          setUserRole(ROLES.USER)
+        if (!isPersonnel) {
+          authLog('Auth', `[${callbackId}] User NOT in personnel collection, signing out`, {
+            email: currentUser.email,
+            uid: currentUser.uid,
+          })
+          setAuthError(`Access denied. Email "${currentUser.email}" is not registered in the personnel roster. Please contact your administrator.`)
+          // Sign out - this will trigger another onAuthStateChanged with null
+          // Don't set user/loading here - let the null callback handle final state
+          await signOut(auth)
+          return
         }
-      } else {
-        setUser(null)
-        authLog('Auth', 'No user, clearing role')
-        setUserRole(null)
-      }
 
-      authLog('Auth', 'Setting loading to false')
-      setLoading(false)
+        // Fetch role BEFORE setting user, so we set all state atomically
+        authLog('Auth', `[${callbackId}] User verified in personnel, fetching role...`)
+        let role = ROLES.USER
+        try {
+          role = await fetchUserRole(currentUser.uid)
+          authLog('Auth', `[${callbackId}] Role fetch complete`, { role })
+        } catch (error) {
+          authLog('Auth', `[${callbackId}] ERROR during role fetch, defaulting to USER`, { error: error.message })
+        }
+
+        // Guard: Final check that auth hasn't changed during async operations
+        if (auth.currentUser?.uid !== currentUser.uid) {
+          authLog('Auth', `[${callbackId}] Auth state changed during role fetch, aborting`, {
+            expectedUid: currentUser.uid,
+            actualUid: auth.currentUser?.uid || null,
+          })
+          return
+        }
+
+        // Clear any previous auth errors on successful login
+        setAuthError(null)
+
+        // Set ALL state atomically - user, role, and loading together
+        // This prevents any window where user is set but loading is still true
+        authLog('Auth', `[${callbackId}] Setting user, role, and loading atomically`, {
+          uid: currentUser.uid,
+          email: currentUser.email,
+          role,
+        })
+        setUser(currentUser)
+        setUserRole(role)
+        setLoading(false)
+      } else {
+        // No user - clear all state
+        authLog('Auth', `[${callbackId}] No user, clearing all state`)
+        setUser(null)
+        setUserRole(null)
+        setLoading(false)
+      }
     })
 
     return () => {
@@ -324,10 +359,14 @@ export function AuthProvider({ children }) {
     [userRole]
   )
 
+  const clearAuthError = useCallback(() => setAuthError(null), [])
+
   const value = {
     user,
     userRole,
     loading,
+    authError,
+    clearAuthError,
 
     // Legacy computed properties (keep for backward compatibility)
     isAdmin: userRole === ROLES.ADMIN,
