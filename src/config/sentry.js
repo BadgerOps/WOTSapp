@@ -44,6 +44,7 @@ export function initSentry() {
     // Filter out expected/noisy errors
     beforeSend(event, hint) {
       const error = hint.originalException
+      const errorMessage = error?.message || event?.message || ''
 
       // Ignore auth popup errors (user closed popup, etc.)
       if (error?.code?.startsWith?.('auth/')) {
@@ -59,12 +60,22 @@ export function initSentry() {
       }
 
       // Ignore network errors (offline, timeouts, etc.)
-      if (error?.name === 'NetworkError' || error?.message?.includes('Failed to fetch')) {
+      if (error?.name === 'NetworkError' || errorMessage.includes('Failed to fetch')) {
         return null
       }
 
       // Ignore expected permission denied errors
-      if (error?.code === 'permission-denied' || error?.message?.includes('Missing or insufficient permissions')) {
+      if (error?.code === 'permission-denied' || errorMessage.includes('Missing or insufficient permissions')) {
+        return null
+      }
+
+      // Ignore service worker load failures (common transient errors)
+      if (errorMessage.includes('sw.js load failed') || errorMessage.includes('Script load failed')) {
+        return null
+      }
+
+      // Ignore Firebase/Google API transient errors
+      if (errorMessage.includes('identitytoolkit.googleapis.com')) {
         return null
       }
 
