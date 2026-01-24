@@ -226,12 +226,11 @@ service cloud.firestore {
 
     // Surveys collection
     match /surveys/{surveyId} {
-      // Creators can read their own surveys (any status)
-      allow read: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
-      // Anyone authenticated can read published surveys
-      allow read: if isAuthenticated() && resource.data.status == 'published';
-      // Admins can read all surveys (including drafts)
-      allow read: if isAdmin();
+      // Read: user is admin, OR user created it, OR it's published
+      allow read: if isAuthenticated() &&
+        (isAdmin() ||
+         resource.data.createdBy == request.auth.uid ||
+         resource.data.status == 'published');
       // Anyone authenticated can create surveys
       allow create: if isAuthenticated();
       // Creators can update their own surveys, admins can update any
