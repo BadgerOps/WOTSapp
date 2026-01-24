@@ -15,6 +15,7 @@ import {
 import { db } from "../config/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { usePersonnel } from "./usePersonnel";
+import { useAppConfig } from "./useAppConfig";
 
 /**
  * Status types for personnel
@@ -856,12 +857,54 @@ export function useSelfSignOut() {
     }
   }
 
+  /**
+   * Request pass approval from candidate leadership
+   * Creates a pass approval request instead of directly signing out
+   * @param {Object} requestData - Pass request details
+   * @param {string} requestData.destination - Where they're going
+   * @param {string} requestData.expectedReturn - Expected return time (ISO string)
+   * @param {string} requestData.contactNumber - Contact number while out
+   * @param {string} requestData.notes - Additional notes
+   * @param {Array} requestData.companions - Array of companion objects {id, name, rank}
+   */
+  async function requestPassApproval(requestData) {
+    setLoading(true);
+    setError(null);
+    try {
+      const companions = requestData.companions || [];
+
+      // Create the pass approval request
+      const requestDoc = await addDoc(collection(db, "passApprovalRequests"), {
+        requesterId: user.uid,
+        requesterName: user.displayName || user.email,
+        requesterEmail: user.email,
+        destination: requestData.destination || null,
+        expectedReturn: requestData.expectedReturn || null,
+        contactNumber: requestData.contactNumber || null,
+        notes: requestData.notes || null,
+        companions,
+        status: "pending",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+      return { success: true, requestId: requestDoc.id };
+    } catch (err) {
+      console.error("Error creating pass request:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
   return {
     signOut,
     signIn,
     signOutSickCall,
     updateStage,
     breakFree,
+    requestPassApproval,
     loading,
     error,
   };

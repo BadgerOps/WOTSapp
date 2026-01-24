@@ -372,6 +372,7 @@ export function AuthProvider({ children }) {
     isAdmin: userRole === ROLES.ADMIN,
     isUniformAdmin: userRole === ROLES.UNIFORM_ADMIN || userRole === ROLES.ADMIN,
     canManageWeather: userRole === ROLES.UNIFORM_ADMIN || userRole === ROLES.ADMIN,
+    isCandidateLeadership: userRole === ROLES.CANDIDATE_LEADERSHIP || userRole === ROLES.ADMIN,
 
     // New permission-based check function
     can,
@@ -390,6 +391,9 @@ export function AuthProvider({ children }) {
     canManageDetails: hasPermission(userRole, PERMISSIONS.MANAGE_DETAILS),
     canManageCQ: hasPermission(userRole, PERMISSIONS.MANAGE_CQ),
     canManageConfig: hasPermission(userRole, PERMISSIONS.MANAGE_CONFIG),
+    canApprovePassRequests: hasPermission(userRole, PERMISSIONS.APPROVE_PASS_REQUESTS),
+    canViewPassRequests: hasPermission(userRole, PERMISSIONS.VIEW_PASS_REQUESTS),
+    canManageCQOperations: hasPermission(userRole, PERMISSIONS.MANAGE_CQ_OPERATIONS),
 
     signInWithGoogle,
     logout,

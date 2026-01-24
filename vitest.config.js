@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
+// Unified test config for both frontend (src/) and Cloud Functions (functions/)
+// Frontend tests use jsdom for React component testing
+// Cloud Functions tests use dependency injection, so jsdom works fine
 export default defineConfig({
   plugins: [react()],
   test: {

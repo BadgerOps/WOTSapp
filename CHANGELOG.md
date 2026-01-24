@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - 2026-01-24
+
+### Added
+
+#### Pass Approval System
+- Users can submit pass requests with destination, expected return time, contact number, and notes
+- Support for companions (group sign-out requests)
+- Candidate Leadership role can approve/reject pass requests
+- Push notifications sent to candidate_leadership and admins when pass requests are created
+- Approval automatically signs out requester and companions
+- Pass request history tracked in personnelStatusHistory
+- PassApprovalQueue component for leadership to manage pending requests
+- Bulk approve/reject functionality
+
+#### New Role: Candidate Leadership
+- New `candidate_leadership` role between uniform_admin and admin
+- Can approve pass requests and manage CQ operations
+- Added to role hierarchy and permissions system
+- APPROVE_PASS_REQUESTS permission added
+
+### Changed
+- Updated Firestore rules for passApprovalRequests collection
+- Role hierarchy now includes candidate_leadership
+
+---
+
 ## [0.4.3] - 2026-01-24
 
 ### Added

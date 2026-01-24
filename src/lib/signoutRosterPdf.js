@@ -168,6 +168,10 @@ export function generateSignoutRosterPdf(entries, options = {}) {
     // Calculate week of training from trainingStartDate config
     const weekOfTraining = calculateWeekOfTraining(timestamp, trainingStartDate)
 
+    // Get approver initials from the entry (populated when pass was approved by leadership)
+    // Falls back to empty string for self sign-outs without approval
+    const cqInitials = entry.approverInitials || ''
+
     return {
       date: formatMilitaryDate(timestamp),
       name: formattedName,
@@ -180,7 +184,7 @@ export function generateSignoutRosterPdf(entries, options = {}) {
       expectedReturn: entry.expectedReturn ? formatMilitaryTime(new Date(entry.expectedReturn)) : '',
       initials,
       actualTimeIn: actualTimeIn ? formatMilitaryTime(actualTimeIn) : '',
-      cqInitials: '' // TODO: figure out later
+      cqInitials,
     }
   })
 

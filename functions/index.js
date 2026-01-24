@@ -37,6 +37,9 @@ const { onPersonnelCreated } = require("./personnelAuth");
 // Import role sync functions
 const { syncPersonnelRoleToUser } = require("./roleSync");
 
+// Import pass approval notification functions
+const { onPassRequestCreated } = require("./passApprovalNotifications");
+
 // Import timezone utilities
 const {
   getConfiguredTimezone,
@@ -74,6 +77,9 @@ exports.onPersonnelCreated = onPersonnelCreated;
 
 // Export role sync trigger
 exports.syncPersonnelRoleToUser = syncPersonnelRoleToUser;
+
+// Export pass approval notification trigger
+exports.onPassRequestCreated = onPassRequestCreated;
 
 // Send push notification when a survey is published
 exports.onSurveyPublished = onDocumentCreated(

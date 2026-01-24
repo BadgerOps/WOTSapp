@@ -13,6 +13,7 @@
 export const ROLES = {
   USER: 'user',
   UNIFORM_ADMIN: 'uniform_admin',
+  CANDIDATE_LEADERSHIP: 'candidate_leadership',
   ADMIN: 'admin',
 };
 
@@ -28,6 +29,11 @@ export const ROLE_INFO = {
     description: 'Can manage UOTD and approve weather recommendations',
     color: 'blue',
   },
+  [ROLES.CANDIDATE_LEADERSHIP]: {
+    label: 'Candidate Leadership',
+    description: 'Can approve pass requests and manage CQ operations',
+    color: 'green',
+  },
   [ROLES.ADMIN]: {
     label: 'Admin',
     description: 'Full administrative access',
@@ -36,7 +42,7 @@ export const ROLE_INFO = {
 };
 
 // Role hierarchy (higher index = more permissions)
-export const ROLE_HIERARCHY = [ROLES.USER, ROLES.UNIFORM_ADMIN, ROLES.ADMIN];
+export const ROLE_HIERARCHY = [ROLES.USER, ROLES.UNIFORM_ADMIN, ROLES.CANDIDATE_LEADERSHIP, ROLES.ADMIN];
 
 // Permission definitions
 export const PERMISSIONS = {
@@ -49,6 +55,11 @@ export const PERMISSIONS = {
   MODIFY_UOTD: 'modify_uotd',
   APPROVE_WEATHER_UOTD: 'approve_weather_uotd',
   MODIFY_UNIFORMS: 'modify_uniforms',
+
+  // Candidate leadership permissions
+  APPROVE_PASS_REQUESTS: 'approve_pass_requests',
+  VIEW_PASS_REQUESTS: 'view_pass_requests',
+  MANAGE_CQ_OPERATIONS: 'manage_cq_operations',
 
   // Admin permissions
   MANAGE_POSTS: 'manage_posts',
@@ -76,6 +87,17 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.MODIFY_UOTD,
     PERMISSIONS.APPROVE_WEATHER_UOTD,
     PERMISSIONS.MODIFY_UNIFORMS,
+  ],
+  [ROLES.CANDIDATE_LEADERSHIP]: [
+    // Inherits USER permissions
+    PERMISSIONS.VIEW_ASSIGNED_DETAILS,
+    PERMISSIONS.SIGN_OTHERS_ON_PASS,
+    PERMISSIONS.VIEW_UPDATES,
+    // Candidate leadership permissions - full control over CQ/pass operations
+    PERMISSIONS.APPROVE_PASS_REQUESTS,
+    PERMISSIONS.VIEW_PASS_REQUESTS,
+    PERMISSIONS.MANAGE_CQ_OPERATIONS,
+    PERMISSIONS.MANAGE_CQ,
   ],
   [ROLES.ADMIN]: [
     // All permissions
