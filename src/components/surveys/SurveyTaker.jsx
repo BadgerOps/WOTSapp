@@ -1,14 +1,22 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSurveyResponseActions, useUserSurveyResponse } from '../../hooks/useSurveyResponses'
 import Loading from '../common/Loading'
 
 export default function SurveyTaker({ survey, onComplete, onCancel }) {
-  const { submitResponse, loading: submitting } = useSurveyResponseActions()
+  const { submitResponse, updateResponse, loading: submitting } = useSurveyResponseActions()
   const { response: existingResponse, hasResponded, loading: checkingResponse } = useUserSurveyResponse(survey?.id)
 
   const [answers, setAnswers] = useState({})
   const [formError, setFormError] = useState(null)
   const [submitAnonymously, setSubmitAnonymously] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+
+  // Pre-populate answers when editing an existing response
+  useEffect(() => {
+    if (isEditing && existingResponse?.answers) {
+      setAnswers(existingResponse.answers)
+    }
+  }, [isEditing, existingResponse])
 
   if (!survey) return null
 
@@ -16,19 +24,27 @@ export default function SurveyTaker({ survey, onComplete, onCancel }) {
     return <Loading />
   }
 
-  // If user already responded and multiple responses not allowed
-  if (hasResponded && !survey.allowMultipleResponses) {
+  // If user already responded and not in edit mode
+  if (hasResponded && !survey.allowMultipleResponses && !isEditing) {
     return (
       <div className="card">
         <div className="text-center py-8">
           <div className="text-4xl mb-4">✓</div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Already Submitted</h3>
           <p className="text-gray-600 mb-4">You have already responded to this survey.</p>
-          {onCancel && (
-            <button onClick={onCancel} className="btn-secondary">
-              Go Back
+          <div className="flex justify-center gap-3">
+            <button
+              onClick={() => setIsEditing(true)}
+              className="btn-primary"
+            >
+              Edit Response
             </button>
-          )}
+            {onCancel && (
+              <button onClick={onCancel} className="btn-secondary">
+                Go Back
+              </button>
+            )}
+          </div>
         </div>
       </div>
     )
@@ -65,7 +81,11 @@ export default function SurveyTaker({ survey, onComplete, onCancel }) {
     if (!validateAnswers()) return
 
     try {
-      await submitResponse(survey.id, answers, submitAnonymously && survey.allowAnonymous)
+      if (isEditing && existingResponse) {
+        await updateResponse(existingResponse.id, answers)
+      } else {
+        await submitResponse(survey.id, answers, submitAnonymously && survey.allowAnonymous)
+      }
       if (onComplete) onComplete()
     } catch (err) {
       setFormError(err.message)
@@ -225,9 +245,22 @@ export default function SurveyTaker({ survey, onComplete, onCancel }) {
             disabled={submitting}
             className="btn-primary flex-1 disabled:opacity-50"
           >
-            {submitting ? 'Submitting...' : 'Submit Response'}
+            {submitting
+              ? (isEditing ? 'Updating...' : 'Submitting...')
+              : (isEditing ? 'Update Response' : 'Submit Response')}
           </button>
-          {onCancel && (
+          {isEditing ? (
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditing(false)
+                setAnswers({})
+              }}
+              className="btn-secondary"
+            >
+              Cancel Edit
+            </button>
+          ) : onCancel && (
             <button type="button" onClick={onCancel} className="btn-secondary">
               Cancel
             </button>

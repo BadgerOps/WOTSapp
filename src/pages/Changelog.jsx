@@ -5,8 +5,18 @@ const APP_VERSION = '0.4.1'
 const changelog = [
   {
     version: '0.4.1',
-    date: '2026-01-23',
+    date: '2026-01-24',
     sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            details: [
+              'Survey response editing: Users can now edit/update their previously submitted survey responses from both the main Surveys page and Admin dashboard',
+            ],
+          },
+        ],
+      },
       {
         title: 'Fixed',
         items: [

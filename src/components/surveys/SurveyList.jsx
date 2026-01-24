@@ -50,13 +50,12 @@ function SurveyCard({ survey, onTake }) {
 
         <button
           onClick={() => onTake(survey)}
-          className={`btn-primary text-sm whitespace-nowrap ${
-            hasResponded && !survey.allowMultipleResponses ? 'opacity-50' : ''
+          className={`text-sm whitespace-nowrap ${
+            hasResponded && !survey.allowMultipleResponses ? 'btn-secondary' : 'btn-primary'
           }`}
-          disabled={hasResponded && !survey.allowMultipleResponses}
         >
           {hasResponded && !survey.allowMultipleResponses
-            ? 'Completed'
+            ? 'Edit Response'
             : hasResponded
             ? 'Respond Again'
             : 'Take Survey'}
