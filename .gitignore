@@ -41,3 +41,5 @@ PROJECT_STATUS.md
 WOTS_COLOR.jpg
 handoff.md
 data/
+*.xlsx
+cq_list_converted.csv
