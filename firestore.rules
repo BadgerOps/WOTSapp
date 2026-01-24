@@ -181,6 +181,30 @@ service cloud.firestore {
       allow write: if isCandidateLeadership();
     }
 
+    // CQ Schedule collection (new format with dual shifts)
+    match /cqSchedule/{scheduleId} {
+      // Anyone authenticated can read schedule
+      allow read: if isAuthenticated();
+      // Only admins can manage schedule (import, update, delete)
+      allow write: if isAdmin();
+    }
+
+    // CQ Roster collection (legacy roster-based scheduling)
+    match /cqRoster/{rosterId} {
+      // Anyone authenticated can read roster
+      allow read: if isAuthenticated();
+      // Only admins can manage roster
+      allow write: if isAdmin();
+    }
+
+    // CQ Skips collection (dates to skip in schedule)
+    match /cqSkips/{skipId} {
+      // Anyone authenticated can read skips
+      allow read: if isAuthenticated();
+      // Only admins can manage skips
+      allow write: if isAdmin();
+    }
+
     // Pass Approval Requests collection
     match /passApprovalRequests/{requestId} {
       // Anyone authenticated can read their own requests
