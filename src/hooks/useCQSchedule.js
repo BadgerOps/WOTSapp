@@ -93,7 +93,22 @@ export function useCQSchedule() {
 }
 
 /**
- * Hook to get today's CQ schedule for the current user
+ * CQ Shift time constants
+ * Shift 1: 2000 - 0100 (8 PM to 1 AM)
+ * Shift 2: 0100 - 0600 (1 AM to 6 AM)
+ */
+export const CQ_SHIFT_TIMES = {
+  shift1: { start: '20:00', end: '01:00', label: '2000–0100' },
+  shift2: { start: '01:00', end: '06:00', label: '0100–0600' },
+}
+
+/**
+ * Hook to get the current user's CQ shift (today or upcoming overnight shift)
+ *
+ * This hook checks:
+ * 1. Today's shifts - show if user is on shift 1 (2000-0100) or shift 2 (0100-0600) today
+ * 2. Tomorrow's shift 2 - show the day before since shift 2 starts at 0100
+ *    (users need to know they have CQ tonight even though it's "tomorrow's" date)
  */
 export function useMyCQShift() {
   const { user } = useAuth()
@@ -108,43 +123,96 @@ export function useMyCQShift() {
       return
     }
 
-    // Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0]
+    // Get today's and tomorrow's dates in YYYY-MM-DD format
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
+    // Query for both today and tomorrow to catch overnight shifts
     const q = query(
       collection(db, 'cqSchedule'),
-      where('date', '==', today),
+      where('date', 'in', [today, tomorrow]),
       where('status', 'in', ['scheduled', 'active'])
     )
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const todayShifts = snapshot.docs.map((doc) => ({
+        const shifts = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }))
 
-        // Find if user is assigned to any shift today
-        const userShift = todayShifts.find((shift) => {
-          return (
-            shift.firstShiftPersonnelId === user.uid ||
-            shift.secondShiftPersonnelId === user.uid
-          )
-        })
+        // Separate today's and tomorrow's shifts
+        const todayShifts = shifts.filter(s => s.date === today)
+        const tomorrowShifts = shifts.filter(s => s.date === tomorrow)
 
-        if (userShift) {
-          // Determine which shift the user is on
-          const isFirstShift = userShift.firstShiftPersonnelId === user.uid
+        // Helper to check if user is assigned to a shift
+        const isUserOnShift1 = (shift) =>
+          shift.shift1Person1Id === user.uid || shift.shift1Person2Id === user.uid
+        const isUserOnShift2 = (shift) =>
+          shift.shift2Person1Id === user.uid || shift.shift2Person2Id === user.uid
+
+        // Priority:
+        // 1. Active shift today (either shift)
+        // 2. Today's shift 1 (2000-0100) - starts tonight
+        // 3. Today's shift 2 (0100-0600) - already past or early morning
+        // 4. Tomorrow's shift 2 (0100-0600) - starts tonight after midnight
+
+        let foundShift = null
+        let shiftContext = null // 'today', 'tonight', 'tomorrow_early'
+
+        // Check today's shifts first
+        for (const shift of todayShifts) {
+          if (isUserOnShift1(shift) || isUserOnShift2(shift)) {
+            foundShift = shift
+            const isShift1 = isUserOnShift1(shift)
+            // Shift 1 starts at 2000 (tonight), Shift 2 is 0100-0600 (early morning today)
+            shiftContext = isShift1 ? 'tonight' : 'today_early'
+            break
+          }
+        }
+
+        // If no shift today, check if user has shift 2 tomorrow (starts tonight after midnight)
+        if (!foundShift) {
+          for (const shift of tomorrowShifts) {
+            if (isUserOnShift2(shift)) {
+              foundShift = shift
+              shiftContext = 'tonight_late' // Shift 2 tomorrow = starts after midnight tonight
+              break
+            }
+          }
+        }
+
+        if (foundShift) {
+          const isShift1 = isUserOnShift1(foundShift)
+          const position =
+            foundShift.shift1Person1Id === user.uid ||
+            foundShift.shift2Person1Id === user.uid
+              ? 1
+              : 2
+
+          // Get partner info based on shift type
+          let partner = null
+          if (isShift1) {
+            partner = position === 1 ? foundShift.shift1Person2Name : foundShift.shift1Person1Name
+          } else {
+            partner = position === 1 ? foundShift.shift2Person2Name : foundShift.shift2Person1Name
+          }
+
           setMyShift({
-            ...userShift,
-            myShiftType: isFirstShift ? 'first' : 'second',
-            myShiftStart: isFirstShift
-              ? config?.cqFirstShiftStart || '20:00'
-              : config?.cqSecondShiftStart || '01:00',
-            myShiftEnd: isFirstShift
-              ? config?.cqFirstShiftEnd || '01:00'
-              : config?.cqSecondShiftEnd || '06:00',
+            ...foundShift,
+            myShiftType: isShift1 ? 'shift1' : 'shift2',
+            myPosition: position,
+            myPartnerName: partner,
+            myShiftStart: isShift1
+              ? config?.cqShift1Start || CQ_SHIFT_TIMES.shift1.start
+              : config?.cqShift2Start || CQ_SHIFT_TIMES.shift2.start,
+            myShiftEnd: isShift1
+              ? config?.cqShift1End || CQ_SHIFT_TIMES.shift1.end
+              : config?.cqShift2End || CQ_SHIFT_TIMES.shift2.end,
+            shiftContext, // 'tonight', 'today_early', 'tonight_late'
+            isOvernightPreview: shiftContext === 'tonight_late', // Tomorrow's shift showing today
           })
         } else {
           setMyShift(null)
@@ -174,7 +242,91 @@ export function useCQScheduleActions() {
   const [error, setError] = useState(null)
 
   /**
-   * Import roster from parsed CSV data
+   * Import schedule directly from parsed CSV data (new format)
+   * CSV format: Date, Day, Shift 1 (2000–0100), Shift 2 (0100–0600)
+   * Each shift has 2 people separated by "/"
+   * Names with * indicate candidate leadership (potential skip days)
+   */
+  async function importSchedule(scheduleArray, options = {}) {
+    setLoading(true)
+    setError(null)
+
+    const { clearExisting = false } = options
+
+    try {
+      const batch = writeBatch(db)
+
+      // Optionally clear existing schedule
+      if (clearExisting) {
+        const existingSchedule = await getDocs(collection(db, 'cqSchedule'))
+        existingSchedule.docs.forEach((docSnap) => {
+          batch.delete(docSnap.ref)
+        })
+      }
+
+      // Add new schedule entries
+      for (const entry of scheduleArray) {
+        // Check if schedule already exists for this date
+        const existingSchedule = await getDocs(
+          query(collection(db, 'cqSchedule'), where('date', '==', entry.date))
+        )
+
+        if (existingSchedule.empty) {
+          const scheduleRef = doc(collection(db, 'cqSchedule'))
+          batch.set(scheduleRef, {
+            date: entry.date,
+            dayOfWeek: entry.dayOfWeek,
+            // Shift 1 (2000-0100)
+            shift1Person1Name: entry.shift1Person1Name,
+            shift1Person1Id: entry.shift1Person1Id || null,
+            shift1Person2Name: entry.shift1Person2Name,
+            shift1Person2Id: entry.shift1Person2Id || null,
+            // Shift 2 (0100-0600)
+            shift2Person1Name: entry.shift2Person1Name,
+            shift2Person1Id: entry.shift2Person1Id || null,
+            shift2Person2Name: entry.shift2Person2Name,
+            shift2Person2Id: entry.shift2Person2Id || null,
+            // Potential skip day indicator (before quiz/PT test)
+            isPotentialSkipDay: entry.isPotentialSkipDay || false,
+            skipDayReason: entry.skipDayReason || null,
+            status: 'scheduled',
+            importedBy: user.uid,
+            importedAt: serverTimestamp(),
+          })
+        } else {
+          // Update existing entry
+          const existingDoc = existingSchedule.docs[0]
+          batch.update(existingDoc.ref, {
+            dayOfWeek: entry.dayOfWeek,
+            shift1Person1Name: entry.shift1Person1Name,
+            shift1Person1Id: entry.shift1Person1Id || null,
+            shift1Person2Name: entry.shift1Person2Name,
+            shift1Person2Id: entry.shift1Person2Id || null,
+            shift2Person1Name: entry.shift2Person1Name,
+            shift2Person1Id: entry.shift2Person1Id || null,
+            shift2Person2Name: entry.shift2Person2Name,
+            shift2Person2Id: entry.shift2Person2Id || null,
+            isPotentialSkipDay: entry.isPotentialSkipDay || false,
+            skipDayReason: entry.skipDayReason || null,
+            updatedBy: user.uid,
+            updatedAt: serverTimestamp(),
+          })
+        }
+      }
+
+      await batch.commit()
+      setLoading(false)
+      return { success: true, count: scheduleArray.length }
+    } catch (err) {
+      console.error('Error importing CQ schedule:', err)
+      setError(err.message)
+      setLoading(false)
+      throw err
+    }
+  }
+
+  /**
+   * Import roster from parsed CSV data (legacy format)
    */
   async function importRoster(rosterArray) {
     setLoading(true)
@@ -185,8 +337,8 @@ export function useCQScheduleActions() {
 
       // Clear existing roster
       const existingRoster = await getDocs(collection(db, 'cqRoster'))
-      existingRoster.docs.forEach((doc) => {
-        batch.delete(doc.ref)
+      existingRoster.docs.forEach((docSnap) => {
+        batch.delete(docSnap.ref)
       })
 
       // Add new roster entries
@@ -211,7 +363,7 @@ export function useCQScheduleActions() {
   }
 
   /**
-   * Generate schedule from roster for a date range
+   * Generate schedule from roster for a date range (legacy - roster-based)
    * @param {string} startDate - Start date (YYYY-MM-DD)
    * @param {number} days - Number of days to generate
    */
@@ -224,9 +376,9 @@ export function useCQScheduleActions() {
       const rosterSnapshot = await getDocs(
         query(collection(db, 'cqRoster'), orderBy('order', 'asc'))
       )
-      const roster = rosterSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
+      const roster = rosterSnapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
       }))
 
       if (roster.length === 0) {
@@ -236,7 +388,7 @@ export function useCQScheduleActions() {
       // Get skipped dates
       const skipsSnapshot = await getDocs(collection(db, 'cqSkips'))
       const skippedDates = new Set(
-        skipsSnapshot.docs.map((doc) => doc.data().date)
+        skipsSnapshot.docs.map((docSnap) => docSnap.data().date)
       )
 
       // Group roster by order (each order = one day)
@@ -278,6 +430,7 @@ export function useCQScheduleActions() {
             batch.set(scheduleRef, {
               date: dateStr,
               order: dayOrder,
+              // Legacy format - single person per shift
               firstShiftPersonnelId: dayRoster.first?.personnelId || null,
               firstShiftName: dayRoster.first?.name || null,
               secondShiftPersonnelId: dayRoster.second?.personnelId || null,
@@ -427,6 +580,7 @@ export function useCQScheduleActions() {
   }
 
   return {
+    importSchedule,
     importRoster,
     generateSchedule,
     skipDate,

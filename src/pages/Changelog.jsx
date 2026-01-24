@@ -1,8 +1,45 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.4'
+const APP_VERSION = '0.4.5'
 
 const changelog = [
+  {
+    version: '0.4.5',
+    date: '2026-01-24',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'CQ Schedule Management',
+            details: [
+              'New CQ schedule format with 2 people per shift',
+              'Shift 1: 2000-0100 (8 PM to 1 AM), Shift 2: 0100-0600 (1 AM to 6 AM)',
+              'CSV import with format: date, shift, user1, user2, isPotentialSkip',
+              'Potential skip day labeling (orange highlight) for quiz/PT test days',
+              'Schedule display shows all 4 assigned personnel per day',
+            ],
+          },
+          {
+            category: 'CQ Shift Card Enhancement',
+            details: [
+              'MyCQShiftCard now shows shifts the day before for overnight shifts',
+              'Shift 2 displays the evening before since it starts after midnight',
+              '"Tonight" badge (blue) for upcoming overnight shifts',
+              'Partner name display for each shift',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Changed',
+        items: [
+          { details: ['useMyCQShift hook now queries both today and tomorrow to catch overnight shifts'] },
+          { details: ['Updated Firestore rules for cqSchedule, cqRoster, and cqSkips collections'] },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.4',
     date: '2026-01-24',

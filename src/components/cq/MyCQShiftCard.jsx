@@ -1,4 +1,4 @@
-import { useMyCQShift, useCQScheduleActions } from '../../hooks/useCQSchedule'
+import { useMyCQShift, useCQScheduleActions, CQ_SHIFT_TIMES } from '../../hooks/useCQSchedule'
 import { useAppConfig } from '../../hooks/useAppConfig'
 import { format } from 'date-fns'
 
@@ -9,14 +9,15 @@ export default function MyCQShiftCard() {
 
   if (loading) return null
 
-  // Only show if user has a CQ shift today
+  // Only show if user has a CQ shift
   if (!myShift) {
     return null
   }
 
-  const isFirstShift = myShift.myShiftType === 'first'
+  const isShift1 = myShift.myShiftType === 'shift1'
   const isActive = myShift.status === 'active'
   const isScheduled = myShift.status === 'scheduled'
+  const isOvernightPreview = myShift.isOvernightPreview // Tomorrow's shift 2 showing today
 
   // Determine if current time is within the shift window
   const now = new Date()
@@ -34,7 +35,11 @@ export default function MyCQShiftCard() {
   const isOvernight = shiftEnd < shiftStart
   let isWithinShiftWindow = false
 
-  if (isOvernight) {
+  if (isOvernightPreview) {
+    // For tomorrow's shift 2 showing today, it starts after midnight
+    // Don't show as "within window" until after midnight
+    isWithinShiftWindow = false
+  } else if (isOvernight) {
     // For overnight shift (e.g., 20:00-01:00), window is 20:00-23:59 OR 00:00-01:00
     isWithinShiftWindow = currentTime >= shiftStart || currentTime <= shiftEnd
   } else {
@@ -47,6 +52,11 @@ export default function MyCQShiftCard() {
     const period = hours >= 12 ? 'PM' : 'AM'
     const displayHours = hours % 12 || 12
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`
+  }
+
+  // Format military time for display
+  function formatMilitary(timeStr) {
+    return timeStr.replace(':', '')
   }
 
   async function handleStart() {
@@ -68,18 +78,22 @@ export default function MyCQShiftCard() {
   function getStatusColor() {
     if (isActive) return 'bg-green-50 border-green-200'
     if (isWithinShiftWindow) return 'bg-yellow-50 border-yellow-200'
+    if (isOvernightPreview) return 'bg-blue-50 border-blue-200'
     return 'bg-purple-50 border-purple-200'
   }
 
   function getStatusBadge() {
     if (isActive) return { bg: 'bg-green-100', text: 'text-green-800', label: 'On Duty' }
     if (isWithinShiftWindow) return { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Shift Starting' }
+    if (isOvernightPreview) return { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Tonight' }
     return { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Scheduled' }
   }
 
   const statusBadge = getStatusBadge()
-  const shiftLabel = isFirstShift ? 'First Shift' : 'Second Shift'
-  const partner = isFirstShift ? myShift.secondShiftName : myShift.firstShiftName
+  const shiftLabel = isShift1
+    ? `Shift 1 (${CQ_SHIFT_TIMES.shift1.label})`
+    : `Shift 2 (${CQ_SHIFT_TIMES.shift2.label})`
+  const partner = myShift.myPartnerName
 
   return (
     <div className={`rounded-lg border p-4 mb-6 ${getStatusColor()}`}>
@@ -102,14 +116,20 @@ export default function MyCQShiftCard() {
               <div className="text-gray-700">
                 <span className="font-medium">Time:</span>{' '}
                 {formatTime(myShift.myShiftStart)} - {formatTime(myShift.myShiftEnd)}
+                {isOvernightPreview && (
+                  <span className="ml-2 text-blue-600 font-medium">(starts after midnight)</span>
+                )}
               </div>
               <div className="text-gray-700">
                 <span className="font-medium">Date:</span>{' '}
-                {format(new Date(myShift.date), 'EEEE, MMMM d, yyyy')}
+                {format(new Date(myShift.date + 'T12:00:00'), 'EEEE, MMMM d, yyyy')}
+                {isOvernightPreview && (
+                  <span className="ml-1 text-gray-500">(tomorrow)</span>
+                )}
               </div>
               {partner && (
                 <div className="text-gray-600">
-                  <span className="font-medium">Partner ({isFirstShift ? 'Second Shift' : 'First Shift'}):</span>{' '}
+                  <span className="font-medium">Partner:</span>{' '}
                   {partner}
                 </div>
               )}
@@ -156,9 +176,15 @@ export default function MyCQShiftCard() {
             </button>
           )}
 
-          {isScheduled && !isWithinShiftWindow && (
+          {isScheduled && !isWithinShiftWindow && !isOvernightPreview && (
             <div className="text-sm text-gray-600 italic">
               Shift starts at {formatTime(myShift.myShiftStart)}
+            </div>
+          )}
+
+          {isOvernightPreview && (
+            <div className="text-sm text-blue-600 italic">
+              CQ duty tonight - shift starts at {formatTime(myShift.myShiftStart)} (after midnight)
             </div>
           )}
         </div>
