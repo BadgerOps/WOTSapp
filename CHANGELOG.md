@@ -31,9 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Firebase Auth API transient errors filtered
 - Sensitive data scrubbed from headers and URLs
 
+#### Profile Self-Service
+- Users can edit their own phone number and room number from Profile page
+- Profile changes sync to both users and personnel collections
+- Personnel info (rank, name, flight) displayed on profile
+
 ### Changed
 - All Cloud Functions now wrapped with Sentry error tracking
 - Vite build now generates source maps for Sentry
+- Updated Firestore rules to allow users to update own personnel record (phone/room only)
 
 ---
 

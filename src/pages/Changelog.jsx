@@ -1,8 +1,43 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.2'
+const APP_VERSION = '0.4.3'
 
 const changelog = [
+  {
+    version: '0.4.3',
+    date: '2026-01-24',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Sentry Error Tracking',
+            details: [
+              'Frontend error tracking with React Error Boundary and user-friendly fallback UI',
+              'Backend error tracking for all Cloud Functions',
+              'Automatic user context (uid, email, role) attached to error reports',
+              'Console logging integration sends logs to Sentry',
+              'Performance monitoring with configurable sample rates',
+            ],
+          },
+          {
+            category: 'Profile Editing',
+            details: [
+              'Users can now edit their own profile information (phone number, room number)',
+              'Profile changes sync to personnel records automatically',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Changed',
+        items: [
+          { details: ['All Cloud Functions now wrapped with Sentry error tracking'] },
+          { details: ['Service worker and Firebase API transient errors filtered from error reports'] },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.2',
     date: '2026-01-24',
