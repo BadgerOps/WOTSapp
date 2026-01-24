@@ -162,9 +162,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // CQ Shifts collection (admin-only for now; future cq_admin role)
+    // CQ Shifts collection
     match /cqShifts/{shiftId} {
-      allow read, write: if isAdmin();
+      // Anyone authenticated can read shifts
+      allow read: if isAuthenticated();
+      // Only admins can create, update, delete shifts
+      allow write: if isAdmin();
     }
 
     // Personnel Status collection (rolling current status)
