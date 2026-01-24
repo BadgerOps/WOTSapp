@@ -3,7 +3,7 @@ import { useUserSurveyResponse } from '../../hooks/useSurveyResponses'
 import Loading from '../common/Loading'
 import { format } from 'date-fns'
 
-function SurveyCard({ survey, onTake }) {
+function SurveyCard({ survey, onTake, onViewResults }) {
   const { hasResponded } = useUserSurveyResponse(survey.id)
 
   const getTypeBadge = (type) => {
@@ -48,25 +48,34 @@ function SurveyCard({ survey, onTake }) {
           </div>
         </div>
 
-        <button
-          onClick={() => onTake(survey)}
-          className={`btn-primary text-sm whitespace-nowrap ${
-            hasResponded && !survey.allowMultipleResponses ? 'opacity-50' : ''
-          }`}
-          disabled={hasResponded && !survey.allowMultipleResponses}
-        >
-          {hasResponded && !survey.allowMultipleResponses
-            ? 'Completed'
-            : hasResponded
-            ? 'Respond Again'
-            : 'Take Survey'}
-        </button>
+        <div className="flex gap-2">
+          {hasResponded && survey.responseCount > 0 && (
+            <button
+              onClick={() => onViewResults(survey)}
+              className="btn-secondary text-sm whitespace-nowrap"
+            >
+              View Results
+            </button>
+          )}
+          <button
+            onClick={() => onTake(survey)}
+            className={`text-sm whitespace-nowrap ${
+              hasResponded && !survey.allowMultipleResponses ? 'btn-secondary' : 'btn-primary'
+            }`}
+          >
+            {hasResponded && !survey.allowMultipleResponses
+              ? 'Edit Response'
+              : hasResponded
+              ? 'Respond Again'
+              : 'Take Survey'}
+          </button>
+        </div>
       </div>
     </div>
   )
 }
 
-export default function SurveyList({ onTakeSurvey }) {
+export default function SurveyList({ onTakeSurvey, onViewResults }) {
   const { surveys, loading, error } = useSurveys('published')
 
   if (loading) {
@@ -94,7 +103,7 @@ export default function SurveyList({ onTakeSurvey }) {
   return (
     <div className="space-y-3">
       {surveys.map((survey) => (
-        <SurveyCard key={survey.id} survey={survey} onTake={onTakeSurvey} />
+        <SurveyCard key={survey.id} survey={survey} onTake={onTakeSurvey} onViewResults={onViewResults} />
       ))}
     </div>
   )

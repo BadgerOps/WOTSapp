@@ -1,11 +1,30 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.1'
+const APP_VERSION = '0.4.2'
 
 const changelog = [
   {
+    version: '0.4.2',
+    date: '2026-01-24',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            details: [
+              'Survey response editing: Users can now edit/update their previously submitted survey responses from both the main Surveys page and Admin dashboard',
+              'Survey results viewing: Users who have responded can view aggregated results from the main Surveys page',
+              'Pending survey card on Home page: Shows unanswered surveys, disappears after user responds',
+              'Push notifications for new surveys: Users receive notifications when surveys are published',
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
     version: '0.4.1',
-    date: '2026-01-23',
+    date: '2026-01-24',
     sections: [
       {
         title: 'Fixed',
