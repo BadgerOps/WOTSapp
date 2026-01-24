@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-01-24
+
+### Added
+
+#### Sentry Error Tracking & Performance Monitoring
+- Frontend error tracking with `@sentry/react` integration
+- Backend error tracking with `@sentry/node` for Cloud Functions
+- React Error Boundary with user-friendly fallback UI
+- Automatic user context (uid, email, role) attached to error reports
+- Performance monitoring with configurable sample rates
+- Source map upload support for readable stack traces in production
+
+#### Sentry Wrappers for Cloud Functions
+- `wrapCallable()` - Wraps callable functions with error tracking and user context
+- `wrapScheduled()` - Wraps scheduled functions with breadcrumbs and error capture
+- `wrapFirestoreTrigger()` - Wraps Firestore triggers with document context
+
+#### Error Filtering
+- Auth popup errors filtered out (user-closed, blocked, cancelled)
+- Network errors filtered (offline, timeouts)
+- Expected permission-denied errors filtered
+- Sensitive data scrubbed from headers and URLs
+
+### Changed
+- All Cloud Functions now wrapped with Sentry error tracking
+- Vite build now generates source maps for Sentry
+
+---
+
 ## [0.4.2] - 2026-01-24
 
 ### Added

@@ -3,6 +3,10 @@ const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 
+// Initialize Sentry for error tracking (must be early)
+const { initSentry, wrapFirestoreTrigger, addBreadcrumb, Sentry } = require("./utils/sentry");
+initSentry();
+
 // Import scheduled functions
 const { uotdScheduler } = require("./uotdScheduler");
 
@@ -74,8 +78,9 @@ exports.syncPersonnelRoleToUser = syncPersonnelRoleToUser;
 // Send push notification when a survey is published
 exports.onSurveyPublished = onDocumentCreated(
   "surveys/{surveyId}",
-  async (event) => {
+  wrapFirestoreTrigger(async (event) => {
     const survey = event.data.data();
+    addBreadcrumb("Survey published trigger", { surveyId: event.params.surveyId }, "notification");
 
     // Only send notifications for published surveys
     if (survey.status !== "published") {
@@ -214,14 +219,16 @@ exports.onSurveyPublished = onDocumentCreated(
       return response;
     } catch (error) {
       console.error("Error sending survey notifications:", error);
+      Sentry.captureException(error);
       return null;
     }
-  },
+  }, "onSurveyPublished"),
 );
 
 // Send push notification when a new post is created
-exports.onPostCreated = onDocumentCreated("posts/{postId}", async (event) => {
+exports.onPostCreated = onDocumentCreated("posts/{postId}", wrapFirestoreTrigger(async (event) => {
   const post = event.data.data();
+  addBreadcrumb("Post created trigger", { postId: event.params.postId, type: post.type }, "notification");
 
   // Only send notifications for published posts
   if (post.status !== "published") {
@@ -350,9 +357,10 @@ exports.onPostCreated = onDocumentCreated("posts/{postId}", async (event) => {
     return response;
   } catch (error) {
     console.error("Error sending notifications:", error);
+    Sentry.captureException(error);
     return null;
   }
-});
+}, "onPostCreated"));
 
 function getNotificationTitle(postType, post, timezone) {
   // Use the shared timezone-aware formatting function

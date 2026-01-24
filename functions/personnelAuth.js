@@ -1,6 +1,7 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore')
 const { getAuth } = require('firebase-admin/auth')
 const { getFirestore, FieldValue } = require('firebase-admin/firestore')
+const { wrapFirestoreTrigger, addBreadcrumb } = require('./utils/sentry')
 
 // When a new personnel record is created, create a Firebase Auth account if it doesn't exist
 exports.onPersonnelCreated = onDocumentCreated(
@@ -10,9 +11,10 @@ exports.onPersonnelCreated = onDocumentCreated(
     memory: '256MiB',
     timeoutSeconds: 60,
   },
-  async (event) => {
+  wrapFirestoreTrigger(async (event) => {
     const personnelData = event.data.data()
     const personnelId = event.params.personnelId
+    addBreadcrumb('Personnel created trigger', { personnelId, email: personnelData.email }, 'personnelAuth')
 
     // Skip if userId already exists (account already linked)
     if (personnelData.userId) {
@@ -106,7 +108,7 @@ exports.onPersonnelCreated = onDocumentCreated(
         error: error.message,
       }
     }
-  }
+  }, 'onPersonnelCreated')
 )
 
 function generateRandomPassword(length = 12) {

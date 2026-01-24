@@ -2,12 +2,14 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getExistingUotdPost } = require("./utils/uotdUtils");
+const { wrapCallable, wrapScheduled, addBreadcrumb } = require("./utils/sentry");
 
 /**
  * Approve a weather recommendation and create a UOTD post
  */
-exports.approveRecommendation = onCall(async (request) => {
+exports.approveRecommendation = onCall(wrapCallable(async (request) => {
   const db = getFirestore();
+  addBreadcrumb("Approve recommendation initiated", { recommendationId: request.data?.recommendationId }, "approval");
 
   // Check authentication
   if (!request.auth) {
@@ -162,13 +164,14 @@ exports.approveRecommendation = onCall(async (request) => {
       uniformName: uniform.name,
     },
   };
-});
+}));
 
 /**
  * Reject a weather recommendation
  */
-exports.rejectRecommendation = onCall(async (request) => {
+exports.rejectRecommendation = onCall(wrapCallable(async (request) => {
   const db = getFirestore();
+  addBreadcrumb("Reject recommendation initiated", { recommendationId: request.data?.recommendationId }, "approval");
 
   // Check authentication
   if (!request.auth) {
@@ -223,12 +226,12 @@ exports.rejectRecommendation = onCall(async (request) => {
     message: "Recommendation rejected",
     recommendationId,
   };
-});
+}));
 
 /**
  * Get pending recommendations count (for badge display)
  */
-exports.getPendingCount = onCall(async (request) => {
+exports.getPendingCount = onCall(wrapCallable(async (request) => {
   const db = getFirestore();
 
   // Check authentication
@@ -251,7 +254,7 @@ exports.getPendingCount = onCall(async (request) => {
     .get();
 
   return { count: snapshot.data().count };
-});
+}));
 
 /**
  * Expire old pending recommendations (cleanup function)
@@ -295,12 +298,13 @@ exports.autoPublishPendingRecommendations = onSchedule(
   {
     schedule: "* * * * *", // Every minute
   },
-  async () => {
+  wrapScheduled(async () => {
     const db = getFirestore();
     const now = new Date();
     const cutoffTime = new Date(
       now.getTime() - AUTO_PUBLISH_DELAY_MINUTES * 60 * 1000,
     );
+    addBreadcrumb("Auto-publish check starting", { cutoffTime: cutoffTime.toISOString() }, "approval");
 
     console.log(
       `Checking for pending recommendations older than ${cutoffTime.toISOString()}`,
@@ -469,5 +473,5 @@ exports.autoPublishPendingRecommendations = onSchedule(
 
     console.log(`Auto-published ${successCount} recommendations`);
     return { autoPublished: successCount };
-  },
+  }, "autoPublishPendingRecommendations"),
 );

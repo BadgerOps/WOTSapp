@@ -1,5 +1,6 @@
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { wrapFirestoreTrigger, addBreadcrumb } = require("./utils/sentry");
 
 const VALID_ROLES = ["user", "uniform_admin", "admin"];
 
@@ -29,11 +30,12 @@ function normalizeRole(role) {
  */
 exports.syncPersonnelRoleToUser = onDocumentUpdated(
   "personnel/{personnelId}",
-  async (event) => {
+  wrapFirestoreTrigger(async (event) => {
     const db = getFirestore();
     const before = event.data.before.data();
     const after = event.data.after.data();
     const personnelId = event.params.personnelId;
+    addBreadcrumb("Role sync triggered", { personnelId }, "roleSync");
 
     // Check if role changed
     const beforeRole = normalizeRole(before.role);
@@ -98,5 +100,5 @@ exports.syncPersonnelRoleToUser = onDocumentUpdated(
       );
       throw error;
     }
-  },
+  }, "syncPersonnelRoleToUser"),
 );

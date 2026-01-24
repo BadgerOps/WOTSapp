@@ -1,10 +1,30 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 export default defineConfig({
+  build: {
+    sourcemap: true, // Required for Sentry source maps
+  },
   plugins: [
     react(),
+    // Sentry source map upload (only when SENTRY_AUTH_TOKEN is set)
+    ...(process.env.SENTRY_AUTH_TOKEN
+      ? [
+          sentryVitePlugin({
+            org: process.env.SENTRY_ORG,
+            project: process.env.SENTRY_PROJECT,
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            release: {
+              name: process.env.VITE_SENTRY_RELEASE,
+            },
+            sourcemaps: {
+              filesToDeleteAfterUpload: ['./dist/**/*.map'], // Remove source maps from deployment
+            },
+          }),
+        ]
+      : []),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {

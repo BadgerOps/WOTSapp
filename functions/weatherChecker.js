@@ -10,6 +10,7 @@ const {
   getTodayInTimezone,
   determineTargetSlot,
 } = require('./utils/timezone')
+const { wrapScheduled, wrapCallable, addBreadcrumb } = require('./utils/sentry')
 
 /**
  * Check if there's already a pending or approved recommendation for today's slot
@@ -321,8 +322,9 @@ exports.scheduledWeatherCheck = onSchedule(
   {
     schedule: '* * * * *', // Every minute; logic below gates by configured timezone and UOTD schedule
   },
-  async () => {
+  wrapScheduled(async () => {
     const db = getFirestore()
+    addBreadcrumb('Starting scheduled weather check', {}, 'weather')
     try {
       const timezone = await getConfiguredTimezone(db)
       const currentTime = getCurrentTimeInTimezone(timezone)
@@ -354,14 +356,15 @@ exports.scheduledWeatherCheck = onSchedule(
       console.error('Scheduled weather check failed:', error)
       throw error
     }
-  }
+  }, 'scheduledWeatherCheck')
 )
 
 /**
  * Manual weather check - callable by uniform_admin or admin
  */
-exports.manualWeatherCheck = onCall(async (request) => {
+exports.manualWeatherCheck = onCall(wrapCallable(async (request) => {
   const db = getFirestore()
+  addBreadcrumb('Manual weather check initiated', { targetSlot: request.data?.targetSlot }, 'weather')
 
   // Check authentication
   if (!request.auth) {
@@ -390,14 +393,15 @@ exports.manualWeatherCheck = onCall(async (request) => {
     console.error('Manual weather check failed:', error)
     throw new HttpsError('internal', error.message || 'Weather check failed')
   }
-})
+}))
 
 /**
  * Get current weather (cached or fresh)
  * Callable by any authenticated user
  */
-exports.getCurrentWeather = onCall(async (request) => {
+exports.getCurrentWeather = onCall(wrapCallable(async (request) => {
   const db = getFirestore()
+  addBreadcrumb('Get current weather requested', {}, 'weather')
 
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be logged in')
@@ -464,4 +468,4 @@ exports.getCurrentWeather = onCall(async (request) => {
     console.error('Failed to fetch weather:', error)
     throw new HttpsError('internal', 'Failed to fetch weather data')
   }
-})
+}))

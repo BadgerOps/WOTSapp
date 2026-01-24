@@ -5,13 +5,15 @@ const {
   getCurrentTimeInTimezone,
   isToday,
 } = require('./utils/timezone')
+const { wrapScheduled, addBreadcrumb } = require('./utils/sentry')
 
 /**
  * Scheduled function that runs every minute to check for UOTD posts to create
  * Reads timezone from settings/appConfig
  */
-exports.uotdScheduler = onSchedule('* * * * *', async () => {
+exports.uotdScheduler = onSchedule('* * * * *', wrapScheduled(async () => {
   const db = getFirestore()
+  addBreadcrumb('UOTD scheduler running', {}, 'uotd')
 
   console.log('UOTD Scheduler running...')
 
@@ -125,4 +127,4 @@ exports.uotdScheduler = onSchedule('* * * * *', async () => {
   }
 
   return null
-})
+}, 'uotdScheduler'))
