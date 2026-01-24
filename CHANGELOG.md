@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-01-24
+
+### Added
+
+#### Sentry Error Tracking & Performance Monitoring
+- Frontend error tracking with `@sentry/react` integration
+- Backend error tracking with `@sentry/node` for Cloud Functions
+- React Error Boundary with user-friendly fallback UI
+- Automatic user context (uid, email, role) attached to error reports
+- Performance monitoring with configurable sample rates
+- Source map upload support for readable stack traces in production
+- Console logging integration sends console.log/warn/error to Sentry Logs
+
+#### Sentry Wrappers for Cloud Functions
+- `wrapCallable()` - Wraps callable functions with error tracking and user context
+- `wrapScheduled()` - Wraps scheduled functions with breadcrumbs and error capture
+- `wrapFirestoreTrigger()` - Wraps Firestore triggers with document context
+
+#### Error Filtering
+- Auth popup errors filtered out (user-closed, blocked, cancelled)
+- Network errors filtered (offline, timeouts)
+- Expected permission-denied errors filtered
+- Service worker load failures filtered (transient PWA errors)
+- Firebase Auth API transient errors filtered
+- Sensitive data scrubbed from headers and URLs
+
+#### Profile Self-Service
+- Users can edit their own phone number and room number from Profile page
+- Profile changes sync to both users and personnel collections
+- Personnel info (rank, name, flight) displayed on profile
+
+### Changed
+- All Cloud Functions now wrapped with Sentry error tracking
+- Vite build now generates source maps for Sentry
+- Updated Firestore rules to allow users to update own personnel record (phone/room only)
+
+---
+
 ## [0.4.2] - 2026-01-24
 
 ### Added

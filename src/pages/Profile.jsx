@@ -2,15 +2,20 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUserProfile } from '../hooks/useUserProfile'
 import { useSearchParams, Link } from 'react-router-dom'
+import { doc, updateDoc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore'
+import { db } from '../config/firebase'
 import Loading from '../components/common/Loading'
 import DebugPanel from '../components/common/DebugPanel'
 
-const APP_VERSION = '0.1.0'
+const APP_VERSION = '0.4.3'
 
 export default function Profile() {
   const { user } = useAuth()
   const { profile, loading, error, updateProfile } = useUserProfile()
+  const [personnelRecord, setPersonnelRecord] = useState(null)
+  const [personnelLoading, setPersonnelLoading] = useState(true)
   const [phoneNumber, setPhoneNumber] = useState('')
+  const [roomNumber, setRoomNumber] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState(null)
@@ -19,11 +24,46 @@ export default function Profile() {
   const tapCount = useRef(0)
   const tapTimer = useRef(null)
 
+  // Fetch user's personnel record
   useEffect(() => {
-    if (profile?.phoneNumber) {
-      setPhoneNumber(profile.phoneNumber)
+    async function fetchPersonnelRecord() {
+      if (!user) {
+        setPersonnelLoading(false)
+        return
+      }
+
+      try {
+        const q = query(
+          collection(db, 'personnel'),
+          where('userId', '==', user.uid)
+        )
+        const snapshot = await getDocs(q)
+
+        if (!snapshot.empty) {
+          const doc = snapshot.docs[0]
+          const data = { id: doc.id, ...doc.data() }
+          setPersonnelRecord(data)
+          setPhoneNumber(data.phoneNumber || '')
+          setRoomNumber(data.roomNumber || '')
+        }
+      } catch (err) {
+        console.error('Error fetching personnel record:', err)
+      } finally {
+        setPersonnelLoading(false)
+      }
     }
-  }, [profile])
+
+    fetchPersonnelRecord()
+  }, [user])
+
+  // Fall back to profile data if no personnel record
+  useEffect(() => {
+    if (!personnelRecord && profile) {
+      if (profile.phoneNumber && !phoneNumber) {
+        setPhoneNumber(profile.phoneNumber)
+      }
+    }
+  }, [profile, personnelRecord, phoneNumber])
 
   // Check for ?debug=true in URL
   useEffect(() => {
@@ -50,7 +90,7 @@ export default function Profile() {
     }
   }
 
-  if (loading) {
+  if (loading || personnelLoading) {
     return <Loading />
   }
 
@@ -61,10 +101,25 @@ export default function Profile() {
     setSaveError(null)
 
     try {
-      await updateProfile({ phoneNumber })
+      // Update personnel record if it exists
+      if (personnelRecord) {
+        await updateDoc(doc(db, 'personnel', personnelRecord.id), {
+          phoneNumber: phoneNumber.trim(),
+          roomNumber: roomNumber.trim(),
+          updatedAt: serverTimestamp(),
+        })
+      }
+
+      // Also update user profile
+      await updateProfile({
+        phoneNumber: phoneNumber.trim(),
+        roomNumber: roomNumber.trim(),
+      })
+
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
     } catch (err) {
+      console.error('Error saving profile:', err)
       setSaveError(err.message)
     } finally {
       setSaving(false)
@@ -98,6 +153,13 @@ export default function Profile() {
           <div>
             <p className="font-medium text-gray-900">{user?.displayName}</p>
             <p className="text-sm text-gray-600">{user?.email}</p>
+            {personnelRecord && (
+              <p className="text-xs text-gray-500 mt-1">
+                {personnelRecord.rank && `${personnelRecord.rank} `}
+                {personnelRecord.firstName} {personnelRecord.lastName}
+                {personnelRecord.flight && ` • ${personnelRecord.flight} Flight`}
+              </p>
+            )}
           </div>
         </div>
         <p className="text-xs text-gray-500">
@@ -121,26 +183,44 @@ export default function Profile() {
           </div>
         )}
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Phone Number
-          </label>
-          <input
-            type="tel"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            placeholder="Enter your phone number"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            This will be auto-filled when signing out on pass.
-          </p>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Phone Number
+            </label>
+            <input
+              type="tel"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder="Enter your phone number"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              This will be auto-filled when signing out on pass.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Room Number
+            </label>
+            <input
+              type="text"
+              value={roomNumber}
+              onChange={(e) => setRoomNumber(e.target.value)}
+              placeholder="Enter your room number"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Used for CQ signout roster and cleaning details.
+            </p>
+          </div>
         </div>
 
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+          className="mt-6 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save Changes'}
         </button>

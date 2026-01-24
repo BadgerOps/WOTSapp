@@ -104,7 +104,12 @@ service cloud.firestore {
     match /personnel/{personnelId} {
       // Anyone authenticated can read personnel
       allow read: if isAuthenticated();
-      // Only admins can create, update, delete personnel
+      // Users can update their own personnel record (only phoneNumber, roomNumber, updatedAt)
+      allow update: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['phoneNumber', 'roomNumber', 'updatedAt']);
+      // Admins can create, update, delete personnel
       allow create, update, delete: if isAdmin();
     }
 
