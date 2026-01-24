@@ -25,12 +25,14 @@ import PersonnelStatusTracker from '../components/cq/PersonnelStatusTracker'
 import CQNotesLog from '../components/cq/CQNotesLog'
 import CQAuditLog from '../components/cq/CQAuditLog'
 import StatusCleanupTool from '../components/cq/StatusCleanupTool'
+import CQSwapApprovalQueue from '../components/cq/CQSwapApprovalQueue'
 import SurveyComposer from '../components/surveys/SurveyComposer'
 import SurveyManager from '../components/surveys/SurveyManager'
 import SurveyResults from '../components/surveys/SurveyResults'
 import { usePendingCount } from '../hooks/useWeatherRecommendations'
 import { usePendingDetailApprovals } from '../hooks/useDetailAssignments'
 import { useActiveShift } from '../hooks/useCQShifts'
+import { usePendingSwapRequestCount } from '../hooks/useCQSwapRequests'
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('posts')
@@ -46,6 +48,7 @@ export default function Admin() {
   const { count: pendingCount } = usePendingCount()
   const { count: pendingDetailsCount } = usePendingDetailApprovals()
   const { activeShift } = useActiveShift()
+  const { count: pendingSwapCount } = usePendingSwapRequestCount()
 
   const tabs = [
     { id: 'posts', label: 'Posts' },
@@ -350,6 +353,21 @@ export default function Admin() {
             >
               Maintenance
             </button>
+            <button
+              onClick={() => setCqSubTab('swaps')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cqSubTab === 'swaps'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Swap Requests
+              {pendingSwapCount > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-500 text-white">
+                  {pendingSwapCount}
+                </span>
+              )}
+            </button>
           </div>
 
           {cqSubTab === 'dashboard' && <CQDashboard />}
@@ -359,6 +377,7 @@ export default function Admin() {
           {cqSubTab === 'notes' && <CQNotesLog />}
           {cqSubTab === 'audit' && <CQAuditLog />}
           {cqSubTab === 'maintenance' && <StatusCleanupTool />}
+          {cqSubTab === 'swaps' && <CQSwapApprovalQueue />}
         </div>
       )}
 

@@ -21,6 +21,7 @@ export default function CQScheduleManager() {
     generateSchedule,
     skipDate,
     removeSkip,
+    updateShiftAssignment,
     loading: actionLoading,
     error: actionError,
   } = useCQScheduleActions()
@@ -35,6 +36,11 @@ export default function CQScheduleManager() {
   )
   const [generateDays, setGenerateDays] = useState(30)
   const [success, setSuccess] = useState(null)
+
+  // Edit modal state
+  const [editingShift, setEditingShift] = useState(null) // { scheduleId, shiftType, position, currentName, currentId }
+  const [selectedPersonnelId, setSelectedPersonnelId] = useState('')
+  const [personnelSearch, setPersonnelSearch] = useState('')
 
   const fileInputRef = useRef(null)
 
@@ -346,6 +352,50 @@ export default function CQScheduleManager() {
     }
   }
 
+  function openEditModal(scheduleId, shiftType, position, currentName, currentId) {
+    setEditingShift({ scheduleId, shiftType, position, currentName, currentId })
+    setSelectedPersonnelId(currentId || '')
+    setPersonnelSearch('')
+  }
+
+  function closeEditModal() {
+    setEditingShift(null)
+    setSelectedPersonnelId('')
+    setPersonnelSearch('')
+  }
+
+  async function handleSaveAssignment() {
+    if (!editingShift) return
+
+    const selectedPerson = personnel.find(p => (p.userId || p.id) === selectedPersonnelId)
+    const newName = selectedPerson
+      ? `${selectedPerson.rank || ''} ${selectedPerson.lastName}`.trim()
+      : ''
+
+    try {
+      await updateShiftAssignment(
+        editingShift.scheduleId,
+        editingShift.shiftType,
+        editingShift.position,
+        selectedPersonnelId || null,
+        newName
+      )
+      setSuccess('Shift assignment updated!')
+      setTimeout(() => setSuccess(null), 3000)
+      closeEditModal()
+    } catch (err) {
+      // Error handled by hook
+    }
+  }
+
+  // Filter personnel for search
+  const filteredPersonnel = personnelSearch
+    ? personnel.filter(p =>
+        `${p.firstName} ${p.lastName}`.toLowerCase().includes(personnelSearch.toLowerCase()) ||
+        p.lastName?.toLowerCase().includes(personnelSearch.toLowerCase())
+      )
+    : personnel
+
   return (
     <div className="space-y-4">
       {/* Hidden file input */}
@@ -531,14 +581,60 @@ export default function CQScheduleManager() {
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-gray-600 mt-2 space-y-1">
+                          <div className="text-sm text-gray-600 mt-2 space-y-2">
                             <div>
-                              <span className="font-medium text-gray-700">Shift 1 ({CQ_SHIFT_TIMES.shift1.label}):</span>{' '}
-                              {shift1Display || '-'}
+                              <span className="font-medium text-gray-700">Shift 1 ({CQ_SHIFT_TIMES.shift1.label}):</span>
+                              {isNewFormat ? (
+                                <div className="ml-4 mt-1 space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span>{entry.shift1Person1Name || '-'}</span>
+                                    <button
+                                      onClick={() => openEditModal(entry.id, 'shift1', 1, entry.shift1Person1Name, entry.shift1Person1Id)}
+                                      className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+                                    >
+                                      Edit
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span>{entry.shift1Person2Name || '-'}</span>
+                                    <button
+                                      onClick={() => openEditModal(entry.id, 'shift1', 2, entry.shift1Person2Name, entry.shift1Person2Id)}
+                                      className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+                                    >
+                                      Edit
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="ml-1">{shift1Display || '-'}</span>
+                              )}
                             </div>
                             <div>
-                              <span className="font-medium text-gray-700">Shift 2 ({CQ_SHIFT_TIMES.shift2.label}):</span>{' '}
-                              {shift2Display || '-'}
+                              <span className="font-medium text-gray-700">Shift 2 ({CQ_SHIFT_TIMES.shift2.label}):</span>
+                              {isNewFormat ? (
+                                <div className="ml-4 mt-1 space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span>{entry.shift2Person1Name || '-'}</span>
+                                    <button
+                                      onClick={() => openEditModal(entry.id, 'shift2', 1, entry.shift2Person1Name, entry.shift2Person1Id)}
+                                      className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+                                    >
+                                      Edit
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span>{entry.shift2Person2Name || '-'}</span>
+                                    <button
+                                      onClick={() => openEditModal(entry.id, 'shift2', 2, entry.shift2Person2Name, entry.shift2Person2Id)}
+                                      className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+                                    >
+                                      Edit
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="ml-1">{shift2Display || '-'}</span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -815,6 +911,117 @@ export default function CQScheduleManager() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Edit Shift Assignment Modal */}
+      {editingShift && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">
+                Edit Shift Assignment
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {editingShift.shiftType === 'shift1' ? 'Shift 1 (2000-0100)' : 'Shift 2 (0100-0600)'},
+                Position {editingShift.position}
+              </p>
+              {editingShift.currentName && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Current: {editingShift.currentName}
+                </p>
+              )}
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              {/* Search input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Search Personnel
+                </label>
+                <input
+                  type="text"
+                  value={personnelSearch}
+                  onChange={(e) => setPersonnelSearch(e.target.value)}
+                  placeholder="Type to search..."
+                  className="input text-sm"
+                />
+              </div>
+
+              {/* Personnel list */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select Personnel
+                </label>
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+                  {/* Option to clear/unassign */}
+                  <label
+                    className={`flex items-center p-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 ${
+                      selectedPersonnelId === '' ? 'bg-primary-50' : ''
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="personnel"
+                      value=""
+                      checked={selectedPersonnelId === ''}
+                      onChange={() => setSelectedPersonnelId('')}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-500 italic">Unassigned</span>
+                  </label>
+
+                  {filteredPersonnel.length === 0 ? (
+                    <p className="p-3 text-sm text-gray-500 italic">
+                      No personnel found
+                    </p>
+                  ) : (
+                    filteredPersonnel.map((person) => {
+                      const personId = person.userId || person.id
+                      return (
+                        <label
+                          key={personId}
+                          className={`flex items-center p-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                            selectedPersonnelId === personId ? 'bg-primary-50' : ''
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="personnel"
+                            value={personId}
+                            checked={selectedPersonnelId === personId}
+                            onChange={() => setSelectedPersonnelId(personId)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm">
+                            {person.rank && <span className="text-gray-500">{person.rank} </span>}
+                            {person.lastName}, {person.firstName}
+                          </span>
+                        </label>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex gap-3">
+              <button
+                onClick={handleSaveAssignment}
+                disabled={actionLoading}
+                className="btn-primary flex-1 disabled:opacity-50"
+              >
+                {actionLoading ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={closeEditModal}
+                disabled={actionLoading}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
