@@ -239,8 +239,8 @@ export function useCQScheduleActions() {
             shift2Person1Id: entry.shift2Person1Id || null,
             shift2Person2Name: entry.shift2Person2Name,
             shift2Person2Id: entry.shift2Person2Id || null,
-            // Skip day indicator (if any name has asterisk)
-            isLikelySkipDay: entry.isLikelySkipDay || false,
+            // Potential skip day indicator (before quiz/PT test)
+            isPotentialSkipDay: entry.isPotentialSkipDay || false,
             skipDayReason: entry.skipDayReason || null,
             status: 'scheduled',
             importedBy: user.uid,
@@ -259,7 +259,7 @@ export function useCQScheduleActions() {
             shift2Person1Id: entry.shift2Person1Id || null,
             shift2Person2Name: entry.shift2Person2Name,
             shift2Person2Id: entry.shift2Person2Id || null,
-            isLikelySkipDay: entry.isLikelySkipDay || false,
+            isPotentialSkipDay: entry.isPotentialSkipDay || false,
             skipDayReason: entry.skipDayReason || null,
             updatedBy: user.uid,
             updatedAt: serverTimestamp(),

@@ -106,12 +106,11 @@ export default function CQScheduleManager() {
   /**
    * Parse new format CSV: Date, Day, Shift 1, Shift 2
    * Each shift has 2 people separated by "/"
-   * Asterisks (*) indicate candidate leadership - these days are SKIPPED (no CQ)
+   * Asterisks (*) indicate potential skip days (before quizzes/PT tests) - label but still schedule
    */
   function parseNewFormatCSV(lines, indices) {
     const { dateIndex, dayIndex, shift1Index, shift2Index } = indices
     const entries = []
-    const skippedDays = []
     const currentYear = new Date().getFullYear()
 
     for (let i = 1; i < lines.length; i++) {
@@ -132,22 +131,10 @@ export default function CQScheduleManager() {
       const parsedDate = parseDateString(dateStr, currentYear)
       if (!parsedDate) continue
 
-      // Detect if any name has asterisk (candidate leadership = skip day, no CQ)
+      // Detect if any name has asterisk (potential skip day - before quiz/PT test)
       const hasAsterisk = shift1Raw.includes('*') || shift2Raw.includes('*')
 
-      // If candidate leadership day, track as skipped and don't include in schedule
-      if (hasAsterisk) {
-        skippedDays.push({
-          date: parsedDate,
-          dayOfWeek,
-          reason: 'Candidate Leadership',
-          originalShift1: shift1Raw,
-          originalShift2: shift2Raw,
-        })
-        continue // Skip this day - candidate leadership doesn't do CQ
-      }
-
-      // Parse shift personnel (format: "Name1/Name2")
+      // Parse shift personnel (format: "Name1/Name2" or "Name1*/Name2*")
       const shift1Personnel = parseShiftPersonnel(shift1Raw)
       const shift2Personnel = parseShiftPersonnel(shift2Raw)
 
@@ -183,8 +170,8 @@ export default function CQScheduleManager() {
         shift2Person1Id: p1s2.id,
         shift2Person2Name: p2s2.name,
         shift2Person2Id: p2s2.id,
-        isLikelySkipDay: false,
-        skipDayReason: null,
+        isPotentialSkipDay: hasAsterisk,
+        skipDayReason: hasAsterisk ? 'Potential Skip (Quiz/PT Test)' : null,
         // Track matching status for preview
         _matchStatus: {
           shift1: [p1s1.matched, p2s1.matched],
@@ -194,15 +181,7 @@ export default function CQScheduleManager() {
       })
     }
 
-    // Sort by date
-    const sortedEntries = entries.sort((a, b) => a.date.localeCompare(b.date))
-
-    // Attach skipped days info for preview display
-    if (skippedDays.length > 0) {
-      sortedEntries._skippedDays = skippedDays
-    }
-
-    return sortedEntries
+    return entries.sort((a, b) => a.date.localeCompare(b.date))
   }
 
   /**
@@ -520,12 +499,15 @@ export default function CQScheduleManager() {
                     ? [entry.shift2Person1Name, entry.shift2Person2Name].filter(Boolean).join(' / ')
                     : entry.secondShiftName
 
+                  // Check for potential skip day (supports both old and new field names)
+                  const isPotentialSkip = entry.isPotentialSkipDay || entry.isLikelySkipDay
+
                   return (
                     <div
                       key={entry.id}
                       className={`p-3 rounded-lg border ${
-                        entry.isLikelySkipDay
-                          ? 'bg-purple-50 border-purple-200'
+                        isPotentialSkip
+                          ? 'bg-orange-50 border-orange-200'
                           : entry.date === today
                           ? 'bg-yellow-50 border-yellow-200'
                           : 'bg-gray-50 border-gray-200'
@@ -540,9 +522,9 @@ export default function CQScheduleManager() {
                                 Today
                               </span>
                             )}
-                            {entry.isLikelySkipDay && (
-                              <span className="text-xs bg-purple-200 text-purple-800 px-2 py-0.5 rounded-full">
-                                {entry.skipDayReason || 'Candidate Leadership'}
+                            {isPotentialSkip && (
+                              <span className="text-xs bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full">
+                                {entry.skipDayReason || 'Potential Skip'}
                               </span>
                             )}
                           </div>
@@ -593,20 +575,23 @@ export default function CQScheduleManager() {
                     ? [entry.shift2Person1Name, entry.shift2Person2Name].filter(Boolean).join('/')
                     : entry.secondShiftName
 
+                  // Check for potential skip day (supports both old and new field names)
+                  const isPotentialSkip = entry.isPotentialSkipDay || entry.isLikelySkipDay
+
                   return (
                     <div
                       key={entry.id}
                       className={`p-2 rounded border text-sm ${
-                        entry.isLikelySkipDay
-                          ? 'bg-purple-50 border-purple-100'
+                        isPotentialSkip
+                          ? 'bg-orange-50 border-orange-100'
                           : 'bg-gray-50 border-gray-100'
                       }`}
                     >
                       <div className="flex justify-between items-start">
                         <span className="text-gray-700">
                           {format(new Date(entry.date + 'T12:00:00'), 'MMM d, yyyy')}
-                          {entry.isLikelySkipDay && (
-                            <span className="ml-1 text-xs text-purple-600">(CL)</span>
+                          {isPotentialSkip && (
+                            <span className="ml-1 text-xs text-orange-600">(*)</span>
                           )}
                         </span>
                         <div className="text-right text-gray-500 text-xs">
@@ -653,14 +638,11 @@ export default function CQScheduleManager() {
               {importPreview[0]?._format === 'new' && (
                 <div className="mb-3 p-2 bg-blue-50 border border-blue-200 text-blue-700 rounded text-sm">
                   Detected new schedule format with 2 people per shift.
-                </div>
-              )}
-              {importPreview._skippedDays?.length > 0 && (
-                <div className="mb-3 p-2 bg-purple-50 border border-purple-200 text-purple-700 rounded text-sm">
-                  <strong>{importPreview._skippedDays.length} days skipped</strong> (Candidate Leadership - no CQ):
-                  <span className="ml-1 text-purple-600">
-                    {importPreview._skippedDays.map(d => format(new Date(d.date + 'T12:00:00'), 'MMM d')).join(', ')}
-                  </span>
+                  {importPreview.filter(e => e.isPotentialSkipDay).length > 0 && (
+                    <span className="ml-1">
+                      Days marked with <span className="bg-orange-200 text-orange-800 px-1 rounded">*</span> are potential skip days (before quiz/PT test).
+                    </span>
+                  )}
                 </div>
               )}
               {importError && (
@@ -677,11 +659,12 @@ export default function CQScheduleManager() {
                         <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">Date</th>
                         <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">Shift 1 (2000-0100)</th>
                         <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">Shift 2 (0100-0600)</th>
+                        <th className="px-2 py-2 text-left text-xs font-medium text-gray-500">Flag</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {importPreview.map((entry, idx) => (
-                        <tr key={idx}>
+                        <tr key={idx} className={entry.isPotentialSkipDay ? 'bg-orange-50' : ''}>
                           <td className="px-2 py-2 whitespace-nowrap">
                             {format(new Date(entry.date + 'T12:00:00'), 'MMM d')}
                             <span className="text-gray-400 ml-1 text-xs">{entry.dayOfWeek}</span>
@@ -693,6 +676,13 @@ export default function CQScheduleManager() {
                           <td className="px-2 py-2">
                             <div>{entry.shift2Person1Name || '-'}</div>
                             <div>{entry.shift2Person2Name || '-'}</div>
+                          </td>
+                          <td className="px-2 py-2">
+                            {entry.isPotentialSkipDay && (
+                              <span className="text-xs bg-orange-200 text-orange-800 px-1.5 py-0.5 rounded">
+                                *
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))}
