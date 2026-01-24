@@ -10,6 +10,7 @@ import MyDetails from './pages/MyDetails'
 import CQView from './pages/CQView'
 import Profile from './pages/Profile'
 import Changelog from './pages/Changelog'
+import Surveys from './pages/Surveys'
 import Admin from './pages/Admin'
 import { authLog } from './lib/authDebugger'
 
@@ -132,6 +133,14 @@ export default function App() {
             element={
               <ProtectedRoute routeName="Changelog">
                 <Changelog />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/surveys"
+            element={
+              <ProtectedRoute routeName="Surveys">
+                <Surveys />
               </ProtectedRoute>
             }
           />

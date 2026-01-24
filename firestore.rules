@@ -223,5 +223,36 @@ service cloud.firestore {
       // Admins can mark as used or delete
       allow delete: if isAdmin();
     }
+
+    // Surveys collection
+    match /surveys/{surveyId} {
+      // Creators can read their own surveys (any status)
+      allow read: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+      // Anyone authenticated can read published surveys
+      allow read: if isAuthenticated() && resource.data.status == 'published';
+      // Admins can read all surveys (including drafts)
+      allow read: if isAdmin();
+      // Anyone authenticated can create surveys
+      allow create: if isAuthenticated();
+      // Creators can update their own surveys, admins can update any
+      allow update: if isAuthenticated() &&
+        (resource.data.createdBy == request.auth.uid || isAdmin());
+      // Creators can delete their own surveys, admins can delete any
+      allow delete: if isAuthenticated() &&
+        (resource.data.createdBy == request.auth.uid || isAdmin());
+    }
+
+    // Survey Responses collection
+    match /surveyResponses/{responseId} {
+      // Anyone authenticated can read responses (for results viewing)
+      allow read: if isAuthenticated();
+      // Anyone authenticated can create a response
+      allow create: if isAuthenticated();
+      // Users can update their own responses
+      allow update: if isAuthenticated() &&
+        (resource.data.respondentId == request.auth.uid || isAdmin());
+      // Admins can delete responses
+      allow delete: if isAdmin();
+    }
   }
 }

@@ -22,6 +22,7 @@ export default function Navbar() {
     { path: '/documents', label: 'Documents' },
     { path: '/details', label: 'Details' },
     { path: '/cq', label: 'CQ' },
+    { path: '/surveys', label: 'Surveys' },
   ]
 
   if (isAdmin) {
