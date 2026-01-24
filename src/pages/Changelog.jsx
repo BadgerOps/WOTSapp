@@ -1,8 +1,39 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.2.0'
+const APP_VERSION = '0.3.0'
 
 const changelog = [
+  {
+    version: '0.3.0',
+    date: '2026-01-23',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'CQ Signout Roster PDF Export',
+            details: [
+              'Export pass audit log as PDF matching military DA Form signout roster format',
+              'Columns: Date, Name, Room #, Flight, Week of Training, Destination, Contact #, Time Out, Expected Return, Initials, Actual Time In, CQ Initials',
+              'Export with data populated from audit log entries',
+              'Export blank roster form for printing',
+              'Auto-calculate initials from personnel name (first + last initial)',
+              'Calculate week of training from configurable training start date',
+              'Training Start Date added to app configuration settings',
+              'Room and flight info pulled from personnel records',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Dependencies',
+        items: [
+          { details: ['Added jspdf for PDF generation'] },
+          { details: ['Added jspdf-autotable for table formatting'] },
+        ],
+      },
+    ],
+  },
   {
     version: '0.2.0',
     date: '2026-01-23',
@@ -174,6 +205,9 @@ export default function Changelog() {
                 )}
                 {section.title === 'Changed' && (
                   <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                )}
+                {section.title === 'Dependencies' && (
+                  <span className="w-2 h-2 rounded-full bg-purple-500"></span>
                 )}
                 {section.title}
               </h3>
