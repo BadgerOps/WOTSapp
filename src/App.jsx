@@ -1,19 +1,24 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import Navbar from './components/layout/Navbar'
 import Footer from './components/layout/Footer'
 import Loading from './components/common/Loading'
+import { authLog } from './lib/authDebugger'
+
+// Eagerly loaded pages (critical path)
 import Login from './pages/Login'
 import Home from './pages/Home'
-import Schedule from './pages/Schedule'
-import Documents from './pages/Documents'
-import MyDetails from './pages/MyDetails'
-import CQView from './pages/CQView'
-import Profile from './pages/Profile'
-import Changelog from './pages/Changelog'
-import Surveys from './pages/Surveys'
-import Admin from './pages/Admin'
-import { authLog } from './lib/authDebugger'
+
+// Lazy loaded pages (code splitting)
+const Schedule = lazy(() => import('./pages/Schedule'))
+const Documents = lazy(() => import('./pages/Documents'))
+const MyDetails = lazy(() => import('./pages/MyDetails'))
+const CQView = lazy(() => import('./pages/CQView'))
+const Profile = lazy(() => import('./pages/Profile'))
+const Changelog = lazy(() => import('./pages/Changelog'))
+const Surveys = lazy(() => import('./pages/Surveys'))
+const Admin = lazy(() => import('./pages/Admin'))
 
 function ProtectedRoute({ children, adminOnly = false, routeName = 'unknown' }) {
   const { user, loading, isAdmin } = useAuth()
@@ -67,6 +72,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 pb-10">
       {user && <Navbar />}
       <main className={user ? 'pt-16' : ''}>
+        <Suspense fallback={<Loading />}>
         <Routes>
           <Route
             path="/login"
@@ -155,6 +161,7 @@ export default function App() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </main>
       {user && <Footer />}
     </div>

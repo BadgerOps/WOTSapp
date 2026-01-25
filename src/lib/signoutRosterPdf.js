@@ -1,6 +1,3 @@
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
-
 /**
  * Format date as DDMMMYY (military style)
  * @param {Date|string} date
@@ -71,7 +68,13 @@ function calculateWeekOfTraining(eventDate, trainingStartDate) {
  * @param {Object} options.personnelData - Map of personnelId to personnel record (for room/flight info)
  * @param {string|Date} options.trainingStartDate - When training started (for calculating week of training)
  */
-export function generateSignoutRosterPdf(entries, options = {}) {
+export async function generateSignoutRosterPdf(entries, options = {}) {
+  // Dynamic import for code splitting
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable')
+  ])
+
   const { startDate, endDate, personnelData = {}, trainingStartDate } = options
 
   // Filter to only sign-out events (one row per trip)
@@ -258,9 +261,9 @@ export function generateSignoutRosterPdf(entries, options = {}) {
 /**
  * Download the signout roster as PDF
  */
-export function downloadSignoutRosterPdf(entries, options = {}) {
+export async function downloadSignoutRosterPdf(entries, options = {}) {
   const { startDate, endDate } = options
-  const doc = generateSignoutRosterPdf(entries, options)
+  const doc = await generateSignoutRosterPdf(entries, options)
 
   const filename = startDate === endDate
     ? `signout-roster-${startDate}.pdf`
@@ -274,7 +277,7 @@ export function downloadSignoutRosterPdf(entries, options = {}) {
  * @param {string} date - Date for the roster header
  * @param {number} rows - Number of blank rows (default 30)
  */
-export function generateBlankSignoutRosterPdf(date, rows = 30) {
+export async function generateBlankSignoutRosterPdf(date, rows = 30) {
   const emptyEntries = Array(rows).fill({})
   return generateSignoutRosterPdf(emptyEntries, { startDate: date, endDate: date })
 }
@@ -282,7 +285,7 @@ export function generateBlankSignoutRosterPdf(date, rows = 30) {
 /**
  * Download a blank signout roster PDF
  */
-export function downloadBlankSignoutRosterPdf(date, rows = 30) {
-  const doc = generateBlankSignoutRosterPdf(date, rows)
+export async function downloadBlankSignoutRosterPdf(date, rows = 30) {
+  const doc = await generateBlankSignoutRosterPdf(date, rows)
   doc.save(`signout-roster-blank-${date}.pdf`)
 }

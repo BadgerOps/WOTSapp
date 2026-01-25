@@ -6,6 +6,19 @@ import { sentryVitePlugin } from '@sentry/vite-plugin'
 export default defineConfig({
   build: {
     sourcemap: true, // Required for Sentry source maps
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'firebase-core': ['firebase/app', 'firebase/auth'],
+          'firebase-db': ['firebase/firestore'],
+          'firebase-storage': ['firebase/storage'],
+          'firebase-functions': ['firebase/functions'],
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-sentry': ['@sentry/react'],
+          'vendor-dates': ['date-fns'],
+        }
+      }
+    }
   },
   plugins: [
     react(),
