@@ -5,6 +5,12 @@ import { useMySwapRequests } from '../../hooks/useCQSwapRequests'
 import { useAuth } from '../../contexts/AuthContext'
 import { format } from 'date-fns'
 import RequestSwapModal from './RequestSwapModal'
+import {
+  isWithinShiftWindow as checkIsWithinShiftWindow,
+  isShiftUpcoming as checkIsShiftUpcoming,
+  isDateToday,
+  DEFAULT_TIMEZONE,
+} from '../../lib/timezone'
 
 export default function MyCQShiftCard() {
   const { user } = useAuth()
@@ -26,20 +32,11 @@ export default function MyCQShiftCard() {
   const isScheduled = myShift.status === 'scheduled'
   const isOvernightPreview = myShift.shiftContext === 'tomorrow' // Tomorrow's shift (overnight preview)
 
+  // Use configured timezone for all time calculations
+  const timezone = config?.timezone || DEFAULT_TIMEZONE
+
   // Determine if current time is within the shift window (only for today's shifts)
-  const now = new Date()
-  const currentHours = now.getHours()
-  const currentMinutes = now.getMinutes()
-  const currentTime = currentHours * 60 + currentMinutes
-
-  // Parse shift times
-  const [startH, startM] = myShift.myShiftStart.split(':').map(Number)
-  const [endH, endM] = myShift.myShiftEnd.split(':').map(Number)
-  const shiftStart = startH * 60 + startM
-  let shiftEnd = endH * 60 + endM
-
-  // Handle overnight shifts (end time is next day)
-  const isOvernight = shiftEnd < shiftStart
+  // Using timezone-aware utilities instead of browser local time
   let isWithinShiftWindow = false
   let isUpcoming = false // Shift is today but not starting soon
 
@@ -47,15 +44,18 @@ export default function MyCQShiftCard() {
     // Tomorrow's shift 2 showing today - it's "tonight" (starts after midnight)
     isWithinShiftWindow = false
     isUpcoming = false
-  } else if (isOvernight) {
-    // For overnight shift (e.g., 20:00-01:00), window is 20:00-23:59 OR 00:00-01:00
-    isWithinShiftWindow = currentTime >= shiftStart || currentTime <= shiftEnd
-    // "Upcoming" if it's before the shift starts (e.g., before 2000 for shift 1)
-    isUpcoming = !isWithinShiftWindow && currentTime < shiftStart
   } else {
-    isWithinShiftWindow = currentTime >= shiftStart && currentTime <= shiftEnd
-    // "Upcoming" if it's before the shift starts
-    isUpcoming = !isWithinShiftWindow && currentTime < shiftStart
+    // Use timezone-aware shift window check
+    isWithinShiftWindow = checkIsWithinShiftWindow(
+      myShift.myShiftStart,
+      myShift.myShiftEnd,
+      timezone
+    )
+    isUpcoming = checkIsShiftUpcoming(
+      myShift.myShiftStart,
+      myShift.myShiftEnd,
+      timezone
+    )
   }
 
   // Format times for display

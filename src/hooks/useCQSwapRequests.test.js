@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
+import { renderHook, waitFor, cleanup } from '@testing-library/react'
 import {
   usePendingSwapRequests,
   useMySwapRequests,
@@ -7,10 +7,25 @@ import {
   useSwapApprovalActions,
   usePendingSwapRequestCount,
 } from './useCQSwapRequests'
-import * as firestore from 'firebase/firestore'
 
-// Mock Firebase
-vi.mock('firebase/firestore')
+// Mock Firebase modules
+vi.mock('firebase/firestore', () => ({
+  collection: vi.fn(() => ({})),
+  query: vi.fn(() => ({})),
+  where: vi.fn(() => ({})),
+  orderBy: vi.fn(() => ({})),
+  onSnapshot: vi.fn(),
+  doc: vi.fn(() => ({})),
+  addDoc: vi.fn(),
+  updateDoc: vi.fn(),
+  getDoc: vi.fn(),
+  serverTimestamp: vi.fn(() => 'timestamp'),
+  writeBatch: vi.fn(() => ({
+    update: vi.fn(),
+    commit: vi.fn(() => Promise.resolve()),
+  })),
+}))
+
 vi.mock('../config/firebase', () => ({
   db: {},
 }))
@@ -26,9 +41,28 @@ vi.mock('../contexts/AuthContext', () => ({
   }),
 }))
 
+// Import the mocked functions for use in tests
+import {
+  onSnapshot,
+  addDoc,
+  getDoc,
+  updateDoc,
+  writeBatch,
+} from 'firebase/firestore'
+
+// Global cleanup
+afterAll(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
+
 describe('usePendingSwapRequests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    cleanup()
   })
 
   it('should fetch pending swap requests', async () => {
@@ -62,21 +96,15 @@ describe('usePendingSwapRequests', () => {
       },
     ]
 
-    const mockOnSnapshot = vi.fn((query, callback) => {
+    vi.mocked(onSnapshot).mockImplementation((query, callback) => {
       callback({
         docs: mockRequests.map((req) => ({
           id: req.id,
           data: () => req,
         })),
       })
-      return vi.fn()
+      return vi.fn() // unsubscribe function
     })
-
-    firestore.onSnapshot = mockOnSnapshot
-    firestore.collection = vi.fn(() => ({}))
-    firestore.query = vi.fn(() => ({}))
-    firestore.where = vi.fn(() => ({}))
-    firestore.orderBy = vi.fn(() => ({}))
 
     const { result } = renderHook(() => usePendingSwapRequests())
 
@@ -92,16 +120,11 @@ describe('usePendingSwapRequests', () => {
 
   it('should handle errors gracefully', async () => {
     const mockError = new Error('Firestore error')
-    const mockOnSnapshot = vi.fn((query, successCallback, errorCallback) => {
+
+    vi.mocked(onSnapshot).mockImplementation((query, successCallback, errorCallback) => {
       errorCallback(mockError)
       return vi.fn()
     })
-
-    firestore.onSnapshot = mockOnSnapshot
-    firestore.collection = vi.fn(() => ({}))
-    firestore.query = vi.fn(() => ({}))
-    firestore.where = vi.fn(() => ({}))
-    firestore.orderBy = vi.fn(() => ({}))
 
     const { result } = renderHook(() => usePendingSwapRequests())
 
@@ -117,6 +140,10 @@ describe('usePendingSwapRequests', () => {
 describe('useMySwapRequests', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    cleanup()
   })
 
   it('should fetch current user swap requests', async () => {
@@ -136,7 +163,7 @@ describe('useMySwapRequests', () => {
       },
     ]
 
-    const mockOnSnapshot = vi.fn((query, callback) => {
+    vi.mocked(onSnapshot).mockImplementation((query, callback) => {
       callback({
         docs: mockRequests.map((req) => ({
           id: req.id,
@@ -145,12 +172,6 @@ describe('useMySwapRequests', () => {
       })
       return vi.fn()
     })
-
-    firestore.onSnapshot = mockOnSnapshot
-    firestore.collection = vi.fn(() => ({}))
-    firestore.query = vi.fn(() => ({}))
-    firestore.where = vi.fn(() => ({}))
-    firestore.orderBy = vi.fn(() => ({}))
 
     const { result } = renderHook(() => useMySwapRequests())
 
@@ -168,13 +189,12 @@ describe('useSwapRequestActions', () => {
     vi.clearAllMocks()
   })
 
-  it('should create a swap request', async () => {
-    const mockAddDoc = vi.fn(() => Promise.resolve({ id: 'new-request-id' }))
-    const mockServerTimestamp = vi.fn(() => 'timestamp')
+  afterEach(() => {
+    cleanup()
+  })
 
-    firestore.addDoc = mockAddDoc
-    firestore.collection = vi.fn(() => ({}))
-    firestore.serverTimestamp = mockServerTimestamp
+  it('should create a swap request', async () => {
+    vi.mocked(addDoc).mockResolvedValue({ id: 'new-request-id' })
 
     const { result } = renderHook(() => useSwapRequestActions())
 
@@ -192,7 +212,7 @@ describe('useSwapRequestActions', () => {
 
     expect(response.success).toBe(true)
     expect(response.requestId).toBe('new-request-id')
-    expect(mockAddDoc).toHaveBeenCalledWith(
+    expect(addDoc).toHaveBeenCalledWith(
       {},
       expect.objectContaining({
         requesterId: 'test-user-id',
@@ -205,30 +225,21 @@ describe('useSwapRequestActions', () => {
   })
 
   it('should cancel a swap request', async () => {
-    const mockGetDoc = vi.fn(() =>
-      Promise.resolve({
-        exists: () => true,
-        data: () => ({
-          requesterId: 'test-user-id',
-          status: 'pending',
-        }),
-      })
-    )
-    const mockUpdateDoc = vi.fn(() => Promise.resolve())
-    const mockDoc = vi.fn(() => ({}))
-    const mockServerTimestamp = vi.fn(() => 'timestamp')
-
-    firestore.getDoc = mockGetDoc
-    firestore.updateDoc = mockUpdateDoc
-    firestore.doc = mockDoc
-    firestore.serverTimestamp = mockServerTimestamp
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        requesterId: 'test-user-id',
+        status: 'pending',
+      }),
+    })
+    vi.mocked(updateDoc).mockResolvedValue()
 
     const { result } = renderHook(() => useSwapRequestActions())
 
     const response = await result.current.cancelSwapRequest('request-id')
 
     expect(response.success).toBe(true)
-    expect(mockUpdateDoc).toHaveBeenCalledWith(
+    expect(updateDoc).toHaveBeenCalledWith(
       {},
       expect.objectContaining({
         status: 'cancelled',
@@ -237,19 +248,13 @@ describe('useSwapRequestActions', () => {
   })
 
   it('should reject cancelling another users request', async () => {
-    const mockGetDoc = vi.fn(() =>
-      Promise.resolve({
-        exists: () => true,
-        data: () => ({
-          requesterId: 'different-user-id',
-          status: 'pending',
-        }),
-      })
-    )
-    const mockDoc = vi.fn(() => ({}))
-
-    firestore.getDoc = mockGetDoc
-    firestore.doc = mockDoc
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        requesterId: 'different-user-id',
+        status: 'pending',
+      }),
+    })
 
     const { result } = renderHook(() => useSwapRequestActions())
 
@@ -259,19 +264,13 @@ describe('useSwapRequestActions', () => {
   })
 
   it('should reject cancelling non-pending request', async () => {
-    const mockGetDoc = vi.fn(() =>
-      Promise.resolve({
-        exists: () => true,
-        data: () => ({
-          requesterId: 'test-user-id',
-          status: 'approved',
-        }),
-      })
-    )
-    const mockDoc = vi.fn(() => ({}))
-
-    firestore.getDoc = mockGetDoc
-    firestore.doc = mockDoc
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        requesterId: 'test-user-id',
+        status: 'approved',
+      }),
+    })
 
     const { result } = renderHook(() => useSwapRequestActions())
 
@@ -284,6 +283,10 @@ describe('useSwapRequestActions', () => {
 describe('useSwapApprovalActions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    cleanup()
   })
 
   it('should approve a swap request', async () => {
@@ -302,8 +305,7 @@ describe('useSwapApprovalActions', () => {
       shift1Person1Name: 'SGT Smith',
     }
 
-    const mockGetDoc = vi
-      .fn()
+    vi.mocked(getDoc)
       .mockResolvedValueOnce({
         exists: () => true,
         data: () => mockRequest,
@@ -315,18 +317,10 @@ describe('useSwapApprovalActions', () => {
 
     const mockBatchUpdate = vi.fn()
     const mockBatchCommit = vi.fn(() => Promise.resolve())
-    const mockWriteBatch = vi.fn(() => ({
+    vi.mocked(writeBatch).mockReturnValue({
       update: mockBatchUpdate,
       commit: mockBatchCommit,
-    }))
-
-    const mockDoc = vi.fn(() => ({}))
-    const mockServerTimestamp = vi.fn(() => 'timestamp')
-
-    firestore.getDoc = mockGetDoc
-    firestore.doc = mockDoc
-    firestore.writeBatch = mockWriteBatch
-    firestore.serverTimestamp = mockServerTimestamp
+    })
 
     const { result } = renderHook(() => useSwapApprovalActions())
 
@@ -338,29 +332,20 @@ describe('useSwapApprovalActions', () => {
   })
 
   it('should reject a swap request', async () => {
-    const mockGetDoc = vi.fn(() =>
-      Promise.resolve({
-        exists: () => true,
-        data: () => ({
-          status: 'pending',
-        }),
-      })
-    )
-    const mockUpdateDoc = vi.fn(() => Promise.resolve())
-    const mockDoc = vi.fn(() => ({}))
-    const mockServerTimestamp = vi.fn(() => 'timestamp')
-
-    firestore.getDoc = mockGetDoc
-    firestore.updateDoc = mockUpdateDoc
-    firestore.doc = mockDoc
-    firestore.serverTimestamp = mockServerTimestamp
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        status: 'pending',
+      }),
+    })
+    vi.mocked(updateDoc).mockResolvedValue()
 
     const { result } = renderHook(() => useSwapApprovalActions())
 
     const response = await result.current.rejectSwapRequest('request-id', 'Not available')
 
     expect(response.success).toBe(true)
-    expect(mockUpdateDoc).toHaveBeenCalledWith(
+    expect(updateDoc).toHaveBeenCalledWith(
       {},
       expect.objectContaining({
         status: 'rejected',
@@ -371,18 +356,12 @@ describe('useSwapApprovalActions', () => {
   })
 
   it('should reject approving non-pending request', async () => {
-    const mockGetDoc = vi.fn(() =>
-      Promise.resolve({
-        exists: () => true,
-        data: () => ({
-          status: 'approved',
-        }),
-      })
-    )
-    const mockDoc = vi.fn(() => ({}))
-
-    firestore.getDoc = mockGetDoc
-    firestore.doc = mockDoc
+    vi.mocked(getDoc).mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        status: 'approved',
+      }),
+    })
 
     const { result } = renderHook(() => useSwapApprovalActions())
 
@@ -397,18 +376,17 @@ describe('usePendingSwapRequestCount', () => {
     vi.clearAllMocks()
   })
 
+  afterEach(() => {
+    cleanup()
+  })
+
   it('should return pending count', async () => {
-    const mockOnSnapshot = vi.fn((query, callback) => {
+    vi.mocked(onSnapshot).mockImplementation((query, callback) => {
       callback({
         size: 5,
       })
       return vi.fn()
     })
-
-    firestore.onSnapshot = mockOnSnapshot
-    firestore.collection = vi.fn(() => ({}))
-    firestore.query = vi.fn(() => ({}))
-    firestore.where = vi.fn(() => ({}))
 
     const { result } = renderHook(() => usePendingSwapRequestCount())
 
@@ -420,17 +398,12 @@ describe('usePendingSwapRequestCount', () => {
   })
 
   it('should return 0 when no pending requests', async () => {
-    const mockOnSnapshot = vi.fn((query, callback) => {
+    vi.mocked(onSnapshot).mockImplementation((query, callback) => {
       callback({
         size: 0,
       })
       return vi.fn()
     })
-
-    firestore.onSnapshot = mockOnSnapshot
-    firestore.collection = vi.fn(() => ({}))
-    firestore.query = vi.fn(() => ({}))
-    firestore.where = vi.fn(() => ({}))
 
     const { result } = renderHook(() => usePendingSwapRequestCount())
 

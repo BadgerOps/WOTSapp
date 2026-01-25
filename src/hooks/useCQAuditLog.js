@@ -7,12 +7,21 @@ import {
   getDocs,
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
+import {
+  getStartOfDayInTimezone,
+  getEndOfDayInTimezone,
+  getDateStringInTimezone,
+  formatTimeInTimezone,
+  DEFAULT_TIMEZONE,
+} from '../lib/timezone'
 
 /**
  * Hook to fetch CQ pass audit log for a specific date
  * Queries personnelStatusHistory for all pass-related activities
+ * @param {string} date - Date in YYYY-MM-DD format
+ * @param {string} timezone - IANA timezone string (e.g., 'America/Chicago')
  */
-export function useCQAuditLog(date = null) {
+export function useCQAuditLog(date = null, timezone = DEFAULT_TIMEZONE) {
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -24,9 +33,9 @@ export function useCQAuditLog(date = null) {
       return
     }
 
-    // Create start and end of day for client-side filtering
-    const startOfDay = new Date(date + 'T00:00:00')
-    const endOfDay = new Date(date + 'T23:59:59.999')
+    // Create start and end of day in the configured timezone
+    const startOfDay = getStartOfDayInTimezone(date, timezone)
+    const endOfDay = getEndOfDayInTimezone(date, timezone)
 
     // Query all history entries ordered by timestamp
     // Filter by date range client-side to avoid composite index requirement
@@ -44,7 +53,7 @@ export function useCQAuditLog(date = null) {
             ...doc.data(),
             timestamp: doc.data().timestamp?.toDate?.() || null,
           }))
-          // Filter by date range
+          // Filter by date range (timezone-aware)
           .filter((entry) => {
             if (!entry.timestamp) return false
             return entry.timestamp >= startOfDay && entry.timestamp <= endOfDay
@@ -70,7 +79,7 @@ export function useCQAuditLog(date = null) {
     )
 
     return unsubscribe
-  }, [date])
+  }, [date, timezone])
 
   return { entries, loading, error }
 }
@@ -83,13 +92,14 @@ export function useCQAuditLogRange() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const fetchRange = useCallback(async (startDate, endDate) => {
+  const fetchRange = useCallback(async (startDate, endDate, timezone = DEFAULT_TIMEZONE) => {
     setLoading(true)
     setError(null)
 
     try {
-      const startOfDay = new Date(startDate + 'T00:00:00')
-      const endOfDay = new Date(endDate + 'T23:59:59.999')
+      // Create timezone-aware start and end times
+      const startOfDay = getStartOfDayInTimezone(startDate, timezone)
+      const endOfDay = getEndOfDayInTimezone(endDate, timezone)
 
       // Query all history entries ordered by timestamp
       const q = query(
@@ -104,7 +114,7 @@ export function useCQAuditLogRange() {
           ...doc.data(),
           timestamp: doc.data().timestamp?.toDate?.() || null,
         }))
-        // Filter by date range
+        // Filter by date range (timezone-aware)
         .filter((entry) => {
           if (!entry.timestamp) return false
           return entry.timestamp >= startOfDay && entry.timestamp <= endOfDay
@@ -136,10 +146,12 @@ export function useCQAuditLogRange() {
 
 /**
  * Format audit entry action for display
+ * @param {Object} entry - Audit log entry
+ * @param {string} timezone - IANA timezone string (optional)
  */
-export function formatAuditAction(entry) {
+export function formatAuditAction(entry, timezone = DEFAULT_TIMEZONE) {
   if (entry.action === 'sign_out') {
-    const timeOut = entry.timeOut ? new Date(entry.timeOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : ''
+    const timeOut = entry.timeOut ? formatTimeInTimezone(new Date(entry.timeOut), timezone) : ''
     return `Signed out to ${entry.destination || 'unknown'}${timeOut ? ` at ${timeOut}` : ''}`
   }
   if (entry.action === 'stage_arrived') {
@@ -193,10 +205,21 @@ export function groupEntriesByPersonnel(entries) {
 
 /**
  * Generate summary statistics for a day's audit log
+ * Only counts actual sign-outs (action === 'sign_out'), not intermediate stage changes
  */
 export function generateAuditSummary(entries) {
-  const signOuts = entries.filter(e => e.action === 'sign_out' || (e.status === 'pass' && !e.previousStatus?.startsWith('stage_')))
-  const signIns = entries.filter(e => e.action === 'arrived_barracks' || (e.status === 'present' && e.previousStatus === 'pass'))
+  // Only count actual sign-outs, not intermediate stages (stage_arrived, stage_enroute_back)
+  // A sign-out is when action === 'sign_out' OR when status changed from 'present' to 'pass'
+  const signOuts = entries.filter(e =>
+    e.action === 'sign_out' ||
+    (e.status === 'pass' && e.previousStatus === 'present')
+  )
+
+  // Sign-ins are when someone arrives back at barracks
+  const signIns = entries.filter(e =>
+    e.action === 'arrived_barracks' ||
+    (e.status === 'present' && e.previousStatus === 'pass')
+  )
 
   const destinations = {}
   signOuts.forEach((entry) => {

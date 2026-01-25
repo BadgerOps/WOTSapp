@@ -17,6 +17,11 @@ import {
 import { db } from '../config/firebase'
 import { useAuth } from '../contexts/AuthContext'
 import { useAppConfig } from './useAppConfig'
+import {
+  getTodayInTimezone,
+  getTomorrowInTimezone,
+  DEFAULT_TIMEZONE,
+} from '../lib/timezone'
 
 /**
  * Hook to fetch CQ roster (rotation order)
@@ -135,9 +140,10 @@ export function useMyCQShift() {
     }
 
     // Get today's and tomorrow's dates in YYYY-MM-DD format
-    const now = new Date()
-    const today = now.toISOString().split('T')[0]
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    // Using configured timezone instead of browser local time
+    const timezone = config?.timezone || DEFAULT_TIMEZONE
+    const today = getTodayInTimezone(timezone)
+    const tomorrow = getTomorrowInTimezone(timezone)
 
     // Query for both today and tomorrow
     const q = query(
@@ -589,24 +595,37 @@ export function useCQScheduleActions() {
 
   /**
    * Update a specific shift assignment (swap users)
+   * Supports both new format (shift1Person1Name) and legacy format (firstShiftName)
    * @param {string} scheduleId - The schedule document ID
    * @param {string} shiftType - 'shift1' or 'shift2'
    * @param {number} position - 1 or 2 (Person 1 or Person 2)
    * @param {string|null} newPersonnelId - New personnel's user ID (or null if unassigned)
    * @param {string} newPersonnelName - New personnel's display name
+   * @param {boolean} isLegacyFormat - If true, use legacy field names (firstShiftName/secondShiftName)
    */
-  async function updateShiftAssignment(scheduleId, shiftType, position, newPersonnelId, newPersonnelName) {
+  async function updateShiftAssignment(scheduleId, shiftType, position, newPersonnelId, newPersonnelName, isLegacyFormat = false) {
     setLoading(true)
     setError(null)
 
     try {
-      const fieldPrefix = `${shiftType}Person${position}`
-      await updateDoc(doc(db, 'cqSchedule', scheduleId), {
-        [`${fieldPrefix}Name`]: newPersonnelName,
-        [`${fieldPrefix}Id`]: newPersonnelId || null,
+      let updateData = {
         updatedBy: user.uid,
         updatedAt: serverTimestamp(),
-      })
+      }
+
+      if (isLegacyFormat) {
+        // Legacy format: firstShiftName/secondShiftName (single person per shift)
+        const legacyPrefix = shiftType === 'shift1' ? 'firstShift' : 'secondShift'
+        updateData[`${legacyPrefix}Name`] = newPersonnelName
+        updateData[`${legacyPrefix}PersonnelId`] = newPersonnelId || null
+      } else {
+        // New format: shift1Person1Name, shift1Person2Name, etc.
+        const fieldPrefix = `${shiftType}Person${position}`
+        updateData[`${fieldPrefix}Name`] = newPersonnelName
+        updateData[`${fieldPrefix}Id`] = newPersonnelId || null
+      }
+
+      await updateDoc(doc(db, 'cqSchedule', scheduleId), updateData)
       setLoading(false)
       return { success: true }
     } catch (err) {

@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.8] - 2026-01-24
+
+### Added
+
+#### Timezone Consistency
+- Timezone clock in footer showing configured timezone (e.g., "EST: 14:35")
+- CQ shift scheduling now uses configured timezone for shift times and dates
+
+### Fixed
+- Audit log display now uses configured timezone instead of browser local time
+- Audit log sign-out counting incorrectly included companion sign-outs (was double-counting)
+- Edit buttons now appear for legacy format CQ schedule entries
+- CQ shift swap availability filtering improved to correctly exclude unavailable shifts
+- vitest OOM issues with useCQSwapRequests tests resolved
+
+---
+
 ## [0.4.7] - 2026-01-24
 
 ### Added

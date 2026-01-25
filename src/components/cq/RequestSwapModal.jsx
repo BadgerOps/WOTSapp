@@ -2,12 +2,24 @@ import { useState } from 'react'
 import { usePersonnel } from '../../hooks/usePersonnel'
 import { useSwapRequestActions, SWAP_TYPES } from '../../hooks/useCQSwapRequests'
 import { useCQSchedule, CQ_SHIFT_TIMES } from '../../hooks/useCQSchedule'
+import { useAppConfig } from '../../hooks/useAppConfig'
 import { format } from 'date-fns'
+import {
+  getTodayInTimezone,
+  getCurrentHourInTimezone,
+  isDateToday,
+  isDatePast,
+  DEFAULT_TIMEZONE,
+} from '../../lib/timezone'
 
 export default function RequestSwapModal({ shift, onClose, onSuccess }) {
   const { personnel } = usePersonnel()
   const { schedule } = useCQSchedule()
+  const { config } = useAppConfig()
   const { createSwapRequest, loading, error } = useSwapRequestActions()
+
+  // Use configured timezone for all time calculations
+  const timezone = config?.timezone || DEFAULT_TIMEZONE
   const [swapType, setSwapType] = useState(SWAP_TYPES.individual)
   const [selectedPersonnelId, setSelectedPersonnelId] = useState('')
   const [selectedTargetShift, setSelectedTargetShift] = useState(null) // { scheduleId, shiftType, date }
@@ -32,20 +44,53 @@ export default function RequestSwapModal({ shift, onClose, onSuccess }) {
     return true
   })
 
-  // Get available shifts for full shift swap (exclude current shift)
-  const today = new Date().toISOString().split('T')[0]
+  // Get available shifts for full shift swap
+  // We need to consider that shift times span across calendar days:
+  // - Shift 1 (2000-0100): starts evening, ends after midnight
+  // - Shift 2 (0100-0600): starts after midnight, ends morning
+  //
+  // A schedule entry date represents when the CQ "day" starts at 2000.
+  // Today's Shift 2 (0100-0600) already happened this morning, but
+  // today's Shift 1 (2000) is still upcoming tonight.
+  //
+  // Use configured timezone for date/time calculations
+  const today = getTodayInTimezone(timezone)
+  const currentHour = getCurrentHourInTimezone(timezone)
+
   const availableShifts = schedule
     .filter((s) => {
-      // Only upcoming shifts
-      if (s.date < today) return false
+      // Filter out past dates entirely (using timezone-aware comparison)
+      if (isDatePast(s.date, timezone)) return false
       // Don't include completed shifts
       if (s.status === 'completed') return false
-      // Don't include same shift on same day
-      if (s.id === shift.id) return false
       return true
     })
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 30) // Limit to next 30 entries
+
+  // Helper to check if a specific shift is available (not started yet)
+  // Uses timezone-aware time checks
+  function isShiftAvailable(scheduleEntry, shiftType) {
+    // Don't allow swapping with your own shift on the same day and same type
+    if (scheduleEntry.id === shift.id && shiftType === shift.myShiftType) {
+      return false
+    }
+
+    // For today's schedule entry, check if the shift has already started
+    // Using timezone-aware date/time comparison
+    if (isDateToday(scheduleEntry.date, timezone)) {
+      if (shiftType === 'shift1') {
+        // Shift 1 starts at 2000 - available if before 2000 today (in configured timezone)
+        return currentHour < 20
+      } else if (shiftType === 'shift2') {
+        // Shift 2 (0100-0600) from today's schedule already happened this morning
+        // (it ran from 01:00-06:00 AM today)
+        return false
+      }
+    }
+
+    return true
+  }
 
   // Apply search filter to shifts
   const filteredShifts = shiftSearch
@@ -272,9 +317,19 @@ export default function RequestSwapModal({ shift, onClose, onSuccess }) {
                     {filteredShifts.length === 0 ? (
                       <p className="p-3 text-sm text-gray-500 italic">No available shifts found</p>
                     ) : (
-                      filteredShifts.map((scheduleEntry) => (
+                      filteredShifts.map((scheduleEntry) => {
+                        const shift1Available = isShiftAvailable(scheduleEntry, 'shift1')
+                        const shift2Available = isShiftAvailable(scheduleEntry, 'shift2')
+
+                        // Skip this entry if neither shift is available
+                        if (!shift1Available && !shift2Available) {
+                          return null
+                        }
+
+                        return (
                         <div key={scheduleEntry.id} className="border-b border-gray-100 last:border-b-0">
                           {/* Shift 1 option */}
+                          {shift1Available && (
                           <label
                             className={`flex items-start p-2 hover:bg-gray-50 cursor-pointer ${
                               selectedTargetShift?.scheduleId === scheduleEntry.id &&
@@ -302,16 +357,19 @@ export default function RequestSwapModal({ shift, onClose, onSuccess }) {
                             <div className="text-sm">
                               <div className="font-medium">
                                 {format(new Date(scheduleEntry.date + 'T12:00:00'), 'EEE, MMM d')} - Shift 1 ({CQ_SHIFT_TIMES.shift1.label})
+                                {isDateToday(scheduleEntry.date, timezone) && <span className="ml-1 text-green-600">(Tonight)</span>}
                               </div>
                               <div className="text-gray-500 text-xs">
                                 {scheduleEntry.shift1Person1Name || '-'} / {scheduleEntry.shift1Person2Name || '-'}
                               </div>
                             </div>
                           </label>
+                          )}
 
                           {/* Shift 2 option */}
+                          {shift2Available && (
                           <label
-                            className={`flex items-start p-2 hover:bg-gray-50 cursor-pointer border-t border-gray-50 ${
+                            className={`flex items-start p-2 hover:bg-gray-50 cursor-pointer ${shift1Available ? 'border-t border-gray-50' : ''} ${
                               selectedTargetShift?.scheduleId === scheduleEntry.id &&
                               selectedTargetShift?.shiftType === 'shift2'
                                 ? 'bg-primary-50'
@@ -336,15 +394,19 @@ export default function RequestSwapModal({ shift, onClose, onSuccess }) {
                             />
                             <div className="text-sm">
                               <div className="font-medium">
-                                {format(new Date(scheduleEntry.date + 'T12:00:00'), 'EEE, MMM d')} - Shift 2 ({CQ_SHIFT_TIMES.shift2.label})
+                                {/* Shift 2 runs on the morning AFTER the schedule date */}
+                                {format(new Date(new Date(scheduleEntry.date + 'T12:00:00').getTime() + 24 * 60 * 60 * 1000), 'EEE, MMM d')} AM - Shift 2 ({CQ_SHIFT_TIMES.shift2.label})
+                                {isDateToday(scheduleEntry.date, timezone) && <span className="ml-1 text-blue-600">(Tonight's late shift)</span>}
                               </div>
                               <div className="text-gray-500 text-xs">
                                 {scheduleEntry.shift2Person1Name || '-'} / {scheduleEntry.shift2Person2Name || '-'}
                               </div>
                             </div>
                           </label>
+                          )}
                         </div>
-                      ))
+                        )
+                      })
                     )}
                   </div>
                 </div>
