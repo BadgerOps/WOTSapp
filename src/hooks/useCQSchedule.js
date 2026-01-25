@@ -17,6 +17,11 @@ import {
 import { db } from '../config/firebase'
 import { useAuth } from '../contexts/AuthContext'
 import { useAppConfig } from './useAppConfig'
+import {
+  getTodayInTimezone,
+  getTomorrowInTimezone,
+  DEFAULT_TIMEZONE,
+} from '../lib/timezone'
 
 /**
  * Hook to fetch CQ roster (rotation order)
@@ -135,9 +140,10 @@ export function useMyCQShift() {
     }
 
     // Get today's and tomorrow's dates in YYYY-MM-DD format
-    const now = new Date()
-    const today = now.toISOString().split('T')[0]
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    // Using configured timezone instead of browser local time
+    const timezone = config?.timezone || DEFAULT_TIMEZONE
+    const today = getTodayInTimezone(timezone)
+    const tomorrow = getTomorrowInTimezone(timezone)
 
     // Query for both today and tomorrow
     const q = query(
