@@ -11,6 +11,8 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       created: ${{ steps.create_release.outputs.created }}
       version: ${{ steps.version.outputs.version }}
