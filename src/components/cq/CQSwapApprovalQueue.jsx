@@ -6,6 +6,7 @@ import {
   SWAP_TYPES,
 } from '../../hooks/useCQSwapRequests'
 import { CQ_SHIFT_TIMES } from '../../hooks/useCQSchedule'
+import { getActualShiftDate } from '../../lib/timezone'
 import Loading from '../common/Loading'
 
 function formatRelativeTime(timestamp) {
@@ -22,9 +23,10 @@ function formatRelativeTime(timestamp) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr, shiftType = null) {
   if (!dateStr) return ''
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
+  const actualDate = shiftType ? getActualShiftDate(dateStr, shiftType) : dateStr
+  return new Date(actualDate + 'T12:00:00').toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -302,7 +304,7 @@ export default function CQSwapApprovalQueue() {
                           <div className="flex flex-wrap gap-2 mt-1 text-sm text-gray-600">
                             <span>{formatRelativeTime(request.createdAt)}</span>
                             <span>•</span>
-                            <span>{formatDate(request.scheduleDate)}</span>
+                            <span>{formatDate(request.scheduleDate, request.currentShiftType)}</span>
                           </div>
                         </div>
                         <button
@@ -319,7 +321,7 @@ export default function CQSwapApprovalQueue() {
                           <div>
                             <span className="text-gray-500">Swap with:</span>{' '}
                             <span className="font-medium">
-                              {formatDate(request.targetScheduleDate)} - {targetShiftLabel}
+                              {formatDate(request.targetScheduleDate, request.targetShiftType)} - {targetShiftLabel}
                             </span>
                           </div>
                         ) : (
@@ -348,7 +350,7 @@ export default function CQSwapApprovalQueue() {
                           <div>
                             <span className="text-sm font-medium text-gray-700">Current Shift: </span>
                             <span className="text-sm text-gray-600">
-                              {formatDate(request.scheduleDate)} - {shiftLabel}
+                              {formatDate(request.scheduleDate, request.currentShiftType)} - {shiftLabel}
                               {!isFullShift && `, Position ${request.currentPosition}`}
                             </span>
                           </div>
@@ -357,7 +359,7 @@ export default function CQSwapApprovalQueue() {
                             <div>
                               <span className="text-sm font-medium text-gray-700">Target Shift: </span>
                               <span className="text-sm text-gray-600">
-                                {formatDate(request.targetScheduleDate)} - {targetShiftLabel}
+                                {formatDate(request.targetScheduleDate, request.targetShiftType)} - {targetShiftLabel}
                               </span>
                             </div>
                           ) : (

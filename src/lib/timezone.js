@@ -357,3 +357,30 @@ export function getEndOfDayInTimezone(dateStr, timezone = DEFAULT_TIMEZONE) {
   // Add 24 hours minus 1 millisecond
   return new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1)
 }
+
+/**
+ * Get the actual date a CQ shift occurs on.
+ *
+ * CQ schedules store a "schedule date" which represents when the CQ day starts at 2000.
+ * - Shift 1 (2000-0100): Starts on the schedule date evening, ends after midnight
+ * - Shift 2 (0100-0600): Starts after midnight, which is the NEXT calendar day
+ *
+ * This function returns the actual calendar date the shift occurs on.
+ *
+ * @param {string} scheduleDate - The schedule date in YYYY-MM-DD format
+ * @param {string} shiftType - Either 'shift1' or 'shift2'
+ * @returns {string} The actual shift date in YYYY-MM-DD format
+ */
+export function getActualShiftDate(scheduleDate, shiftType) {
+  if (shiftType === 'shift2') {
+    // Shift 2 occurs on the next calendar day
+    const date = new Date(scheduleDate + 'T12:00:00')
+    date.setDate(date.getDate() + 1)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  // Shift 1 occurs on the schedule date
+  return scheduleDate
+}

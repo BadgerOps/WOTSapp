@@ -9,6 +9,7 @@ import {
   isWithinShiftWindow as checkIsWithinShiftWindow,
   isShiftUpcoming as checkIsShiftUpcoming,
   isDateToday,
+  getActualShiftDate,
   DEFAULT_TIMEZONE,
 } from '../../lib/timezone'
 
@@ -141,7 +142,7 @@ export default function MyCQShiftCard() {
               </div>
               <div className="text-gray-700">
                 <span className="font-medium">Date:</span>{' '}
-                {format(new Date(myShift.date + 'T12:00:00'), 'EEEE, MMMM d, yyyy')}
+                {format(new Date(getActualShiftDate(myShift.date, myShift.myShiftType) + 'T12:00:00'), 'EEEE, MMMM d, yyyy')}
                 {isOvernightPreview && (
                   <span className="ml-1 text-blue-600 font-medium">(starts after midnight)</span>
                 )}
@@ -229,7 +230,7 @@ export default function MyCQShiftCard() {
               <span className="text-yellow-700 font-medium">Swap Request Pending</span>
               <span className="text-yellow-600 ml-1">
                 {pendingSwapRequest.swapType === 'fullShift'
-                  ? `- Full shift swap with ${new Date(pendingSwapRequest.targetScheduleDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  ? `- Full shift swap with ${new Date(getActualShiftDate(pendingSwapRequest.targetScheduleDate, pendingSwapRequest.targetShiftType) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
                   : `- Proposed: ${pendingSwapRequest.proposedPersonnelName}`}
               </span>
             </div>
