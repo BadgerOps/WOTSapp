@@ -357,8 +357,8 @@ export default function CQScheduleManager() {
     }
   }
 
-  function openEditModal(scheduleId, shiftType, position, currentName, currentId) {
-    setEditingShift({ scheduleId, shiftType, position, currentName, currentId })
+  function openEditModal(scheduleId, shiftType, position, currentName, currentId, isLegacyFormat = false) {
+    setEditingShift({ scheduleId, shiftType, position, currentName, currentId, isLegacyFormat })
     setSelectedPersonnelId(currentId || '')
     setPersonnelSearch('')
   }
@@ -383,7 +383,8 @@ export default function CQScheduleManager() {
         editingShift.shiftType,
         editingShift.position,
         selectedPersonnelId || null,
-        newName
+        newName,
+        editingShift.isLegacyFormat || false
       )
       setSuccess('Shift assignment updated!')
       setTimeout(() => setSuccess(null), 3000)
@@ -615,7 +616,17 @@ export default function CQScheduleManager() {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="ml-1">{shift1Display || '-'}</span>
+                                <div className="flex items-center gap-2 ml-1">
+                                  <span>{shift1Display || '-'}</span>
+                                  {canEditShifts && (
+                                    <button
+                                      onClick={() => openEditModal(entry.id, 'shift1', 1, entry.firstShiftName, entry.firstShiftPersonnelId, true)}
+                                      className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
                             <div>
@@ -646,7 +657,17 @@ export default function CQScheduleManager() {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="ml-1">{shift2Display || '-'}</span>
+                                <div className="flex items-center gap-2 ml-1">
+                                  <span>{shift2Display || '-'}</span>
+                                  {canEditShifts && (
+                                    <button
+                                      onClick={() => openEditModal(entry.id, 'shift2', 1, entry.secondShiftName, entry.secondShiftPersonnelId, true)}
+                                      className="text-xs text-primary-600 hover:text-primary-700 hover:underline"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
