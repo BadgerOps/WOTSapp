@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.11] - 2026-01-25
+
+### Changed
+
+#### Bundle Size Optimization
+- Reduced initial JavaScript bundle by ~60% through code splitting
+- Route-based lazy loading for non-critical pages (Schedule, Documents, Details, CQ, Profile, Changelog, Surveys, Admin)
+- Dynamic imports for jsPDF/jspdf-autotable (only loaded when exporting PDFs)
+- Vendor chunk splitting for better caching (firebase-core, firebase-db, firebase-storage, firebase-functions, react, sentry, date-fns)
+
+### Removed
+- Removed unused dependencies: `luxon` and `axios`
+
+---
+
 ## [0.4.10] - 2026-01-25
 
 ### Added

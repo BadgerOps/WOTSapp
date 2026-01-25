@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { useSurveyResultsAggregation } from '../../hooks/useSurveyResponses'
 import Loading from '../common/Loading'
 import { format } from 'date-fns'
-import { jsPDF } from 'jspdf'
-import 'jspdf-autotable'
 
 export default function SurveyResults({ survey, onBack }) {
   const { aggregatedResults, responses, loading, error } = useSurveyResultsAggregation(
@@ -68,9 +66,13 @@ export default function SurveyResults({ survey, onBack }) {
     downloadFile(JSON.stringify(data, null, 2), `${survey.title}-responses.json`, 'application/json')
   }
 
-  function exportToPDF() {
+  async function exportToPDF() {
     setExporting(true)
     try {
+      // Dynamic import for code splitting
+      const { jsPDF } = await import('jspdf')
+      await import('jspdf-autotable')
+
       const doc = new jsPDF()
       const pageWidth = doc.internal.pageSize.getWidth()
 

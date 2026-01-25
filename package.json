@@ -1,7 +1,7 @@
 {
   "name": "wots-app",
   "private": true,
-  "version": "0.4.10",
+  "version": "0.4.11",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,12 +19,10 @@
   },
   "dependencies": {
     "@sentry/react": "^10.36.0",
-    "axios": "^1.13.2",
     "date-fns": "^4.1.0",
     "firebase": "^11.2.0",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
-    "luxon": "^3.7.2",
     "papaparse": "^5.5.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
