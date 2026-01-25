@@ -4,7 +4,27 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 
 export default [
+  {
+    ignores: ['dist/**', 'node_modules/**', 'functions/node_modules/**'],
+  },
   js.configs.recommended,
+  {
+    // Service worker file needs serviceworker globals
+    files: ['public/firebase-messaging-sw.js'],
+    languageOptions: {
+      globals: {
+        ...globals.serviceworker,
+        firebase: 'readonly',
+      },
+    },
+  },
+  {
+    // Test files can assign to mocked imports
+    files: ['**/*.test.{js,jsx}', '**/test/**/*.{js,jsx}'],
+    rules: {
+      'no-import-assign': 'off',
+    },
+  },
   {
     files: ['**/*.{js,jsx}'],
     plugins: {

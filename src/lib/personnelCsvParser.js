@@ -14,7 +14,7 @@ export function isValidEmail(email) {
 export function isValidPhoneNumber(phone) {
   if (!phone) return true; // Phone is optional
   // Allow formats like: 555-0123, (555) 555-0123, +1-555-555-0123, 5550123
-  const phoneRegex = /^[\d\s\-\(\)\+]+$/;
+  const phoneRegex = /^[\d\s\-()+ ]+$/;
   return phoneRegex.test(phone) && phone.replace(/\D/g, '').length >= 7;
 }
 
