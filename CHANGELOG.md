@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Users can choose to replace existing request or keep it
 - Automatic cancellation of old request when replacing
 
+### Changed
+- CQ Dashboard now shows destination (e.g., "BX", "Shoppette") instead of generic "Pass" label for personnel on pass
+
 ### Fixed
 - Pass approval cards not visible to admins and candidate_leadership (component was not wired into Admin dashboard)
 

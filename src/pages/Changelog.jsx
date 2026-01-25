@@ -30,6 +30,12 @@ const changelog = [
         ],
       },
       {
+        title: 'Changed',
+        items: [
+          { details: ['CQ Dashboard now shows destination (e.g., "BX", "Shoppette") instead of generic "Pass" label'] },
+        ],
+      },
+      {
         title: 'Fixed',
         items: [
           { details: ['Pass approval cards not visible to admins and candidate_leadership'] },
