@@ -212,3 +212,148 @@ export function getDayOfWeekInTimezone(dateStr, timezone = DEFAULT_TIMEZONE) {
   })
   return formatter.format(date)
 }
+
+/**
+ * Format a Date object as a time string in the specified timezone
+ * @param {Date} date - JavaScript Date object
+ * @param {string} timezone - IANA timezone string
+ * @returns {string} Formatted time (e.g., '8:30 PM')
+ */
+export function formatTimeInTimezone(date, timezone = DEFAULT_TIMEZONE) {
+  if (!date) return '--:--'
+  return date.toLocaleTimeString('en-US', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+/**
+ * Format a Date object as a short date string in the specified timezone
+ * @param {Date} date - JavaScript Date object
+ * @param {string} timezone - IANA timezone string
+ * @returns {string} Formatted date (e.g., 'Fri, Jan 24')
+ */
+export function formatShortDateInTimezone(date, timezone = DEFAULT_TIMEZONE) {
+  if (!date) return ''
+  return date.toLocaleDateString('en-US', {
+    timeZone: timezone,
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+/**
+ * Format a Date object as a full date string in the specified timezone
+ * @param {Date} date - JavaScript Date object
+ * @param {string} timezone - IANA timezone string
+ * @returns {string} Formatted date (e.g., 'Friday, January 24, 2026')
+ */
+export function formatFullDateInTimezone(date, timezone = DEFAULT_TIMEZONE) {
+  if (!date) return ''
+  return date.toLocaleDateString('en-US', {
+    timeZone: timezone,
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+/**
+ * Format a Date object as date and time in the specified timezone
+ * @param {Date} date - JavaScript Date object
+ * @param {string} timezone - IANA timezone string
+ * @returns {string} Formatted date and time (e.g., 'Jan 24, 2026, 8:30 PM')
+ */
+export function formatDateTimeInTimezone(date, timezone = DEFAULT_TIMEZONE) {
+  if (!date) return ''
+  return date.toLocaleString('en-US', {
+    timeZone: timezone,
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+/**
+ * Get date string (YYYY-MM-DD) for a Date object in the specified timezone
+ * @param {Date} date - JavaScript Date object
+ * @param {string} timezone - IANA timezone string
+ * @returns {string} Date in YYYY-MM-DD format
+ */
+export function getDateStringInTimezone(date, timezone = DEFAULT_TIMEZONE) {
+  if (!date) return ''
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  const parts = formatter.formatToParts(date)
+  const year = parts.find((p) => p.type === 'year').value
+  const month = parts.find((p) => p.type === 'month').value
+  const day = parts.find((p) => p.type === 'day').value
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Get start of day for a date string in the specified timezone
+ * Returns a Date object representing midnight of that date in the timezone
+ * @param {string} dateStr - Date in YYYY-MM-DD format
+ * @param {string} timezone - IANA timezone string
+ * @returns {Date} Date object at start of day in the specified timezone
+ */
+export function getStartOfDayInTimezone(dateStr, timezone = DEFAULT_TIMEZONE) {
+  // Parse the date parts
+  const [year, month, day] = dateStr.split('-').map(Number)
+
+  // Create a date at noon UTC on that date (to avoid DST issues)
+  const noonUtc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+
+  // Get the timezone offset for that date
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+
+  // Get the parts to understand the offset
+  const parts = formatter.formatToParts(noonUtc)
+  const tzHour = parseInt(parts.find(p => p.type === 'hour').value, 10)
+  const tzDay = parseInt(parts.find(p => p.type === 'day').value, 10)
+
+  // Calculate offset (noon UTC vs noon in timezone)
+  let offsetHours = tzHour - 12
+  if (tzDay > day) offsetHours += 24
+  else if (tzDay < day) offsetHours -= 24
+
+  // Create start of day: midnight in the target timezone
+  // If timezone is UTC-5 (EST), midnight EST = 5:00 UTC
+  const startOfDay = new Date(Date.UTC(year, month - 1, day, -offsetHours, 0, 0, 0))
+
+  return startOfDay
+}
+
+/**
+ * Get end of day for a date string in the specified timezone
+ * Returns a Date object representing 23:59:59.999 of that date in the timezone
+ * @param {string} dateStr - Date in YYYY-MM-DD format
+ * @param {string} timezone - IANA timezone string
+ * @returns {Date} Date object at end of day in the specified timezone
+ */
+export function getEndOfDayInTimezone(dateStr, timezone = DEFAULT_TIMEZONE) {
+  const startOfDay = getStartOfDayInTimezone(dateStr, timezone)
+  // Add 24 hours minus 1 millisecond
+  return new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1)
+}

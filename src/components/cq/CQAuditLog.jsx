@@ -10,37 +10,31 @@ import { usePersonnel } from '../../hooks/usePersonnel'
 import { useAppConfig } from '../../hooks/useAppConfig'
 import { downloadSignoutRosterPdf, downloadBlankSignoutRosterPdf } from '../../lib/signoutRosterPdf'
 import Loading from '../common/Loading'
-
-function formatTime(date) {
-  if (!date) return '--:--'
-  return date.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  })
-}
-
-function formatDate(date) {
-  if (!date) return ''
-  return date.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  })
-}
+import {
+  formatTimeInTimezone,
+  formatShortDateInTimezone,
+  getTodayInTimezone,
+  DEFAULT_TIMEZONE,
+} from '../../lib/timezone'
 
 export default function CQAuditLog() {
+  const { config } = useAppConfig()
+  const timezone = config?.timezone || DEFAULT_TIMEZONE
+
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0]
+    getTodayInTimezone(timezone)
   )
   const [viewMode, setViewMode] = useState('timeline') // 'timeline' or 'grouped'
   const [showExportModal, setShowExportModal] = useState(false)
 
-  const { entries, loading, error } = useCQAuditLog(selectedDate)
+  const { entries, loading, error } = useCQAuditLog(selectedDate, timezone)
   const { personnel } = usePersonnel()
-  const { config } = useAppConfig()
   const summary = entries.length > 0 ? generateAuditSummary(entries) : null
   const groupedEntries = viewMode === 'grouped' ? groupEntriesByPersonnel(entries) : []
+
+  // Helper function to format time in configured timezone
+  const formatTime = (date) => formatTimeInTimezone(date, timezone)
+  const formatDate = (date) => formatShortDateInTimezone(date, timezone)
 
   function getActionIcon(entry) {
     if (entry.action === 'sign_out' || entry.status === 'pass') {
@@ -185,7 +179,7 @@ export default function CQAuditLog() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">
-                    {formatAuditAction(entry)}
+                    {formatAuditAction(entry, timezone)}
                   </p>
                   {entry.companions?.length > 0 && (
                     <p className="text-xs text-gray-500 mt-1">
@@ -199,7 +193,7 @@ export default function CQAuditLog() {
                   )}
                   {entry.expectedReturn && (
                     <p className="text-xs text-gray-500">
-                      Expected back: {new Date(entry.expectedReturn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      Expected back: {formatTime(new Date(entry.expectedReturn))}
                     </p>
                   )}
                 </div>
@@ -235,7 +229,7 @@ export default function CQAuditLog() {
                       </span>
                       {getActionIcon(entry)}
                       <span className="text-sm text-gray-700">
-                        {formatAuditAction(entry)}
+                        {formatAuditAction(entry, timezone)}
                       </span>
                     </div>
                   ))}
@@ -254,13 +248,14 @@ export default function CQAuditLog() {
           onClose={() => setShowExportModal(false)}
           personnel={personnel}
           config={config}
+          timezone={timezone}
         />
       )}
     </div>
   )
 }
 
-function ExportModal({ selectedDate, entries, onClose, personnel, config }) {
+function ExportModal({ selectedDate, entries, onClose, personnel, config, timezone }) {
   const { fetchRange, loading } = useCQAuditLogRange()
   const [startDate, setStartDate] = useState(selectedDate)
   const [endDate, setEndDate] = useState(selectedDate)
@@ -274,8 +269,12 @@ function ExportModal({ selectedDate, entries, onClose, personnel, config }) {
     return acc
   }, {})
 
+  // Local formatting helpers that use the passed timezone
+  const formatTime = (date) => formatTimeInTimezone(date, timezone)
+  const formatDate = (date) => formatShortDateInTimezone(date, timezone)
+
   async function handleFetchRange() {
-    const data = await fetchRange(startDate, endDate)
+    const data = await fetchRange(startDate, endDate, timezone)
     setExportData(data)
   }
 
@@ -287,13 +286,13 @@ function ExportModal({ selectedDate, entries, onClose, personnel, config }) {
     const rows = data.map(entry => [
       entry.timestamp ? formatDate(entry.timestamp) : '',
       entry.timestamp ? formatTime(entry.timestamp) : '',
-      entry.timeOut ? new Date(entry.timeOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '',
+      entry.timeOut ? formatTime(new Date(entry.timeOut)) : '',
       entry.personnelName || '',
       entry.personnelRank || '',
-      formatAuditAction(entry),
+      formatAuditAction(entry, timezone),
       entry.destination || '',
       entry.contactNumber || '',
-      entry.expectedReturn ? new Date(entry.expectedReturn).toLocaleString() : '',
+      entry.expectedReturn ? formatTime(new Date(entry.expectedReturn)) : '',
       entry.companions?.map(c => c.name).join('; ') || '',
       entry.selfUpdated ? 'Self' : entry.updatedByName || '',
     ])
