@@ -143,6 +143,13 @@ npm run build
 firebase deploy --only hosting
 ```
 
+### CI/CD (GitHub Actions)
+Deployments are automated via GitHub Actions:
+- **Pull Requests**: Lint, test, build, and deploy to Firebase preview channel
+- **Merge to Master**: Automatic tagging, GitHub release, and production deployment
+
+See `.github/workflows/` for workflow definitions.
+
 ## Security Rules
 
 - Users can only read posts with `status: "published"`
@@ -166,3 +173,4 @@ firebase deploy --only hosting
 5. **Terraform:** Changes to infrastructure should go in `./terraform/`
 6. **Secrets:** Never commit `.env`, `terraform.tfvars`, or files in `.secrets/`
 7. **Changelog updates:** When updating `CHANGELOG.md`, also update the in-app changelog at `src/pages/Changelog.jsx` (update `APP_VERSION` and add the new version entry to the `changelog` array)
+8. **Version bumps:** Update version in `package.json` - CI/CD will automatically create git tags and GitHub releases on merge to master

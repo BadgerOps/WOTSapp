@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.12] - 2026-01-25
+
+### Added
+
+#### GitHub Actions CI/CD Pipeline
+- **PR Workflow** (`pr.yml`): Runs lint, tests, and build on pull requests
+- **Preview Deployments**: Automatic Firebase preview channel deployment for each PR
+- **Release Workflow** (`release.yml`): Automatic tagging, GitHub release creation, and Firebase deployment on merge to master
+- **Preview Cleanup** (`cleanup-preview.yml`): Deletes preview channels when PRs are closed
+- **Sentry Source Maps**: Automatic source map upload for production builds
+- Changelog notes automatically extracted from CHANGELOG.md for GitHub releases
+
+### Infrastructure
+- Added `.github/workflows/` directory with CI/CD configuration
+- 13 GitHub secrets configured for Firebase, Sentry, and build environment
+
+---
+
 ## [0.4.11] - 2026-01-25
 
 ### Changed

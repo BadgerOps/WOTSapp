@@ -1,0 +1,21 @@
+name: Cleanup Preview
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Delete preview channel
+        run: |
+          npm install -g firebase-tools
+          CHANNEL_ID="pr-${{ github.event.pull_request.number }}"
+          firebase hosting:channel:delete "$CHANNEL_ID" --project wots-app-484617 --force || true
+          echo "Deleted preview channel: $CHANNEL_ID"
