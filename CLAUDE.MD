@@ -13,12 +13,13 @@ This file provides context and guidelines for AI assistants (Claude, GPT, etc.) 
 ## Quick Context
 
 ```
-Tech Stack: React 18 + Vite + Tailwind CSS + Firebase
+Tech Stack: React 19 + Vite + Tailwind CSS + Firebase
 Auth: Google OAuth via Firebase Auth
 Database: Firestore (NoSQL)
 Storage: Firebase Storage (documents/files)
 Hosting: Firebase Hosting
 Infrastructure: Terraform managed
+CI/CD: GitHub Actions (lint, test, preview deploy on PR; tag, release, deploy on merge)
 ```
 
 ## File References (Read These First)
@@ -27,8 +28,9 @@ When starting work on this project, read these files in order:
 
 1. **PROJECT_STATUS.md** - Current progress, what's done, what's next
 2. **AGENTS.md** - Technical architecture, data models, conventions
-3. **handoff.md** - Quick onboarding guide for new contributors
-4. **package.json** - Dependencies and scripts
+3. **CONTRIBUTING.md** - How to contribute (PR process, code style)
+4. **handoff.md** - Quick onboarding guide for new contributors
+5. **package.json** - Dependencies and scripts
 
 ## Project Structure
 

@@ -1,8 +1,49 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.10'
+const APP_VERSION = '0.4.12'
 
 const changelog = [
+  {
+    version: '0.4.12',
+    date: '2026-01-25',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'GitHub Actions CI/CD Pipeline',
+            details: [
+              'PR Workflow: Runs lint, tests, and build on pull requests',
+              'Preview Deployments: Automatic Firebase preview channel for each PR',
+              'Release Workflow: Automatic tagging, GitHub release creation, and Firebase deployment on merge to master',
+              'Preview Cleanup: Deletes preview channels when PRs are closed',
+              'Sentry Source Maps: Automatic source map upload for production builds',
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.4.11',
+    date: '2026-01-25',
+    sections: [
+      {
+        title: 'Changed',
+        items: [
+          {
+            category: 'Bundle Size Optimization',
+            details: [
+              'Reduced initial JavaScript bundle by ~60% through code splitting',
+              'Route-based lazy loading for non-critical pages',
+              'Dynamic imports for jsPDF (only loaded when exporting PDFs)',
+              'Vendor chunk splitting for better caching',
+            ],
+          },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.10',
     date: '2026-01-25',
