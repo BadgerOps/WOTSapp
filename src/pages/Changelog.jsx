@@ -1,8 +1,22 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.13'
+const APP_VERSION = '0.4.14'
 
 const changelog = [
+  {
+    version: '0.4.14',
+    date: '2026-01-25',
+    sections: [
+      {
+        title: 'Fixed',
+        items: [
+          {
+            details: ['Release workflow: Create functions/.env for Firebase deploy'],
+          },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.13',
     date: '2026-01-25',
