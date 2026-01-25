@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import Navbar from './components/layout/Navbar'
+import Footer from './components/layout/Footer'
 import Loading from './components/common/Loading'
 import Login from './pages/Login'
 import Home from './pages/Home'
@@ -63,7 +64,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-10">
       {user && <Navbar />}
       <main className={user ? 'pt-16' : ''}>
         <Routes>
@@ -155,6 +156,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      {user && <Footer />}
     </div>
   )
 }

@@ -205,10 +205,21 @@ export function groupEntriesByPersonnel(entries) {
 
 /**
  * Generate summary statistics for a day's audit log
+ * Only counts actual sign-outs (action === 'sign_out'), not intermediate stage changes
  */
 export function generateAuditSummary(entries) {
-  const signOuts = entries.filter(e => e.action === 'sign_out' || (e.status === 'pass' && !e.previousStatus?.startsWith('stage_')))
-  const signIns = entries.filter(e => e.action === 'arrived_barracks' || (e.status === 'present' && e.previousStatus === 'pass'))
+  // Only count actual sign-outs, not intermediate stages (stage_arrived, stage_enroute_back)
+  // A sign-out is when action === 'sign_out' OR when status changed from 'present' to 'pass'
+  const signOuts = entries.filter(e =>
+    e.action === 'sign_out' ||
+    (e.status === 'pass' && e.previousStatus === 'present')
+  )
+
+  // Sign-ins are when someone arrives back at barracks
+  const signIns = entries.filter(e =>
+    e.action === 'arrived_barracks' ||
+    (e.status === 'present' && e.previousStatus === 'pass')
+  )
 
   const destinations = {}
   signOuts.forEach((entry) => {
