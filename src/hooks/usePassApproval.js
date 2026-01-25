@@ -11,6 +11,7 @@ import {
   serverTimestamp,
   writeBatch,
   getDoc,
+  getDocs,
 } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { useAuth } from "../contexts/AuthContext";
@@ -116,6 +117,25 @@ export function usePassRequestActions() {
   const [error, setError] = useState(null);
 
   /**
+   * Check for existing pending pass request for the current user
+   * @returns {Object|null} The existing pending request, or null if none exists
+   */
+  async function checkForDuplicateRequest() {
+    const q = query(
+      collection(db, "passApprovalRequests"),
+      where("requesterId", "==", user.uid),
+      where("status", "==", "pending")
+    );
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) {
+      return null;
+    }
+    // Return the first (most recent) pending request
+    const doc = snapshot.docs[0];
+    return { id: doc.id, ...doc.data() };
+  }
+
+  /**
    * Create a new pass approval request
    * @param {Object} requestData - Pass request details
    * @param {string} requestData.destination - Where they're going
@@ -123,12 +143,41 @@ export function usePassRequestActions() {
    * @param {string} requestData.contactNumber - Contact number while out
    * @param {string} requestData.notes - Additional notes
    * @param {Array} requestData.companions - Array of companion objects {id, name, rank}
+   * @param {boolean} requestData.forceSubmit - If true, cancel existing pending request and create new one
    */
   async function createPassRequest(requestData) {
     setLoading(true);
     setError(null);
     try {
       const companions = requestData.companions || [];
+
+      // Check for existing pending request (unless forceSubmit is true)
+      if (!requestData.forceSubmit) {
+        const existingRequest = await checkForDuplicateRequest();
+        if (existingRequest) {
+          setLoading(false);
+          return {
+            success: false,
+            isDuplicate: true,
+            existingRequest,
+            message: "You already have a pending pass request",
+          };
+        }
+      } else {
+        // Cancel any existing pending requests before creating new one
+        const existingRequest = await checkForDuplicateRequest();
+        if (existingRequest) {
+          const requestRef = doc(db, "passApprovalRequests", existingRequest.id);
+          await updateDoc(requestRef, {
+            status: "cancelled",
+            cancelledAt: serverTimestamp(),
+            cancelledBy: user.uid,
+            cancelledByName: user.displayName || user.email,
+            cancelReason: "Replaced with new request",
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
 
       // Create the main request
       const requestDoc = await addDoc(collection(db, "passApprovalRequests"), {

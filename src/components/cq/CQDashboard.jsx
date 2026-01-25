@@ -244,7 +244,9 @@ export default function CQDashboard() {
                           "100",
                         )} ${STATUS_COLORS[person.status].replace("bg-", "text-").replace("500", "800")}`}
                     >
-                      {STATUS_TYPES[person.status]?.label}
+                      {person.status === "pass" && person.statusDetails?.destination
+                        ? person.statusDetails.destination
+                        : STATUS_TYPES[person.status]?.label}
                     </span>
                     {person.status === "pass" &&
                       person.statusDetails?.passStage && (
@@ -260,11 +262,6 @@ export default function CQDashboard() {
                         </span>
                       )}
                   </div>
-                  {person.statusDetails?.destination && (
-                    <div className="text-sm text-gray-600 mt-1">
-                      {person.statusDetails.destination}
-                    </div>
-                  )}
                 </div>
               ))}
           </div>

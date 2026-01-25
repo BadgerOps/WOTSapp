@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.10] - 2026-01-25
+
+### Added
+
+#### Pass Approval Queue Integration
+- Pass Approval Queue now accessible under Admin → CQ → Pass Approvals tab
+- Pending pass count badge shows number of requests awaiting approval
+- Admins and Candidate Leadership can view and approve/reject pass requests
+
+#### Duplicate Pass Request Detection
+- System detects when a user already has a pending pass request
+- Warning modal shows details of existing request
+- Users can choose to replace existing request or keep it
+- Automatic cancellation of old request when replacing
+
+### Changed
+- CQ Dashboard now shows destination (e.g., "BX", "Shoppette") instead of generic "Pass" label for personnel on pass
+
+### Fixed
+- Pass approval cards not visible to admins and candidate_leadership (component was not wired into Admin dashboard)
+
+### Infrastructure
+- Added Firestore indexes for passApprovalRequests collection (status + createdAt, requesterId + createdAt)
+
+---
+
 ## [0.4.9] - 2026-01-24
 
 ### Fixed
