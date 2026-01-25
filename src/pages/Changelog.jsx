@@ -1,8 +1,42 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.7'
+const APP_VERSION = '0.4.10'
 
 const changelog = [
+  {
+    version: '0.4.10',
+    date: '2026-01-25',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Pass Approval Queue Integration',
+            details: [
+              'Pass Approval Queue now accessible under Admin → CQ → Pass Approvals tab',
+              'Pending pass count badge shows number of requests awaiting approval',
+              'Admins and Candidate Leadership can view and approve/reject pass requests',
+            ],
+          },
+          {
+            category: 'Duplicate Pass Request Detection',
+            details: [
+              'System detects when a user already has a pending pass request',
+              'Warning modal shows details of existing request',
+              'Users can choose to replace existing request or keep it',
+              'Automatic cancellation of old request when replacing',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Fixed',
+        items: [
+          { details: ['Pass approval cards not visible to admins and candidate_leadership'] },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.7',
     date: '2026-01-24',

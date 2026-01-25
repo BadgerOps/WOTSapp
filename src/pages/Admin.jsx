@@ -26,6 +26,7 @@ import CQNotesLog from '../components/cq/CQNotesLog'
 import CQAuditLog from '../components/cq/CQAuditLog'
 import StatusCleanupTool from '../components/cq/StatusCleanupTool'
 import CQSwapApprovalQueue from '../components/cq/CQSwapApprovalQueue'
+import PassApprovalQueue from '../components/cq/PassApprovalQueue'
 import SurveyComposer from '../components/surveys/SurveyComposer'
 import SurveyManager from '../components/surveys/SurveyManager'
 import SurveyResults from '../components/surveys/SurveyResults'
@@ -33,6 +34,7 @@ import { usePendingCount } from '../hooks/useWeatherRecommendations'
 import { usePendingDetailApprovals } from '../hooks/useDetailAssignments'
 import { useActiveShift } from '../hooks/useCQShifts'
 import { usePendingSwapRequestCount } from '../hooks/useCQSwapRequests'
+import { usePendingPassRequestCount } from '../hooks/usePassApproval'
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState('posts')
@@ -49,6 +51,7 @@ export default function Admin() {
   const { count: pendingDetailsCount } = usePendingDetailApprovals()
   const { activeShift } = useActiveShift()
   const { count: pendingSwapCount } = usePendingSwapRequestCount()
+  const { count: pendingPassCount } = usePendingPassRequestCount()
 
   const tabs = [
     { id: 'posts', label: 'Posts' },
@@ -368,6 +371,21 @@ export default function Admin() {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setCqSubTab('passApprovals')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cqSubTab === 'passApprovals'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Pass Approvals
+              {pendingPassCount > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-500 text-white">
+                  {pendingPassCount}
+                </span>
+              )}
+            </button>
           </div>
 
           {cqSubTab === 'dashboard' && <CQDashboard />}
@@ -378,6 +396,7 @@ export default function Admin() {
           {cqSubTab === 'audit' && <CQAuditLog />}
           {cqSubTab === 'maintenance' && <StatusCleanupTool />}
           {cqSubTab === 'swaps' && <CQSwapApprovalQueue />}
+          {cqSubTab === 'passApprovals' && <PassApprovalQueue />}
         </div>
       )}
 

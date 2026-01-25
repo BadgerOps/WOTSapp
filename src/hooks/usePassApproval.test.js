@@ -31,6 +31,12 @@ vi.mock("firebase/firestore", () => ({
       }),
     })
   ),
+  getDocs: vi.fn(() =>
+    Promise.resolve({
+      empty: true,
+      docs: [],
+    })
+  ),
 }));
 
 vi.mock("../config/firebase", () => ({
