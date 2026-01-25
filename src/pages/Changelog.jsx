@@ -1,8 +1,26 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.12'
+const APP_VERSION = '0.4.13'
 
 const changelog = [
+  {
+    version: '0.4.13',
+    date: '2026-01-25',
+    sections: [
+      {
+        title: 'Fixed',
+        items: [
+          {
+            category: 'CI/CD Pipeline Fixes',
+            details: [
+              'Release workflow now has correct permissions for git tag creation',
+              'Removed storage from automated deploy (managed separately)',
+            ],
+          },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.12',
     date: '2026-01-25',
