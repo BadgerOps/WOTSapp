@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.9] - 2026-01-24
+
+### Fixed
+- CQ Shift 2 date display now shows correct calendar date (the day after schedule date, since 0100-0600 is after midnight)
+- Swap request modals and approval queue now display correct dates for Shift 2
+
+### Added
+- `getActualShiftDate()` utility function for calculating actual shift dates
+
+---
+
 ## [0.4.8] - 2026-01-24
 
 ### Added

@@ -9,6 +9,7 @@ import {
   getCurrentHourInTimezone,
   isDateToday,
   isDatePast,
+  getActualShiftDate,
   DEFAULT_TIMEZONE,
 } from '../../lib/timezone'
 
@@ -181,7 +182,7 @@ export default function RequestSwapModal({ shift, onClose, onSuccess }) {
           <h2 className="text-xl font-bold text-gray-900">Request Shift Swap</h2>
           <p className="text-sm text-gray-600 mt-1">
             {shift.myShiftType === 'shift1' ? 'Shift 1 (2000-0100)' : 'Shift 2 (0100-0600)'} on{' '}
-            {new Date(shift.date + 'T12:00:00').toLocaleDateString('en-US', {
+            {new Date(getActualShiftDate(shift.date, shift.myShiftType) + 'T12:00:00').toLocaleDateString('en-US', {
               weekday: 'short',
               month: 'short',
               day: 'numeric',
