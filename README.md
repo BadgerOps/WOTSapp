@@ -209,7 +209,7 @@ terraform apply
 
 ## License
 
-This project is open source. See the repository for license details.
+This project is licensed under the BSD 2-Clause License. See the [LICENSE](./LICENSE) file for details.
 
 ## Acknowledgments
 
