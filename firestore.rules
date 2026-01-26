@@ -141,10 +141,10 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       // Admins can do everything
       allow create, update, delete: if isAdmin();
-      // Users can create their own self-assignments
+      // Users can create their own self-assignments (allow any authenticated user to self-assign)
       allow create: if isAuthenticated() &&
-        request.resource.data.assignedTo.size() > 0 &&
-        request.resource.data.assignedTo[0].personnelId == request.auth.uid;
+        request.resource.data.status == 'assigned' &&
+        request.resource.data.assignedTo.size() > 0;
       // Assigned users can update their assignments (start, complete tasks, submit, self-assign/unassign)
       // This allows status changes, task completion updates, and task claiming
       allow update: if isAuthenticated() &&
