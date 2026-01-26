@@ -1,45 +1,107 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDetailAssignmentActions } from '../../hooks/useDetailAssignments'
 import { useMyPersonnelIds } from '../../hooks/useMyPersonnelIds'
-import { doc, updateDoc } from 'firebase/firestore'
+import { usePersonnel } from '../../hooks/usePersonnel'
+import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../config/firebase'
 import { format } from 'date-fns'
 
 export default function DetailChecklistView({ assignment, onClose }) {
   const { user } = useAuth()
-  const { isCurrentUser } = useMyPersonnelIds()
+  const { isCurrentUser, personnelDocId } = useMyPersonnelIds()
+  const { personnel } = usePersonnel()
   const { startAssignment, completeAssignment, loading: actionLoading } = useDetailAssignmentActions()
 
-  const [tasks, setTasks] = useState([])
+  const [allTasks, setAllTasks] = useState([])
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set())
   const [taskNotes, setTaskNotes] = useState({})
   const [completionNotes, setCompletionNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [expandedNote, setExpandedNote] = useState(null)
+  const [viewMode, setViewMode] = useState('all') // 'my' or 'all' - default to all
+  const [areaFilter, setAreaFilter] = useState('')
+  const [locationFilter, setLocationFilter] = useState('')
+  const [assignmentFilter, setAssignmentFilter] = useState('') // '', 'unclaimed', 'mine', 'others'
 
-  // Filter tasks for current user and load existing notes
+  // Get current user's personnel record for display info
+  const myPersonnelRecord = useMemo(() => {
+    if (!user || !personnel.length) return null
+    return personnel.find(p => p.userId === user.uid || p.email === user.email)
+  }, [user, personnel])
+
+  // Get unique areas and locations for filtering
+  const uniqueAreas = useMemo(() => {
+    const areas = new Set()
+    allTasks.forEach(t => areas.add(t.areaName))
+    return Array.from(areas).sort()
+  }, [allTasks])
+
+  const uniqueLocations = useMemo(() => {
+    const locations = new Set()
+    allTasks.forEach(t => {
+      if (t.location && t.location !== 'All') {
+        locations.add(t.location)
+      }
+    })
+    return Array.from(locations).sort()
+  }, [allTasks])
+
+  // Initialize all tasks from assignment
   useEffect(() => {
-    if (assignment && user) {
-      const myTasks = assignment.tasks?.filter(
-        t => isCurrentUser(t.assignedTo?.personnelId)
-      ) || []
-      setTasks(myTasks)
+    if (assignment) {
+      setAllTasks(assignment.tasks || [])
 
-      // Load existing task notes
+      // Load existing task notes for user's tasks
       const notes = {}
-      myTasks.forEach((task, idx) => {
-        if (task.notes) {
+      assignment.tasks?.forEach((task, idx) => {
+        if (isCurrentUser(task.assignedTo?.personnelId) && task.notes) {
           notes[idx] = task.notes
         }
       })
       setTaskNotes(notes)
     }
-  }, [assignment, user])
+  }, [assignment, isCurrentUser])
 
-  const allTasksCompleted = tasks.length > 0 && tasks.every(t => t.completed)
-  const completedCount = tasks.filter(t => t.completed).length
+  // Filter tasks based on view mode and filters
+  const displayedTasks = useMemo(() => {
+    let filtered = allTasks
+
+    // View mode filter
+    if (viewMode === 'my') {
+      filtered = filtered.filter(t => isCurrentUser(t.assignedTo?.personnelId))
+    }
+
+    // Area filter
+    if (areaFilter) {
+      filtered = filtered.filter(t => t.areaName === areaFilter)
+    }
+
+    // Location filter
+    if (locationFilter) {
+      filtered = filtered.filter(t => t.location === locationFilter)
+    }
+
+    // Assignment filter
+    if (assignmentFilter === 'unclaimed') {
+      filtered = filtered.filter(t => !t.assignedTo?.personnelId)
+    } else if (assignmentFilter === 'mine') {
+      filtered = filtered.filter(t => isCurrentUser(t.assignedTo?.personnelId))
+    } else if (assignmentFilter === 'others') {
+      filtered = filtered.filter(t => t.assignedTo?.personnelId && !isCurrentUser(t.assignedTo?.personnelId))
+    }
+
+    return filtered
+  }, [allTasks, viewMode, areaFilter, locationFilter, assignmentFilter, isCurrentUser])
+
+  // Get my tasks for progress tracking
+  const myTasks = useMemo(() => {
+    return allTasks.filter(t => isCurrentUser(t.assignedTo?.personnelId))
+  }, [allTasks, isCurrentUser])
+
+  const allMyTasksCompleted = myTasks.length > 0 && myTasks.every(t => t.completed)
+  const completedCount = myTasks.filter(t => t.completed).length
 
   function toggleTaskSelection(taskIndex) {
     const newSelected = new Set(selectedTaskIds)
@@ -52,7 +114,8 @@ export default function DetailChecklistView({ assignment, onClose }) {
   }
 
   function selectAll() {
-    setSelectedTaskIds(new Set(tasks.map((_, idx) => idx)))
+    const indices = displayedTasks.map((_, idx) => idx)
+    setSelectedTaskIds(new Set(indices))
   }
 
   function deselectAll() {
@@ -67,9 +130,11 @@ export default function DetailChecklistView({ assignment, onClose }) {
     }
   }
 
-  async function handleBulkComplete() {
-    if (selectedTaskIds.size === 0) {
-      setError('Please select at least one task to mark as complete')
+  // Claim a task for the current user
+  async function handleClaimTask(taskIndex) {
+    const task = allTasks[taskIndex]
+    if (task.assignedTo?.personnelId) {
+      setError('This task is already assigned to someone')
       return
     }
 
@@ -77,12 +142,155 @@ export default function DetailChecklistView({ assignment, onClose }) {
     setError(null)
 
     try {
-      const updatedTasks = [...assignment.tasks]
+      const updatedTasks = [...allTasks]
+      updatedTasks[taskIndex] = {
+        ...updatedTasks[taskIndex],
+        assignedTo: {
+          personnelId: personnelDocId || user.uid,
+          name: myPersonnelRecord
+            ? `${myPersonnelRecord.rank || ''} ${myPersonnelRecord.firstName} ${myPersonnelRecord.lastName}`.trim()
+            : user.displayName || user.email,
+          rank: myPersonnelRecord?.rank || '',
+          email: user.email
+        }
+      }
 
-      selectedTaskIds.forEach(taskIndex => {
+      await updateDoc(doc(db, 'detailAssignments', assignment.id), {
+        tasks: updatedTasks,
+        updatedAt: serverTimestamp()
+      })
+
+      setAllTasks(updatedTasks)
+    } catch (err) {
+      console.error('Error claiming task:', err)
+      setError('Failed to claim task: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Bulk claim selected unclaimed tasks
+  async function handleBulkClaim() {
+    const unclaimedSelectedIndices = Array.from(selectedTaskIds).filter(idx => {
+      const task = displayedTasks[idx]
+      return !task.assignedTo?.personnelId
+    })
+
+    if (unclaimedSelectedIndices.length === 0) {
+      setError('No unclaimed tasks selected')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      const updatedTasks = [...allTasks]
+
+      unclaimedSelectedIndices.forEach(displayIdx => {
+        const task = displayedTasks[displayIdx]
         const globalTaskIndex = updatedTasks.findIndex(
-          t => t.taskId === tasks[taskIndex].taskId &&
-              t.location === tasks[taskIndex].location &&
+          t => t.taskId === task.taskId && t.location === task.location && !t.assignedTo?.personnelId
+        )
+
+        if (globalTaskIndex !== -1) {
+          updatedTasks[globalTaskIndex] = {
+            ...updatedTasks[globalTaskIndex],
+            assignedTo: {
+              personnelId: personnelDocId || user.uid,
+              name: myPersonnelRecord
+                ? `${myPersonnelRecord.rank || ''} ${myPersonnelRecord.firstName} ${myPersonnelRecord.lastName}`.trim()
+                : user.displayName || user.email,
+              rank: myPersonnelRecord?.rank || '',
+              email: user.email
+            }
+          }
+        }
+      })
+
+      await updateDoc(doc(db, 'detailAssignments', assignment.id), {
+        tasks: updatedTasks,
+        updatedAt: serverTimestamp()
+      })
+
+      setAllTasks(updatedTasks)
+      setSelectedTaskIds(new Set())
+    } catch (err) {
+      console.error('Error claiming tasks:', err)
+      setError('Failed to claim tasks: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Unclaim a task from the current user
+  async function handleUnclaimTask(taskIndex) {
+    const task = allTasks[taskIndex]
+    if (!isCurrentUser(task.assignedTo?.personnelId)) {
+      setError('You can only unclaim your own tasks')
+      return
+    }
+
+    if (task.completed) {
+      setError('Cannot unclaim a completed task')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      const updatedTasks = [...allTasks]
+      updatedTasks[taskIndex] = {
+        ...updatedTasks[taskIndex],
+        assignedTo: null
+      }
+
+      await updateDoc(doc(db, 'detailAssignments', assignment.id), {
+        tasks: updatedTasks,
+        updatedAt: serverTimestamp()
+      })
+
+      setAllTasks(updatedTasks)
+    } catch (err) {
+      console.error('Error unclaiming task:', err)
+      setError('Failed to unclaim task: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleBulkComplete() {
+    if (selectedTaskIds.size === 0) {
+      setError('Please select at least one task to mark as complete')
+      return
+    }
+
+    // Only complete tasks that are assigned to the current user
+    const mySelectedIndices = Array.from(selectedTaskIds).filter(idx => {
+      const task = displayedTasks[idx]
+      const globalIdx = allTasks.findIndex(t =>
+        t.taskId === task.taskId && t.location === task.location && t.assignedTo?.personnelId === task.assignedTo?.personnelId
+      )
+      return isCurrentUser(allTasks[globalIdx]?.assignedTo?.personnelId)
+    })
+
+    if (mySelectedIndices.length === 0) {
+      setError('You can only complete tasks assigned to you')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      const updatedTasks = [...allTasks]
+
+      mySelectedIndices.forEach(displayIdx => {
+        const task = displayedTasks[displayIdx]
+        const globalTaskIndex = updatedTasks.findIndex(
+          t => t.taskId === task.taskId &&
+              t.location === task.location &&
               isCurrentUser(t.assignedTo?.personnelId)
         )
 
@@ -91,19 +299,18 @@ export default function DetailChecklistView({ assignment, onClose }) {
             ...updatedTasks[globalTaskIndex],
             completed: true,
             completedAt: new Date(),
-            notes: taskNotes[taskIndex] || ''
+            notes: taskNotes[displayIdx] || ''
           }
         }
       })
 
       await updateDoc(doc(db, 'detailAssignments', assignment.id), {
         tasks: updatedTasks,
-        status: assignment.status === 'assigned' ? 'in_progress' : assignment.status
+        status: assignment.status === 'assigned' ? 'in_progress' : assignment.status,
+        updatedAt: serverTimestamp()
       })
 
-      // Update local state
-      const newMyTasks = updatedTasks.filter(t => isCurrentUser(t.assignedTo?.personnelId))
-      setTasks(newMyTasks)
+      setAllTasks(updatedTasks)
       setSelectedTaskIds(new Set())
     } catch (err) {
       console.error('Error completing tasks:', err)
@@ -119,16 +326,31 @@ export default function DetailChecklistView({ assignment, onClose }) {
       return
     }
 
+    // Only uncomplete tasks that are assigned to the current user
+    const mySelectedIndices = Array.from(selectedTaskIds).filter(idx => {
+      const task = displayedTasks[idx]
+      const globalIdx = allTasks.findIndex(t =>
+        t.taskId === task.taskId && t.location === task.location && t.assignedTo?.personnelId === task.assignedTo?.personnelId
+      )
+      return isCurrentUser(allTasks[globalIdx]?.assignedTo?.personnelId)
+    })
+
+    if (mySelectedIndices.length === 0) {
+      setError('You can only modify tasks assigned to you')
+      return
+    }
+
     setSaving(true)
     setError(null)
 
     try {
-      const updatedTasks = [...assignment.tasks]
+      const updatedTasks = [...allTasks]
 
-      selectedTaskIds.forEach(taskIndex => {
+      mySelectedIndices.forEach(displayIdx => {
+        const task = displayedTasks[displayIdx]
         const globalTaskIndex = updatedTasks.findIndex(
-          t => t.taskId === tasks[taskIndex].taskId &&
-              t.location === tasks[taskIndex].location &&
+          t => t.taskId === task.taskId &&
+              t.location === task.location &&
               isCurrentUser(t.assignedTo?.personnelId)
         )
 
@@ -142,12 +364,11 @@ export default function DetailChecklistView({ assignment, onClose }) {
       })
 
       await updateDoc(doc(db, 'detailAssignments', assignment.id), {
-        tasks: updatedTasks
+        tasks: updatedTasks,
+        updatedAt: serverTimestamp()
       })
 
-      // Update local state
-      const newMyTasks = updatedTasks.filter(t => isCurrentUser(t.assignedTo?.personnelId))
-      setTasks(newMyTasks)
+      setAllTasks(updatedTasks)
       setSelectedTaskIds(new Set())
     } catch (err) {
       console.error('Error uncompleting tasks:', err)
@@ -162,12 +383,13 @@ export default function DetailChecklistView({ assignment, onClose }) {
     setError(null)
 
     try {
-      const updatedTasks = [...assignment.tasks]
+      const updatedTasks = [...allTasks]
 
-      Object.entries(taskNotes).forEach(([taskIndex, notes]) => {
+      Object.entries(taskNotes).forEach(([displayIdx, notes]) => {
+        const task = displayedTasks[parseInt(displayIdx)]
         const globalTaskIndex = updatedTasks.findIndex(
-          t => t.taskId === tasks[parseInt(taskIndex)].taskId &&
-              t.location === tasks[parseInt(taskIndex)].location &&
+          t => t.taskId === task.taskId &&
+              t.location === task.location &&
               isCurrentUser(t.assignedTo?.personnelId)
         )
 
@@ -180,9 +402,11 @@ export default function DetailChecklistView({ assignment, onClose }) {
       })
 
       await updateDoc(doc(db, 'detailAssignments', assignment.id), {
-        tasks: updatedTasks
+        tasks: updatedTasks,
+        updatedAt: serverTimestamp()
       })
 
+      setAllTasks(updatedTasks)
       alert('Notes saved successfully!')
     } catch (err) {
       console.error('Error saving notes:', err)
@@ -193,8 +417,8 @@ export default function DetailChecklistView({ assignment, onClose }) {
   }
 
   async function handleComplete() {
-    if (!allTasksCompleted) {
-      setError('Please complete all tasks before submitting')
+    if (!allMyTasksCompleted) {
+      setError('Please complete all your tasks before submitting')
       return
     }
 
@@ -212,18 +436,28 @@ export default function DetailChecklistView({ assignment, onClose }) {
     ? assignment.dueDateTime.toDate()
     : new Date(assignment.dueDateTime)
 
-  // Group tasks by area
-  const tasksByArea = tasks.reduce((acc, task, idx) => {
+  // Group displayed tasks by area
+  const tasksByArea = displayedTasks.reduce((acc, task, idx) => {
     if (!acc[task.areaName]) {
       acc[task.areaName] = []
     }
-    acc[task.areaName].push({ ...task, originalIndex: idx })
+    acc[task.areaName].push({ ...task, displayIndex: idx })
     return acc
   }, {})
 
-  const allSelected = tasks.length > 0 && selectedTaskIds.size === tasks.length
-  const hasCompletedSelected = Array.from(selectedTaskIds).some(idx => tasks[idx]?.completed)
-  const hasIncompleteSelected = Array.from(selectedTaskIds).some(idx => !tasks[idx]?.completed)
+  const allSelected = displayedTasks.length > 0 && selectedTaskIds.size === displayedTasks.length
+  const hasCompletedSelected = Array.from(selectedTaskIds).some(idx => displayedTasks[idx]?.completed)
+  const hasIncompleteSelected = Array.from(selectedTaskIds).some(idx => {
+    const task = displayedTasks[idx]
+    return !task?.completed && isCurrentUser(task?.assignedTo?.personnelId)
+  })
+  const hasUnclaimedSelected = Array.from(selectedTaskIds).some(idx => {
+    const task = displayedTasks[idx]
+    return !task?.assignedTo?.personnelId
+  })
+
+  // Count unclaimed tasks
+  const unclaimedCount = allTasks.filter(t => !t.assignedTo?.personnelId).length
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -241,8 +475,8 @@ export default function DetailChecklistView({ assignment, onClose }) {
                 <span>Due: {format(dueDate, 'h:mm a')}</span>
               </div>
               <div className="mt-2 text-sm">
-                <span className="font-medium text-gray-700">Progress: </span>
-                <span className="text-gray-900">{completedCount}/{tasks.length} tasks completed</span>
+                <span className="font-medium text-gray-700">My Progress: </span>
+                <span className="text-gray-900">{completedCount}/{myTasks.length} tasks completed</span>
               </div>
             </div>
             <button
@@ -253,6 +487,98 @@ export default function DetailChecklistView({ assignment, onClose }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+          </div>
+
+          {/* View Toggle */}
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={() => { setViewMode('my'); setSelectedTaskIds(new Set()); }}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                viewMode === 'my'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              My Tasks ({myTasks.length})
+            </button>
+            <button
+              onClick={() => { setViewMode('all'); setSelectedTaskIds(new Set()); }}
+              className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                viewMode === 'all'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              All Tasks ({allTasks.length})
+              {unclaimedCount > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 bg-yellow-200 text-yellow-800 text-xs rounded-full">
+                  {unclaimedCount} unclaimed
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Filters */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {/* Area Filter */}
+            <select
+              value={areaFilter}
+              onChange={(e) => { setAreaFilter(e.target.value); setSelectedTaskIds(new Set()); }}
+              className="text-xs px-2 py-1.5 border border-gray-300 rounded-lg bg-white"
+            >
+              <option value="">All Areas</option>
+              {uniqueAreas.map(area => (
+                <option key={area} value={area}>{area}</option>
+              ))}
+            </select>
+
+            {/* Location Filter */}
+            {uniqueLocations.length > 0 && (
+              <select
+                value={locationFilter}
+                onChange={(e) => { setLocationFilter(e.target.value); setSelectedTaskIds(new Set()); }}
+                className="text-xs px-2 py-1.5 border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">All Locations</option>
+                {uniqueLocations.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
+            )}
+
+            {/* Assignment Filter */}
+            <select
+              value={assignmentFilter}
+              onChange={(e) => { setAssignmentFilter(e.target.value); setSelectedTaskIds(new Set()); }}
+              className="text-xs px-2 py-1.5 border border-gray-300 rounded-lg bg-white"
+            >
+              <option value="">All Assignments</option>
+              <option value="unclaimed">Unclaimed Only ({unclaimedCount})</option>
+              <option value="mine">My Tasks ({myTasks.length})</option>
+              <option value="others">Others' Tasks</option>
+            </select>
+
+            {/* Clear Filters */}
+            {(areaFilter || locationFilter || assignmentFilter) && (
+              <button
+                onClick={() => {
+                  setAreaFilter('')
+                  setLocationFilter('')
+                  setAssignmentFilter('')
+                  setSelectedTaskIds(new Set())
+                }}
+                className="text-xs px-2 py-1.5 text-gray-600 hover:text-gray-800"
+              >
+                Clear Filters
+              </button>
+            )}
+
+            {/* Show filtered count */}
+            {(areaFilter || locationFilter || assignmentFilter) && (
+              <span className="text-xs text-gray-500 py-1.5">
+                Showing {displayedTasks.length} of {allTasks.length} tasks
+              </span>
+            )}
           </div>
         </div>
 
@@ -268,7 +594,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
                   className="w-4 h-4 rounded border-gray-300"
                 />
                 <span className="text-sm font-medium text-gray-700">
-                  Select All ({tasks.length})
+                  Select All ({displayedTasks.length})
                 </span>
               </label>
               {selectedTaskIds.size > 0 && (
@@ -279,13 +605,22 @@ export default function DetailChecklistView({ assignment, onClose }) {
             </div>
 
             <div className="flex gap-2">
+              {hasUnclaimedSelected && (
+                <button
+                  onClick={handleBulkClaim}
+                  disabled={saving}
+                  className="text-sm py-1 px-3 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 disabled:opacity-50"
+                >
+                  Claim Selected
+                </button>
+              )}
               {hasIncompleteSelected && (
                 <button
                   onClick={handleBulkComplete}
                   disabled={saving}
                   className="btn-primary text-sm py-1 px-3 disabled:opacity-50"
                 >
-                  Mark Complete ({Array.from(selectedTaskIds).filter(idx => !tasks[idx]?.completed).length})
+                  Mark Complete
                 </button>
               )}
               {hasCompletedSelected && (
@@ -294,7 +629,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
                   disabled={saving}
                   className="btn-secondary text-sm py-1 px-3 disabled:opacity-50"
                 >
-                  Mark Incomplete ({Array.from(selectedTaskIds).filter(idx => tasks[idx]?.completed).length})
+                  Mark Incomplete
                 </button>
               )}
             </div>
@@ -306,6 +641,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
               {error}
+              <button onClick={() => setError(null)} className="ml-2 text-red-800 font-medium">×</button>
             </div>
           )}
 
@@ -335,14 +671,19 @@ export default function DetailChecklistView({ assignment, onClose }) {
                 </div>
                 <div className="divide-y divide-gray-100">
                   {areaTasks.map((task) => {
-                    const isSelected = selectedTaskIds.has(task.originalIndex)
-                    const isNoteExpanded = expandedNote === task.originalIndex
+                    const isSelected = selectedTaskIds.has(task.displayIndex)
+                    const isNoteExpanded = expandedNote === task.displayIndex
+                    const isMine = isCurrentUser(task.assignedTo?.personnelId)
+                    const isUnclaimed = !task.assignedTo?.personnelId
 
                     return (
                       <div
-                        key={task.originalIndex}
+                        key={task.displayIndex}
                         className={`px-4 py-3 transition-colors ${
-                          isSelected ? 'bg-primary-50' : task.completed ? 'bg-green-50' : 'hover:bg-gray-50'
+                          isSelected ? 'bg-primary-50' :
+                          task.completed ? 'bg-green-50' :
+                          isUnclaimed ? 'bg-yellow-50' :
+                          'hover:bg-gray-50'
                         }`}
                       >
                         <div className="flex items-start gap-3">
@@ -350,7 +691,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onChange={() => toggleTaskSelection(task.originalIndex)}
+                            onChange={() => toggleTaskSelection(task.displayIndex)}
                             className="mt-1 w-5 h-5 rounded border-gray-300"
                           />
 
@@ -359,6 +700,10 @@ export default function DetailChecklistView({ assignment, onClose }) {
                             {task.completed ? (
                               <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            ) : isUnclaimed ? (
+                              <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" strokeWidth="2" strokeDasharray="4 2" />
                               </svg>
                             ) : (
                               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -377,6 +722,40 @@ export default function DetailChecklistView({ assignment, onClose }) {
                                     <span className="ml-2 text-xs text-gray-500">({task.location})</span>
                                   )}
                                 </p>
+
+                                {/* Assignment info */}
+                                <div className="mt-1 flex items-center gap-2 flex-wrap">
+                                  {isUnclaimed ? (
+                                    <button
+                                      onClick={() => handleClaimTask(allTasks.findIndex(
+                                        t => t.taskId === task.taskId && t.location === task.location && !t.assignedTo?.personnelId
+                                      ))}
+                                      disabled={saving}
+                                      className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full hover:bg-yellow-200 disabled:opacity-50"
+                                    >
+                                      + Claim this task
+                                    </button>
+                                  ) : (
+                                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                      isMine ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'
+                                    }`}>
+                                      {isMine ? '👤 Assigned to you' : `Assigned to ${task.assignedTo?.name || 'Unknown'}`}
+                                    </span>
+                                  )}
+
+                                  {isMine && !task.completed && (
+                                    <button
+                                      onClick={() => handleUnclaimTask(allTasks.findIndex(
+                                        t => t.taskId === task.taskId && t.location === task.location && isCurrentUser(t.assignedTo?.personnelId)
+                                      ))}
+                                      disabled={saving}
+                                      className="text-xs text-red-600 hover:text-red-700"
+                                    >
+                                      × Unclaim
+                                    </button>
+                                  )}
+                                </div>
+
                                 {task.completedAt && (
                                   <p className="text-xs text-gray-500 mt-1">
                                     Completed: {format(new Date(task.completedAt), 'h:mm a')}
@@ -384,23 +763,25 @@ export default function DetailChecklistView({ assignment, onClose }) {
                                 )}
                               </div>
 
-                              {/* Add Note Button */}
-                              <button
-                                onClick={() => setExpandedNote(isNoteExpanded ? null : task.originalIndex)}
-                                className="text-xs text-primary-600 hover:text-primary-700 whitespace-nowrap"
-                              >
-                                {task.notes || taskNotes[task.originalIndex] ? '✏️ Edit Note' : '+ Add Note'}
-                              </button>
+                              {/* Add Note Button (only for my tasks) */}
+                              {isMine && (
+                                <button
+                                  onClick={() => setExpandedNote(isNoteExpanded ? null : task.displayIndex)}
+                                  className="text-xs text-primary-600 hover:text-primary-700 whitespace-nowrap"
+                                >
+                                  {task.notes || taskNotes[task.displayIndex] ? '✏️ Edit Note' : '+ Add Note'}
+                                </button>
+                              )}
                             </div>
 
                             {/* Note Input */}
-                            {(isNoteExpanded || task.notes || taskNotes[task.originalIndex]) && (
+                            {isMine && (isNoteExpanded || task.notes || taskNotes[task.displayIndex]) && (
                               <div className="mt-2">
                                 <textarea
-                                  value={taskNotes[task.originalIndex] || ''}
+                                  value={taskNotes[task.displayIndex] || ''}
                                   onChange={(e) => setTaskNotes({
                                     ...taskNotes,
-                                    [task.originalIndex]: e.target.value
+                                    [task.displayIndex]: e.target.value
                                   })}
                                   placeholder="Add a note about this task (optional)..."
                                   className="input text-xs"
@@ -419,7 +800,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
           </div>
 
           {/* Overall Completion Notes */}
-          {allTasksCompleted && (
+          {allMyTasksCompleted && (
             <div className="mt-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Overall Completion Notes (Optional)
@@ -457,7 +838,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
             </button>
           )}
 
-          {allTasksCompleted && (
+          {allMyTasksCompleted && myTasks.length > 0 && (
             <button
               onClick={handleComplete}
               disabled={actionLoading}

@@ -18,6 +18,7 @@ import DetailAssignmentList from '../components/details/DetailAssignmentList'
 import DetailApprovalQueue from '../components/details/DetailApprovalQueue'
 import DetailHistory from '../components/details/DetailHistory'
 import DetailAssignmentImporter from '../components/details/DetailAssignmentImporter'
+import DetailResetTool from '../components/details/DetailResetTool'
 import CQDashboard from '../components/cq/CQDashboard'
 import ShiftManager from '../components/cq/ShiftManager'
 import CQScheduleManager from '../components/cq/CQScheduleManager'
@@ -267,6 +268,16 @@ export default function Admin() {
             >
               Import
             </button>
+            <button
+              onClick={() => setDetailsSubTab('reset')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                detailsSubTab === 'reset'
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Reset
+            </button>
           </div>
 
           {detailsSubTab === 'templates' && <DetailTemplateManager />}
@@ -279,6 +290,7 @@ export default function Admin() {
           {detailsSubTab === 'approvals' && <DetailApprovalQueue />}
           {detailsSubTab === 'history' && <DetailHistory />}
           {detailsSubTab === 'import' && <DetailAssignmentImporter />}
+          {detailsSubTab === 'reset' && <DetailResetTool />}
         </div>
       )}
 
