@@ -76,12 +76,22 @@ export function usePersonnelConfigActions() {
   }
 
   async function addFlight(flightName) {
-    const configRef = doc(db, 'personnelConfig', 'default')
-    const docSnap = await getDoc(configRef)
-    const currentFlights = docSnap.exists() ? (docSnap.data().flights || DEFAULT_FLIGHTS) : DEFAULT_FLIGHTS
+    setError(null)
+    try {
+      const configRef = doc(db, 'personnelConfig', 'default')
+      const docSnap = await getDoc(configRef)
+      const currentFlights = docSnap.exists() ? (docSnap.data().flights || []) : []
 
-    if (!currentFlights.includes(flightName)) {
+      if (currentFlights.includes(flightName)) {
+        return { success: false, reason: 'duplicate' }
+      }
+
       await updateConfig({ flights: [...currentFlights, flightName] })
+      return { success: true }
+    } catch (err) {
+      console.error('Error adding flight:', err)
+      setError(err.message)
+      throw err
     }
   }
 
@@ -94,12 +104,22 @@ export function usePersonnelConfigActions() {
   }
 
   async function addClass(className) {
-    const configRef = doc(db, 'personnelConfig', 'default')
-    const docSnap = await getDoc(configRef)
-    const currentClasses = docSnap.exists() ? (docSnap.data().classes || DEFAULT_CLASSES) : DEFAULT_CLASSES
+    setError(null)
+    try {
+      const configRef = doc(db, 'personnelConfig', 'default')
+      const docSnap = await getDoc(configRef)
+      const currentClasses = docSnap.exists() ? (docSnap.data().classes || []) : []
 
-    if (!currentClasses.includes(className)) {
+      if (currentClasses.includes(className)) {
+        return { success: false, reason: 'duplicate' }
+      }
+
       await updateConfig({ classes: [...currentClasses, className] })
+      return { success: true }
+    } catch (err) {
+      console.error('Error adding class:', err)
+      setError(err.message)
+      throw err
     }
   }
 

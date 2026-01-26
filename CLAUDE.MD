@@ -22,6 +22,26 @@ Infrastructure: Terraform managed
 CI/CD: GitHub Actions (lint, test, preview deploy on PR; tag, release, deploy on merge)
 ```
 
+## Development Environment
+
+**IMPORTANT: Always use `nix-shell` for Node.js CLI commands in this repo.**
+
+```bash
+# Enter the nix-shell before running any node/npm commands
+nix-shell
+
+# Then run commands as normal
+npm install
+npm run dev
+npm run lint
+firebase deploy
+```
+
+The `shell.nix` provides:
+- Node.js 22 (default)
+- nvm for switching Node versions if needed (`nvm use <version>`)
+- Proper PATH configuration for node_modules/.bin
+
 ## File References (Read These First)
 
 When starting work on this project, read these files in order:
@@ -150,7 +170,7 @@ try {
 ### users/{userId}
 ```javascript
 {
-  email: "user@example.com",
+  email: "user16@example.com",
   displayName: "John Doe",
   photoURL: "https://...",
   role: "admin" | "user",

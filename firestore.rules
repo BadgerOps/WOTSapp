@@ -139,8 +139,30 @@ service cloud.firestore {
     match /detailAssignments/{assignmentId} {
       // Anyone authenticated can read assignments
       allow read: if isAuthenticated();
-      // Only admins can create, update, delete assignments
+      // Admins can do everything
       allow create, update, delete: if isAdmin();
+      // Users can create their own self-assignments (allow any authenticated user to self-assign)
+      allow create: if isAuthenticated() &&
+        request.resource.data.status == 'assigned' &&
+        request.resource.data.assignedTo.size() > 0;
+      // Assigned users can update their assignments (start, complete tasks, submit, self-assign/unassign)
+      // This allows status changes, task completion updates, and task claiming
+      allow update: if isAuthenticated() &&
+        // Only allow specific status transitions for non-admins
+        (
+          // Self-assign/unassign: assigned stays assigned (users can claim tasks)
+          (resource.data.status == 'assigned' && request.resource.data.status == 'assigned') ||
+          // Starting: assigned -> in_progress
+          (resource.data.status == 'assigned' && request.resource.data.status == 'in_progress') ||
+          // Task updates: in_progress stays in_progress (updating tasks, self-assign/unassign)
+          (resource.data.status == 'in_progress' && request.resource.data.status == 'in_progress') ||
+          // Submitting: in_progress -> completed
+          (resource.data.status == 'in_progress' && request.resource.data.status == 'completed') ||
+          // Re-doing after rejection: rejected -> in_progress
+          (resource.data.status == 'rejected' && request.resource.data.status == 'in_progress') ||
+          // Self-assign/unassign after rejection: rejected stays rejected
+          (resource.data.status == 'rejected' && request.resource.data.status == 'rejected')
+        );
     }
 
     // Detail Completions collection

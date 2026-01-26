@@ -8,6 +8,7 @@ export default function PersonnelConfigPanel() {
   const [newFlight, setNewFlight] = useState('')
   const [newClass, setNewClass] = useState('')
   const [classError, setClassError] = useState('')
+  const [flightError, setFlightError] = useState('')
 
   if (loading) {
     return <div className="text-gray-600">Loading configuration...</div>
@@ -22,13 +23,19 @@ export default function PersonnelConfigPanel() {
 
   async function handleAddFlight(e) {
     e.preventDefault()
+    setFlightError('')
     if (!newFlight.trim()) return
 
     try {
-      await addFlight(newFlight.trim())
+      const result = await addFlight(newFlight.trim())
+      if (result?.reason === 'duplicate') {
+        setFlightError('Flight already exists')
+        return
+      }
       setNewFlight('')
     } catch (err) {
       console.error('Error adding flight:', err)
+      setFlightError('Failed to add flight: ' + err.message)
     }
   }
 
@@ -54,10 +61,15 @@ export default function PersonnelConfigPanel() {
     }
 
     try {
-      await addClass(newClass.trim())
+      const result = await addClass(newClass.trim())
+      if (result?.reason === 'duplicate') {
+        setClassError('Class already exists')
+        return
+      }
       setNewClass('')
     } catch (err) {
       console.error('Error adding class:', err)
+      setClassError('Failed to add class: ' + err.message)
     }
   }
 
@@ -104,21 +116,29 @@ export default function PersonnelConfigPanel() {
           )}
         </div>
 
-        <form onSubmit={handleAddFlight} className="flex gap-2">
-          <input
-            type="text"
-            value={newFlight}
-            onChange={(e) => setNewFlight(e.target.value)}
-            placeholder="New flight name..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
-          />
-          <button
-            type="submit"
-            disabled={actionLoading || !newFlight.trim()}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 text-sm"
-          >
-            Add
-          </button>
+        <form onSubmit={handleAddFlight} className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newFlight}
+              onChange={(e) => {
+                setNewFlight(e.target.value)
+                setFlightError('')
+              }}
+              placeholder="New flight name..."
+              className={`flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm ${
+                flightError ? 'border-red-300' : 'border-gray-300'
+              }`}
+            />
+            <button
+              type="submit"
+              disabled={actionLoading || !newFlight.trim()}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 text-sm"
+            >
+              Add
+            </button>
+          </div>
+          {flightError && <p className="text-red-600 text-xs">{flightError}</p>}
         </form>
       </div>
 

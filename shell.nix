@@ -7,8 +7,14 @@ pkgs.mkShell {
 
   shellHook = ''
     export PATH="$PWD/node_modules/.bin:$PATH"
+
+    # Initialize nvm if using it
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
     echo "Node.js $(node --version)"
     echo "npm $(npm --version)"
+    echo "nvm available - use 'nvm use <version>' to switch Node versions"
 
     # Git prompt function
     __git_prompt() {
