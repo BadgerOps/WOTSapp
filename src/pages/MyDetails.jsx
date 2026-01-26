@@ -181,7 +181,7 @@ export default function MyDetails() {
         ) : (
           <div className="space-y-4">
             {templates.map((template) => {
-              const totalTasks = template.areas?.reduce((count, area) => count + (area.tasks?.length || 0), 0) || 0
+              const totalTasks = template.areas?.reduce((count, area) => count + (area.items?.length || 0), 0) || 0
               const totalAreas = template.areas?.length || 0
 
               return (
@@ -207,7 +207,7 @@ export default function MyDetails() {
                           key={idx}
                           className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs"
                         >
-                          {area.name} ({area.tasks?.length || 0})
+                          {area.name} ({area.items?.length || 0})
                         </span>
                       ))}
                       {template.areas?.length > 6 && (
@@ -455,19 +455,22 @@ export default function MyDetails() {
                     <h3 className="font-semibold text-gray-900 mb-3">
                       {area.name}
                       <span className="ml-2 text-sm font-normal text-gray-500">
-                        ({area.tasks?.length || 0} tasks)
+                        ({area.items?.length || 0} tasks)
                       </span>
                     </h3>
+                    {area.locations && area.locations.length > 0 && (
+                      <p className="text-xs text-gray-500 mb-2">
+                        Locations: {area.locations.join(', ')}
+                      </p>
+                    )}
                     <div className="space-y-2">
-                      {area.tasks?.map((task, taskIdx) => (
-                        <div key={taskIdx} className="flex items-start gap-2 text-sm">
+                      {area.items?.map((item, itemIdx) => (
+                        <div key={itemIdx} className="flex items-start gap-2 text-sm">
                           <span className="text-gray-400 mt-0.5">•</span>
                           <div className="flex-1">
-                            <span className="text-gray-900">{task.text}</span>
-                            {task.locations && task.locations.length > 0 && task.locations[0] !== 'All' && (
-                              <span className="text-gray-500 ml-1">
-                                (Locations: {task.locations.join(', ')})
-                              </span>
+                            <span className="text-gray-900">{item.text}</span>
+                            {item.criticalFailure && (
+                              <span className="ml-1 text-xs text-red-600 font-medium">(Critical)</span>
                             )}
                           </div>
                         </div>
