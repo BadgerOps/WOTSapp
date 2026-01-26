@@ -144,7 +144,7 @@ export default function MyDetails() {
       {activeTab === 'available' && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
           <strong>Browse and claim tasks:</strong> Click on any detail to view all tasks.
-          You can claim unclaimed tasks (shown in yellow) for yourself.
+          You can claim unclaimed tasks or take over tasks from others.
         </div>
       )}
 
@@ -381,7 +381,10 @@ export default function MyDetails() {
                       </div>
                     </>
                   ) : (
-                    <div className="italic text-gray-500">All tasks are assigned to others</div>
+                    <div className="text-gray-600">
+                      <span className="italic">All tasks assigned</span>
+                      <span className="ml-1 text-blue-600">(click to view and take over)</span>
+                    </div>
                   )}
                 </div>
 
@@ -404,12 +407,12 @@ export default function MyDetails() {
                   <button
                     onClick={() => setSelectedAssignment(assignment)}
                     className={`w-full ${
-                      unclaimedTasks.length > 0 && totalMyTasks === 0
-                        ? 'btn-secondary border-yellow-300 bg-yellow-50 hover:bg-yellow-100 text-yellow-800'
+                      totalMyTasks === 0
+                        ? 'btn-secondary border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800'
                         : 'btn-primary'
                     }`}
                   >
-                    {totalMyTasks === 0 && unclaimedTasks.length > 0
+                    {totalMyTasks === 0
                       ? 'View & Claim Tasks'
                       : assignment.status === 'assigned'
                         ? 'Start Detail'

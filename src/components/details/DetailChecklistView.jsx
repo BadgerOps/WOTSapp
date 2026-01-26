@@ -130,12 +130,16 @@ export default function DetailChecklistView({ assignment, onClose }) {
     }
   }
 
-  // Claim a task for the current user
-  async function handleClaimTask(taskIndex) {
+  // Claim a task for the current user (can reassign from others)
+  async function handleClaimTask(taskIndex, forceReassign = false) {
     const task = allTasks[taskIndex]
-    if (task.assignedTo?.personnelId) {
-      setError('This task is already assigned to someone')
-      return
+
+    // If task is assigned to someone else and not forcing reassign, ask for confirmation
+    if (task.assignedTo?.personnelId && !isCurrentUser(task.assignedTo?.personnelId) && !forceReassign) {
+      const confirmed = window.confirm(
+        `This task is currently assigned to ${task.assignedTo?.name || 'another person'}. Do you want to take it over?`
+      )
+      if (!confirmed) return
     }
 
     setSaving(true)
@@ -152,7 +156,10 @@ export default function DetailChecklistView({ assignment, onClose }) {
             : user.displayName || user.email,
           rank: myPersonnelRecord?.rank || '',
           email: user.email
-        }
+        },
+        // Clear completion status if reassigning
+        completed: false,
+        completedAt: null
       }
 
       await updateDoc(doc(db, 'detailAssignments', assignment.id), {
@@ -736,11 +743,25 @@ export default function DetailChecklistView({ assignment, onClose }) {
                                       + Claim this task
                                     </button>
                                   ) : (
-                                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                      isMine ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'
-                                    }`}>
-                                      {isMine ? '👤 Assigned to you' : `Assigned to ${task.assignedTo?.name || 'Unknown'}`}
-                                    </span>
+                                    <>
+                                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                        isMine ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'
+                                      }`}>
+                                        {isMine ? '👤 Assigned to you' : `Assigned to ${task.assignedTo?.name || 'Unknown'}`}
+                                      </span>
+                                      {/* Allow taking over tasks from others */}
+                                      {!isMine && (
+                                        <button
+                                          onClick={() => handleClaimTask(allTasks.findIndex(
+                                            t => t.taskId === task.taskId && t.location === task.location && t.assignedTo?.personnelId === task.assignedTo?.personnelId
+                                          ))}
+                                          disabled={saving}
+                                          className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 disabled:opacity-50"
+                                        >
+                                          Take Over
+                                        </button>
+                                      )}
+                                    </>
                                   )}
 
                                   {isMine && !task.completed && (
