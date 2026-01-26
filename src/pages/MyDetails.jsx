@@ -10,7 +10,7 @@ import { format } from 'date-fns'
 export default function MyDetails() {
   const { user } = useAuth()
   const { isCurrentUser } = useMyPersonnelIds()
-  const [activeTab, setActiveTab] = useState('available') // 'my', 'available', or 'templates'
+  const [activeTab, setActiveTab] = useState('templates') // 'my', 'available', or 'templates' - default to templates
   const [statusFilter, setStatusFilter] = useState(null)
   const [selectedAssignment, setSelectedAssignment] = useState(null)
   const [selectedTemplate, setSelectedTemplate] = useState(null)
