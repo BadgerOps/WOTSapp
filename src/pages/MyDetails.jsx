@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMyDetailAssignments, useDetailAssignments } from '../hooks/useDetailAssignments'
+import { useDetailTemplates } from '../hooks/useDetailTemplates'
 import { useAuth } from '../contexts/AuthContext'
 import { useMyPersonnelIds } from '../hooks/useMyPersonnelIds'
 import Loading from '../components/common/Loading'
@@ -9,9 +10,10 @@ import { format } from 'date-fns'
 export default function MyDetails() {
   const { user } = useAuth()
   const { isCurrentUser } = useMyPersonnelIds()
-  const [activeTab, setActiveTab] = useState('available') // 'my' or 'available' - default to available
+  const [activeTab, setActiveTab] = useState('available') // 'my', 'available', or 'templates'
   const [statusFilter, setStatusFilter] = useState(null)
   const [selectedAssignment, setSelectedAssignment] = useState(null)
+  const [selectedTemplate, setSelectedTemplate] = useState(null)
 
   // Get user's assignments
   const { myAssignments, loading: myLoading, error: myError } = useMyDetailAssignments(statusFilter)
@@ -19,9 +21,12 @@ export default function MyDetails() {
   // Get all assignments (for browsing available tasks)
   const { assignments: allAssignments, loading: allLoading, error: allError } = useDetailAssignments()
 
-  // Wait for both to load to avoid flicker
-  const loading = myLoading || allLoading
-  const error = activeTab === 'my' ? myError : allError
+  // Get all active templates (for browsing available task lists)
+  const { templates, loading: templatesLoading, error: templatesError } = useDetailTemplates(true)
+
+  // Wait for all to load to avoid flicker
+  const loading = myLoading || allLoading || templatesLoading
+  const error = activeTab === 'my' ? myError : activeTab === 'templates' ? templatesError : allError
 
   if (loading) {
     return <Loading />
@@ -60,8 +65,8 @@ export default function MyDetails() {
         </div>
       )}
 
-      {/* Main Tabs: My Details vs Available */}
-      <div className="mb-4 flex gap-2">
+      {/* Main Tabs: My Details vs Available vs Templates */}
+      <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={() => { setActiveTab('my'); setStatusFilter(null); }}
           className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -86,6 +91,16 @@ export default function MyDetails() {
               {totalUnclaimedTasks} unclaimed
             </span>
           )}
+        </button>
+        <button
+          onClick={() => { setActiveTab('templates'); setStatusFilter(null); }}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            activeTab === 'templates'
+              ? 'bg-primary-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          Task Lists ({templates.length})
         </button>
       </div>
 
@@ -133,32 +148,119 @@ export default function MyDetails() {
         </div>
       )}
 
-      {/* Assignments List */}
-      {displayedAssignments.length === 0 ? (
-        <div className="card text-center py-12">
-          <svg
-            className="mx-auto h-12 w-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">
-            {activeTab === 'my' ? 'No assignments yet' : 'No cleaning details available'}
-          </h3>
-          <p className="mt-1 text-sm text-gray-500">
-            {activeTab === 'my'
-              ? "You don't have any cleaning details assigned at this time. Check the 'Available Tasks' tab to claim tasks."
-              : "No cleaning detail assignments have been created yet. An admin needs to create a detail assignment first."}
-          </p>
+      {/* Info Banner for Templates Tab */}
+      {activeTab === 'templates' && (
+        <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+          <strong>Task Lists:</strong> Browse available cleaning task templates.
+          These show what tasks are included in each detail type.
         </div>
-      ) : (
+      )}
+
+      {/* Templates List */}
+      {activeTab === 'templates' && (
+        templates.length === 0 ? (
+          <div className="card text-center py-12">
+            <svg
+              className="mx-auto h-12 w-12 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+              />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No task lists available</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              No cleaning detail templates have been created yet.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {templates.map((template) => {
+              const totalTasks = template.areas?.reduce((count, area) => count + (area.tasks?.length || 0), 0) || 0
+              const totalAreas = template.areas?.length || 0
+
+              return (
+                <div key={template.id} className="card hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900">{template.name}</h3>
+                      {template.description && (
+                        <p className="text-sm text-gray-600 mt-1">{template.description}</p>
+                      )}
+                    </div>
+                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+                      {totalTasks} tasks
+                    </span>
+                  </div>
+
+                  {/* Areas Summary */}
+                  <div className="text-sm text-gray-600 mb-3">
+                    <div className="font-medium mb-2">Areas ({totalAreas}):</div>
+                    <div className="flex flex-wrap gap-2">
+                      {template.areas?.slice(0, 6).map((area, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs"
+                        >
+                          {area.name} ({area.tasks?.length || 0})
+                        </span>
+                      ))}
+                      {template.areas?.length > 6 && (
+                        <span className="px-2 py-1 text-gray-500 text-xs">
+                          + {template.areas.length - 6} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <div className="pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => setSelectedTemplate(template)}
+                      className="w-full btn-secondary"
+                    >
+                      View All Tasks
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )
+      )}
+
+      {/* Assignments List */}
+      {activeTab !== 'templates' && (
+        displayedAssignments.length === 0 ? (
+          <div className="card text-center py-12">
+            <svg
+              className="mx-auto h-12 w-12 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+              />
+            </svg>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">
+              {activeTab === 'my' ? 'No assignments yet' : 'No cleaning details available'}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500">
+              {activeTab === 'my'
+                ? "You don't have any cleaning details assigned at this time. Check the 'Available Tasks' tab to claim tasks."
+                : "No cleaning detail assignments have been created yet. Check the 'Task Lists' tab to see available task templates."}
+            </p>
+          </div>
+        ) : (
         <div className="space-y-4">
           {displayedAssignments.map((assignment) => {
             const dueDate = assignment.dueDateTime?.toDate
@@ -317,6 +419,75 @@ export default function MyDetails() {
               </div>
             )
           })}
+        </div>
+        )
+      )}
+
+      {/* Template Detail Modal */}
+      {selectedTemplate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">{selectedTemplate.name}</h2>
+                  {selectedTemplate.description && (
+                    <p className="text-sm text-gray-600 mt-1">{selectedTemplate.description}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setSelectedTemplate(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-6">
+                {selectedTemplate.areas?.map((area, areaIdx) => (
+                  <div key={areaIdx} className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 mb-3">
+                      {area.name}
+                      <span className="ml-2 text-sm font-normal text-gray-500">
+                        ({area.tasks?.length || 0} tasks)
+                      </span>
+                    </h3>
+                    <div className="space-y-2">
+                      {area.tasks?.map((task, taskIdx) => (
+                        <div key={taskIdx} className="flex items-start gap-2 text-sm">
+                          <span className="text-gray-400 mt-0.5">•</span>
+                          <div className="flex-1">
+                            <span className="text-gray-900">{task.text}</span>
+                            {task.locations && task.locations.length > 0 && task.locations[0] !== 'All' && (
+                              <span className="text-gray-500 ml-1">
+                                (Locations: {task.locations.join(', ')})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200">
+              <button
+                onClick={() => setSelectedTemplate(null)}
+                className="w-full btn-secondary"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
