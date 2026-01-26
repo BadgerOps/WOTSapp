@@ -133,13 +133,6 @@ export default function MyDetails() {
         </div>
       )}
 
-      {/* Debug info - remove in production */}
-      {activeTab === 'available' && (
-        <div className="mb-4 p-2 bg-gray-100 rounded text-xs text-gray-600">
-          Debug: {allAssignments.length} total assignments, {availableAssignments.length} available (not completed/approved)
-        </div>
-      )}
-
       {/* Assignments List */}
       {displayedAssignments.length === 0 ? (
         <div className="card text-center py-12">

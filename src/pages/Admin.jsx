@@ -10,6 +10,7 @@ import WeatherApprovalQueue from '../components/admin/WeatherApprovalQueue'
 import ManualWeatherCheck from '../components/admin/ManualWeatherCheck'
 import PersonnelRosterUpload from '../components/personnel/PersonnelRosterUpload'
 import PersonnelRosterTable from '../components/personnel/PersonnelRosterTable'
+import PersonnelAddForm from '../components/personnel/PersonnelAddForm'
 import PersonnelConfigPanel from '../components/personnel/PersonnelConfigPanel'
 import ConfigManager from '../components/admin/ConfigManager'
 import DetailTemplateManager from '../components/details/DetailTemplateManager'
@@ -489,6 +490,16 @@ export default function Admin() {
               Roster
             </button>
             <button
+              onClick={() => setPersonnelSubTab('add')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                personnelSubTab === 'add'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Add
+            </button>
+            <button
               onClick={() => setPersonnelSubTab('import')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                 personnelSubTab === 'import'
@@ -511,6 +522,7 @@ export default function Admin() {
           </div>
 
           {personnelSubTab === 'roster' && <PersonnelRosterTable />}
+          {personnelSubTab === 'add' && <PersonnelAddForm onSuccess={() => setPersonnelSubTab('roster')} />}
           {personnelSubTab === 'import' && <PersonnelRosterUpload />}
           {personnelSubTab === 'config' && <PersonnelConfigPanel />}
         </div>
