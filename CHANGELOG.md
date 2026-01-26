@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.15] - 2026-01-26
+
+### Added
+
+#### Cleaning Details Self-Assignment
+- Users can now sign up for cleaning detail tasks directly from Task Lists tab
+- New TemplateTaskSelector component with multi-select task selection
+- Select individual tasks or entire areas with one click
+- Task counts properly account for locations (e.g., 5 items × 3 locations = 15 tasks)
+- "Take Over" functionality allows reassigning tasks from others (with confirmation)
+
+#### Personnel Management
+- Manual "Add Personnel" form for admins to add individual personnel records
+- Personnel Config panel for managing flights and classes
+
+### Changed
+- Removed "Available Tasks" tab from My Details page (replaced by self-assignment from Task Lists)
+- Firestore rules updated to allow authenticated users to create self-assignments
+
+### Fixed
+- Template task counts showing "0 tasks" (field name mismatch: area.tasks → area.items)
+
+---
+
 ## [0.4.14] - 2026-01-25
 
 ### Fixed

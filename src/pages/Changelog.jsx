@@ -1,8 +1,48 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.14'
+const APP_VERSION = '0.4.15'
 
 const changelog = [
+  {
+    version: '0.4.15',
+    date: '2026-01-26',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Cleaning Details Self-Assignment',
+            details: [
+              'Users can now sign up for cleaning detail tasks directly from Task Lists tab',
+              'Multi-select task selection with individual tasks or entire areas',
+              'Task counts properly account for locations (e.g., 5 items × 3 locations = 15 tasks)',
+              '"Take Over" functionality allows reassigning tasks from others (with confirmation)',
+            ],
+          },
+          {
+            category: 'Personnel Management',
+            details: [
+              'Manual "Add Personnel" form for admins to add individual personnel records',
+              'Personnel Config panel for managing flights and classes',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Changed',
+        items: [
+          { details: ['Removed "Available Tasks" tab from My Details (replaced by self-assignment from Task Lists)'] },
+          { details: ['Firestore rules updated to allow authenticated users to create self-assignments'] },
+        ],
+      },
+      {
+        title: 'Fixed',
+        items: [
+          { details: ['Template task counts showing "0 tasks" (field name mismatch fixed)'] },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.14',
     date: '2026-01-25',
