@@ -10,7 +10,7 @@ A military class communication application that enables instructors and administ
 - **Personnel Roster** - Import and manage student rosters via CSV
 - **Cleaning Details** - Assign and track dormitory cleaning tasks with interactive checklists
 - **CQ Tracker** - Track personnel in/out status and pass details
-- **Role-Based Access** - Admin and user roles with granular permissions
+- **Role-Based Access** - Admin, uniform admin, candidate leadership, and user roles with granular permissions
 - **Real-Time Updates** - Live data synchronization via Firestore
 - **Mobile-First Design** - Responsive UI built with Tailwind CSS
 - **PWA Support** - Installable on mobile devices for native-like experience
@@ -64,6 +64,12 @@ A military class communication application that enables instructors and administ
    VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
    VITE_FIREBASE_APP_ID=your-app-id
    ```
+   Optional (but used in-app):
+   ```
+   VITE_FIREBASE_VAPID_KEY=your-vapid-key
+   VITE_SENTRY_DSN=your-sentry-dsn
+   VITE_SENTRY_ENVIRONMENT=development
+   ```
 
 4. **Start the development server**
    ```bash
@@ -78,9 +84,9 @@ A military class communication application that enables instructors and administ
 2. Enable Authentication with Google provider
 3. Create a Firestore database
 4. Enable Storage
-5. Deploy security rules:
+5. Deploy security rules and indexes:
    ```bash
-   firebase deploy --only firestore:rules,storage:rules
+   firebase deploy --only firestore:rules,firestore:indexes,storage:rules
    ```
 
 ## Project Structure
@@ -121,7 +127,8 @@ wots-app/
 | `npm run deploy` | Build and deploy to Firebase |
 | `npm run deploy:hosting` | Deploy only hosting |
 | `npm run deploy:functions` | Deploy only Cloud Functions |
-| `npm run deploy:rules` | Deploy Firestore and Storage rules |
+| `npm run deploy:rules` | Deploy Firestore/Storage rules and indexes |
+| `npm run deploy:all` | Build and deploy everything |
 
 ## Documentation
 

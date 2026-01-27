@@ -8,8 +8,8 @@ WOTS SPA is a military class communication application built with React + Fireba
 
 ## Tech Stack
 
-- **Frontend:** React 18 + Vite + Tailwind CSS
-- **Backend:** Firebase (Auth, Firestore, Storage, Cloud Messaging)
+- **Frontend:** React 19 + Vite + Tailwind CSS
+- **Backend:** Firebase (Auth, Firestore, Storage, Cloud Functions, Cloud Messaging)
 - **Authentication:** Google OAuth via Firebase Auth
 - **Infrastructure:** Terraform (in `./terraform/`)
 - **Package Manager:** npm
@@ -20,10 +20,15 @@ WOTS SPA is a military class communication application built with React + Fireba
 wots-app/
 ├── src/
 │   ├── components/       # Reusable UI components
+│   │   ├── admin/        # Admin tools (UOTD, weather, config)
 │   │   ├── common/       # Shared components (Loading, ErrorBoundary, etc.)
+│   │   ├── cq/           # CQ tracking components
+│   │   ├── details/      # Cleaning detail components
+│   │   ├── documents/    # Document-related components
 │   │   ├── layout/       # Layout components (Navbar, Footer)
+│   │   ├── personnel/    # Personnel roster components
 │   │   ├── posts/        # Post-related components
-│   │   └── documents/    # Document-related components
+│   │   └── surveys/      # Survey components
 │   ├── pages/            # Route-level page components
 │   ├── hooks/            # Custom React hooks
 │   ├── contexts/         # React context providers
@@ -52,7 +57,7 @@ users/{userId}
 ├── email: string
 ├── displayName: string
 ├── photoURL: string
-├── role: "admin" | "user"
+├── role: "admin" | "uniform_admin" | "candidate_leadership" | "user"
 ├── createdAt: timestamp
 └── lastLogin: timestamp
 
@@ -63,6 +68,9 @@ posts/{postId}
 ├── authorId: string
 ├── authorName: string
 ├── status: "draft" | "published"
+├── adminNote?: string
+├── targetSlot?: string
+├── weatherCondition?: string
 ├── createdAt: timestamp
 └── updatedAt: timestamp
 
@@ -75,6 +83,34 @@ documents/{documentId}
 ├── uploadedBy: string
 ├── createdAt: timestamp
 └── updatedAt: timestamp
+
+uniforms/{uniformId}
+├── number: string
+├── name: string
+├── description?: string
+└── updatedAt: timestamp
+
+settings/{settingId} (appConfig, uotdSchedule, weatherLocation, weatherRules, weatherCache)
+weatherRecommendations/{id}
+personnel/{personnelId}
+detailTemplates/{templateId}
+detailAssignments/{assignmentId}
+detailCompletions/{completionId}
+detailConfig/{configId}
+personnelConfig/{configId}
+cqSchedule/{scheduleId}
+cqShifts/{shiftId}
+cqRoster/{rosterId}
+cqSkips/{skipId}
+cqSwapRequests/{requestId}
+passApprovalRequests/{requestId}
+personnelStatus/{statusId}
+personnelStatusHistory/{logId}
+cqNotes/{noteId}
+daForms/{formId}
+passwordResets/{userId}
+surveys/{surveyId}
+surveyResponses/{responseId}
 ```
 
 ## Coding Conventions
@@ -110,6 +146,9 @@ VITE_FIREBASE_PROJECT_ID=wots-app-484617
 VITE_FIREBASE_STORAGE_BUCKET=
 VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
+VITE_FIREBASE_VAPID_KEY=
+VITE_SENTRY_DSN=
+VITE_SENTRY_ENVIRONMENT=development
 ```
 
 Generate from Terraform: `terraform output -raw firebase_config_env`
@@ -130,11 +169,11 @@ terraform init
 terraform apply
 ```
 
-### Creating an Admin User
+### Creating a Privileged User
 After a user logs in, update their Firestore document:
 ```javascript
 // In Firestore console or via script
-db.collection('users').doc(userId).update({ role: 'admin' })
+db.collection('users').doc(userId).update({ role: 'admin' }) // or 'uniform_admin' / 'candidate_leadership'
 ```
 
 ### Deploying to Firebase Hosting
@@ -152,9 +191,10 @@ See `.github/workflows/` for workflow definitions.
 
 ## Security Rules
 
-- Users can only read posts with `status: "published"`
+- Authenticated users can read published posts; admins can read all posts
 - Only admins can create/edit/delete posts and documents
-- Users can only read/write their own user document
+- Users can read/write their own user document; admins can read all users and update roles
+- Uniform admins and candidate leadership have scoped write access for UOTD/weather and CQ/pass workflows
 - Storage uploads restricted to authenticated users
 
 ## Testing Approach

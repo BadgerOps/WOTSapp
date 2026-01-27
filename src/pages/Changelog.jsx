@@ -1,8 +1,26 @@
 import { Link } from 'react-router-dom'
 
-const APP_VERSION = '0.4.15'
+const APP_VERSION = '0.4.16'
 
 const changelog = [
+  {
+    version: '0.4.16',
+    date: '2026-01-27',
+    sections: [
+      {
+        title: 'Changed',
+        items: [
+          {
+            details: [
+              'Documentation alignment: updated AGENTS/README/CONTRIBUTING to match current roles, env vars, scripts, and project structure',
+              'Clarified Firestore rules/indexes deploy step and deploy-all script',
+              'Documented optional Sentry and Web Push (VAPID) environment variables',
+            ],
+          },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.15',
     date: '2026-01-26',
