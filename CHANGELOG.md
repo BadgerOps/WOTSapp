@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-01-27
+
+### Added
+
+#### Unified Approvals Tab
+- **New top-level "Approvals" navigation tab** for users with approval authority (`candidate_leadership`, `uniform_admin`, or `admin` roles)
+- **Consolidates all approval workflows** into a single location:
+  - **Passes** - Pass request approvals (candidate_leadership, admin)
+  - **Details** - Cleaning detail completion approvals (candidate_leadership, admin)
+  - **CQ Swaps** - CQ shift swap request approvals (candidate_leadership, admin)
+  - **Weather** - Weather-based UOTD recommendation approvals (uniform_admin, admin)
+- **Real-time badge counter** in navbar showing total pending approval count
+- **Tabbed interface** within Approvals page for each approval type
+- **Permission-filtered tabs** - users only see tabs for approvals they can action
+- **`hasApprovalAuthority`** property added to AuthContext for easy permission checking
+
+#### Cleaning Details Multi-Select Workflow
+- **Multi-select task starting** - Select which tasks to start instead of starting all at once
+  - Checkbox list of assigned tasks with individual selection
+  - "Select All" checkbox header for bulk selection
+  - "Start Selected (N)" button showing count of selected tasks
+  - All tasks selected by default when viewing
+- **Multi-select task completion** - Complete multiple tasks in batch
+  - "Complete Selected (N)" button replaces Start after beginning detail
+  - All incomplete tasks selected by default for efficient completion
+  - Individual task deselection supported
+- **`completeSelectedTasks()`** action added to `useDetailCardActions` hook
+- **Improved task tracking** using Set-based state management with task keys (`taskId-location`)
+
+#### Detail Push Notification System
+- **Scheduled cloud function** (`scheduledDetailReminder`) runs hourly to check for notification times
+- **Configurable notification times** - Morning and evening times adjustable in Admin panel
+  - Default: 07:00 (morning) and 19:00 (evening)
+  - Times stored in `detailConfig/default` Firestore document
+- **Time-slot aware notifications** - Morning notifications for morning/both details, evening for evening/both
+- **Global timezone support** - Uses `getConfiguredTimezone()` from app settings (never hardcoded)
+- **FCM push notifications** sent to users with assigned details for current time slot
+  - Title: "Detail Reminder: [Morning/Evening] Cleaning"
+  - Body: Template name and task count
+- **Admin notification settings UI** (`DetailNotificationSettings.jsx`)
+  - Toggle to enable/disable notifications
+  - Time inputs for morning and evening notification times
+  - Shows configured timezone for clarity
+  - Available under Admin → Details → Settings sub-tab
+
+### New Files
+- `functions/detailNotifications.js` - Scheduled detail reminder cloud function
+- `src/pages/Approvals.jsx` - Unified approvals page with tabbed interface
+- `src/hooks/useUnifiedApprovalCount.js` - Combined pending approval counts hook
+- `src/components/admin/DetailNotificationSettings.jsx` - Admin UI for notification settings
+
+### Modified Files
+- `functions/index.js` - Export `scheduledDetailReminder` function
+- `src/App.jsx` - Add `/approvals` route with lazy loading
+- `src/components/layout/Navbar.jsx` - Add Approvals tab with badge for approval authority users
+- `src/contexts/AuthContext.jsx` - Add `hasApprovalAuthority` computed property
+- `src/components/details/MyDetailCard.jsx` - Complete rewrite with multi-select UI
+- `src/hooks/useMyActiveDetail.js` - Add `completeSelectedTasks()` action
+- `src/hooks/useDetailConfig.js` - Add notification time defaults
+- `src/pages/Admin.jsx` - Add Settings sub-tab to details section
+
+---
+
 ## [0.4.18] - 2026-01-27
 
 ### Fixed

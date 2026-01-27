@@ -318,10 +318,51 @@ export function useDetailCardActions() {
     }
   }
 
+  /**
+   * Complete selected tasks (multi-select)
+   * @param {string} assignmentId - The assignment ID
+   * @param {Set<string>} selectedTaskKeys - Set of task keys in format "taskId-location"
+   * @param {Array} allTasks - All tasks in the assignment
+   */
+  async function completeSelectedTasks(assignmentId, selectedTaskKeys, allTasks) {
+    setLoading(true)
+    setError(null)
+    try {
+      const updatedTasks = allTasks.map((task) => {
+        const taskKey = `${task.taskId}-${task.location}`
+        if (
+          selectedTaskKeys.has(taskKey) &&
+          isCurrentUser(task.assignedTo?.personnelId) &&
+          !task.completed
+        ) {
+          return {
+            ...task,
+            completed: true,
+            completedAt: new Date().toISOString(),
+          }
+        }
+        return task
+      })
+
+      await updateDoc(doc(db, 'detailAssignments', assignmentId), {
+        tasks: updatedTasks,
+        status: 'in_progress',
+        updatedAt: serverTimestamp(),
+      })
+      setLoading(false)
+    } catch (err) {
+      console.error('Error completing selected tasks:', err)
+      setError(err.message)
+      setLoading(false)
+      throw err
+    }
+  }
+
   return {
     startDetail,
     completeTask,
     completeAllTasks,
+    completeSelectedTasks,
     submitForApproval,
     loading,
     error,

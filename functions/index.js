@@ -40,6 +40,9 @@ const { syncPersonnelRoleToUser } = require("./roleSync");
 // Import pass approval notification functions
 const { onPassRequestCreated } = require("./passApprovalNotifications");
 
+// Import detail notification functions
+const { scheduledDetailReminder } = require("./detailNotifications");
+
 // Import timezone utilities
 const {
   getConfiguredTimezone,
@@ -80,6 +83,9 @@ exports.syncPersonnelRoleToUser = syncPersonnelRoleToUser;
 
 // Export pass approval notification trigger
 exports.onPassRequestCreated = onPassRequestCreated;
+
+// Export detail notification functions
+exports.scheduledDetailReminder = scheduledDetailReminder;
 
 // Send push notification when a survey is published
 exports.onSurveyPublished = onDocumentCreated(

@@ -374,6 +374,12 @@ export function AuthProvider({ children }) {
     canManageWeather: userRole === ROLES.UNIFORM_ADMIN || userRole === ROLES.ADMIN,
     isCandidateLeadership: userRole === ROLES.CANDIDATE_LEADERSHIP || userRole === ROLES.ADMIN,
 
+    // Approval authority check (used for showing Approvals tab)
+    hasApprovalAuthority:
+      userRole === ROLES.ADMIN ||
+      userRole === ROLES.UNIFORM_ADMIN ||
+      userRole === ROLES.CANDIDATE_LEADERSHIP,
+
     // New permission-based check function
     can,
 

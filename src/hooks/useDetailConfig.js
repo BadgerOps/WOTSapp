@@ -33,6 +33,8 @@ export function useDetailConfig() {
             defaultDurationHours: 4,
             notificationEnabled: true,
             reminderBeforeMinutes: 30,
+            morningNotificationTime: '07:00',
+            eveningNotificationTime: '19:00',
           })
         }
         setLoading(false)
