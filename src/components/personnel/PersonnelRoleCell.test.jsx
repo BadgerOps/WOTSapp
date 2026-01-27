@@ -11,7 +11,7 @@ describe('PersonnelRoleCell', () => {
     id: 'person-123',
     firstName: 'John',
     lastName: 'Doe',
-    email: 'john.doe@example.com',
+    email: 'user6@example.com',
     role: ROLES.USER,
     userId: 'user-456',
   };

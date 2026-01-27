@@ -13,7 +13,7 @@ export function isValidEmail(email) {
  */
 export function isValidPhoneNumber(phone) {
   if (!phone) return true; // Phone is optional
-  // Allow formats like: 555-0123, (555) 555-0123, +1-555-555-0123, 5550123
+  // Allow formats like: 555-0100, (555) 555-0100, +1-555-555-0100, 5550100
   const phoneRegex = /^[\d\s\-()+ ]+$/;
   return phoneRegex.test(phone) && phone.replace(/\D/g, '').length >= 7;
 }
@@ -222,11 +222,11 @@ export function generateCSVTemplate() {
   const exampleRows = [
     [
       '1',
-      'john.doe@example.com',
+      'user6@example.com',
       'John',
       'Doe',
       'A1C',
-      '555-0123',
+      '555-0100',
       '25-001',
       'Alpha',
       'TRUE',
@@ -234,11 +234,11 @@ export function generateCSVTemplate() {
     ],
     [
       '2',
-      'jane.smith@example.com',
+      'user4@example.com',
       'Jane',
       'Smith',
       'SrA',
-      '555-0124',
+      '555-0101',
       '25-001',
       'Bravo',
       'TRUE',

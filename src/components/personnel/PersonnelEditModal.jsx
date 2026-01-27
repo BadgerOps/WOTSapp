@@ -232,7 +232,7 @@ export default function PersonnelEditModal({ person, onClose }) {
                 name="phoneNumber"
                 value={formData.phoneNumber}
                 onChange={handleChange}
-                placeholder="555-123-4567"
+                placeholder="555-555-0100"
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
                   errors.phoneNumber ? 'border-red-300' : 'border-gray-300'
                 }`}

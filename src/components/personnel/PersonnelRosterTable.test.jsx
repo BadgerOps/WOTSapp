@@ -22,11 +22,11 @@ describe('PersonnelRosterTable', () => {
     {
       id: '1',
       rosterId: 1,
-      email: 'john.doe@example.com',
+      email: 'user6@example.com',
       firstName: 'John',
       lastName: 'Doe',
       rank: 'A1C',
-      phoneNumber: '555-0123',
+      phoneNumber: '555-0100',
       class: '26-01',
       flight: 'Barrow',
       detailEligible: true,
@@ -35,11 +35,11 @@ describe('PersonnelRosterTable', () => {
     {
       id: '2',
       rosterId: 2,
-      email: 'jane.smith@example.com',
+      email: 'user4@example.com',
       firstName: 'Jane',
       lastName: 'Smith',
       rank: 'SrA',
-      phoneNumber: '555-0124',
+      phoneNumber: '555-0101',
       class: '26-02',
       flight: 'Long',
       detailEligible: true,
@@ -54,7 +54,7 @@ describe('PersonnelRosterTable', () => {
     vi.clearAllMocks();
 
     AuthContext.useAuth = vi.fn(() => ({
-      user: { uid: 'test-user', email: 'test@example.com' },
+      user: { uid: 'test-user', email: 'user11@example.com' },
       isAdmin: true,
       loading: false,
     }));
@@ -80,8 +80,8 @@ describe('PersonnelRosterTable', () => {
     // Name format is "Last, First"
     expect(screen.getByText('Doe, John')).toBeInTheDocument();
     expect(screen.getByText('Smith, Jane')).toBeInTheDocument();
-    expect(screen.getByText('john.doe@example.com')).toBeInTheDocument();
-    expect(screen.getByText('jane.smith@example.com')).toBeInTheDocument();
+    expect(screen.getByText('user6@example.com')).toBeInTheDocument();
+    expect(screen.getByText('user4@example.com')).toBeInTheDocument();
   });
 
   it('should display loading state', () => {
@@ -212,7 +212,7 @@ describe('PersonnelRosterTable', () => {
       {
         id: '3',
         rosterId: 3,
-        email: 'test@example.com',
+        email: 'user11@example.com',
         firstName: 'Test',
         lastName: 'User',
         rank: '',
@@ -281,7 +281,7 @@ describe('PersonnelRosterTable', () => {
       {
         id: '1',
         rosterId: 1,
-        email: 'john.doe@example.com',
+        email: 'user6@example.com',
         firstName: 'John',
         lastName: 'Doe',
         rank: 'A1C',

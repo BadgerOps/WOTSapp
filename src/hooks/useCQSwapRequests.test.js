@@ -36,7 +36,7 @@ vi.mock('../contexts/AuthContext', () => ({
     user: {
       uid: 'test-user-id',
       displayName: 'Test User',
-      email: 'test@example.com',
+      email: 'user11@example.com',
     },
   }),
 }))
