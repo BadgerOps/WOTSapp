@@ -62,7 +62,7 @@ export function useUnifiedApprovalCount() {
 
   // Only query collections user has permission to access
   // Note: detailAssignments uses 'completed' status for items awaiting approval
-  const { count: passCount, loading: passLoading } = useCountWithPermission('passRequests', 'pending', canApprovePasses)
+  const { count: passCount, loading: passLoading } = useCountWithPermission('passApprovalRequests', 'pending', canApprovePasses)
   const { count: detailCount, loading: detailLoading } = useCountWithPermission('detailAssignments', 'completed', canApproveDetails)
   const { count: swapCount, loading: swapLoading } = useCountWithPermission('cqSwapRequests', 'pending', canApproveSwaps)
   const { count: weatherCount, loading: weatherLoading } = useCountWithPermission('weatherRecommendations', 'pending', canApproveWeather)

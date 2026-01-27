@@ -14,7 +14,10 @@ import { format, isValid, parseISO } from 'date-fns'
 function safeParseDate(value) {
   if (!value) return null
   // Firestore Timestamp
-  if (value?.toDate) return value.toDate()
+  if (value?.toDate) {
+    const date = value.toDate()
+    return isValid(date) ? date : null
+  }
   // Already a Date
   if (value instanceof Date) return isValid(value) ? value : null
   // ISO string or other string format

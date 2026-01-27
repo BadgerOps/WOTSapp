@@ -13,7 +13,10 @@ import { format, isValid, parseISO } from 'date-fns'
 function safeParseDate(value) {
   if (!value) return null
   // Firestore Timestamp
-  if (value?.toDate) return value.toDate()
+  if (value?.toDate) {
+    const date = value.toDate()
+    return isValid(date) ? date : null
+  }
   // Already a Date
   if (value instanceof Date) return isValid(value) ? value : null
   // ISO string or other string format
@@ -809,11 +812,14 @@ export default function DetailChecklistView({ assignment, onClose }) {
                                   )}
                                 </div>
 
-                                {task.completedAt && (
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    Completed: {format(new Date(task.completedAt), 'h:mm a')}
-                                  </p>
-                                )}
+                                {(() => {
+                                  const completedDate = safeParseDate(task.completedAt)
+                                  return completedDate ? (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      Completed: {format(completedDate, 'h:mm a')}
+                                    </p>
+                                  ) : null
+                                })()}
                               </div>
 
                               {/* Add Note Button (only for my tasks) */}
@@ -891,7 +897,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
             </button>
           )}
 
-          {allMyTasksCompleted && myTasks.length > 0 && (
+          {allMyTasksCompleted && myTasks.length > 0 && assignment.status === 'in_progress' && (
             <button
               onClick={handleComplete}
               disabled={actionLoading}
