@@ -56,15 +56,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `src/hooks/useUnifiedApprovalCount.js` - Combined pending approval counts hook
 - `src/components/admin/DetailNotificationSettings.jsx` - Admin UI for notification settings
 
+### Fixed
+
+#### Date Parsing Errors
+- **`safeParseDate()` helper** added to `MyDetails.jsx` and `DetailChecklistView.jsx`
+- Handles Firestore Timestamps, Date objects, ISO strings, and `YYYY-MM-DD` format
+- Gracefully displays "Unknown date" when dates cannot be parsed
+- Fixes `RangeError: Invalid time value` when viewing detail assignments
+
+#### Detail Card Visibility
+- **In-progress and rejected details now show on home screen regardless of time window**
+- Previously, details only appeared during morning (7am-12pm) or evening (7:30pm-midnight) windows
+- Users can now complete and submit their started details at any time of day
+
+#### Modal Auto-Close After Starting
+- `DetailChecklistView` modal now closes automatically after successfully starting a detail
+- User returns to the list view and can see the detail card on the home screen
+
+### Changed
+
+#### CI/CD Optimization
+- Disabled npm cache in GitHub Actions workflows (`pr.yml` and `release.yml`)
+- 713MB cache upload on every lockfile change was slower than running `npm ci` fresh
+
+### New Files
+- `functions/detailNotifications.js` - Scheduled detail reminder cloud function
+- `src/pages/Approvals.jsx` - Unified approvals page with tabbed interface
+- `src/hooks/useUnifiedApprovalCount.js` - Combined pending approval counts hook
+- `src/components/admin/DetailNotificationSettings.jsx` - Admin UI for notification settings
+
 ### Modified Files
 - `functions/index.js` - Export `scheduledDetailReminder` function
 - `src/App.jsx` - Add `/approvals` route with lazy loading
 - `src/components/layout/Navbar.jsx` - Add Approvals tab with badge for approval authority users
 - `src/contexts/AuthContext.jsx` - Add `hasApprovalAuthority` computed property
-- `src/components/details/MyDetailCard.jsx` - Complete rewrite with multi-select UI
-- `src/hooks/useMyActiveDetail.js` - Add `completeSelectedTasks()` action
+- `src/components/details/MyDetailCard.jsx` - Complete rewrite with multi-select UI, show in_progress details outside time windows
+- `src/hooks/useMyActiveDetail.js` - Add `completeSelectedTasks()` action, return in_progress/rejected details regardless of time slot
 - `src/hooks/useDetailConfig.js` - Add notification time defaults
 - `src/pages/Admin.jsx` - Add Settings sub-tab to details section
+- `src/pages/MyDetails.jsx` - Add `safeParseDate()` for robust date handling
+- `src/components/details/DetailChecklistView.jsx` - Add `safeParseDate()`, auto-close on start
+- `.github/workflows/pr.yml` - Disable npm cache for faster CI
+- `.github/workflows/release.yml` - Disable npm cache for faster CI
 
 ---
 
