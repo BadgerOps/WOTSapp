@@ -10,6 +10,98 @@ const changelog = [
         title: 'Fixed',
         items: [
           {
+            category: 'Firestore Permission Error on Login',
+            details: [
+              'Fixed useUnifiedApprovalCount querying wrong collection name (passRequests → passApprovalRequests)',
+              'This caused "Missing or insufficient permissions" errors for users with approval authority',
+            ],
+          },
+          {
+            category: 'Date Parsing Errors',
+            details: [
+              'safeParseDate() now validates Firestore Timestamp conversion before returning',
+              'Fixed DetailChecklistView task completion time display (was using new Date() instead of safeParseDate)',
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.5.0',
+    date: '2026-01-27',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Unified Approvals Tab',
+            details: [
+              'New top-level "Approvals" navigation tab for users with approval authority',
+              'Consolidates all approval workflows: Passes, Details, CQ Swaps, Weather',
+              'Real-time badge counter in navbar showing total pending approval count',
+              'Permission-filtered tabs - users only see tabs for approvals they can action',
+            ],
+          },
+          {
+            category: 'Cleaning Details Multi-Select Workflow',
+            details: [
+              'Multi-select task starting - Select which tasks to start instead of starting all at once',
+              'Multi-select task completion - Complete multiple tasks in batch',
+              '"Select All" checkbox header for bulk selection',
+              'Improved task tracking using Set-based state management',
+            ],
+          },
+          {
+            category: 'Detail Push Notification System',
+            details: [
+              'Scheduled cloud function runs hourly to check for notification times',
+              'Configurable morning and evening notification times in Admin panel',
+              'Time-slot aware notifications - Morning notifications for morning details, evening for evening',
+              'FCM push notifications sent to users with assigned details',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Fixed',
+        items: [
+          {
+            category: 'Date Parsing Errors',
+            details: [
+              'Added safeParseDate() helper to MyDetails.jsx and DetailChecklistView.jsx',
+              'Handles Firestore Timestamps, Date objects, ISO strings, and YYYY-MM-DD format',
+              'Gracefully displays "Unknown date" when dates cannot be parsed',
+            ],
+          },
+          {
+            details: [
+              'In-progress and rejected details now show on home screen regardless of time window',
+              'DetailChecklistView modal now closes automatically after successfully starting a detail',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Changed',
+        items: [
+          {
+            details: [
+              'Disabled npm cache in GitHub Actions workflows (713MB cache upload was slower than npm ci)',
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.4.18',
+    date: '2026-01-27',
+    sections: [
+      {
+        title: 'Fixed',
+        items: [
+          {
             details: [
               'PWA navigation fallback: Fixed "text/html is not a valid JavaScript MIME type" error when directly navigating to SPA routes or refreshing the page',
             ],

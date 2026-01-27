@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-01-27
+
+### Fixed
+
+#### Firestore Permission Error on Login
+- **`useUnifiedApprovalCount` was querying wrong collection name** - queried `passRequests` instead of `passApprovalRequests`
+- This caused "Missing or insufficient permissions" errors in the Firestore snapshot listener for users with approval authority
+
+#### Date Parsing Errors (continued from 0.5.0)
+- **`safeParseDate()` now validates Firestore Timestamp conversion** - the `.toDate()` result is now checked with `isValid()` before returning
+- **Fixed `DetailChecklistView` task completion time display** - was using `new Date(task.completedAt)` directly instead of `safeParseDate()`, causing `RangeError: Invalid time value` when viewing completed tasks
+
+---
+
 ## [0.5.0] - 2026-01-27
 
 ### Added
