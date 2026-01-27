@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAppConfig } from '../../hooks/useAppConfig'
 import { formatTimeInTimezone, DEFAULT_TIMEZONE } from '../../lib/timezone'
+import { APP_VERSION } from '../../config/appVersion'
 
 export default function Footer() {
   const { config } = useAppConfig()
@@ -28,7 +29,7 @@ export default function Footer() {
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-gray-800 text-gray-300 py-2 px-4 text-xs z-40">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <span className="text-gray-500">WOTS App</span>
+        <span className="text-gray-500">WOTS App v{APP_VERSION}</span>
         <span className="font-mono">
           {formatTimeInTimezone(currentTime, timezone)} {timezoneLabel}
         </span>

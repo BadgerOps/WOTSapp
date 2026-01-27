@@ -11,6 +11,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
+    "check:version-sync": "node scripts/check-version-sync.js",
     "deploy": "npm run build && firebase deploy --only firestore:rules,firestore:indexes,functions,hosting --project wots-app-484617",
     "deploy:hosting": "npm run build && firebase deploy --only hosting --project wots-app-484617",
     "deploy:functions": "firebase deploy --only functions --project wots-app-484617",
