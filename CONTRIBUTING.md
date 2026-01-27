@@ -41,6 +41,12 @@ Thank you for your interest in contributing to WOTS App! This document provides 
    VITE_FIREBASE_MESSAGING_SENDER_ID=
    VITE_FIREBASE_APP_ID=
    ```
+   Optional (used for notifications and error tracking):
+   ```
+   VITE_FIREBASE_VAPID_KEY=
+   VITE_SENTRY_DSN=
+   VITE_SENTRY_ENVIRONMENT=development
+   ```
 
 4. **Start the development server**
    ```bash
@@ -170,10 +176,7 @@ export default MyComponent
 
 - Use Tailwind CSS utility classes
 - Mobile-first responsive design
-- Custom colors defined in `tailwind.config.js`:
-  - `wots-green`: #4a5d23
-  - `wots-gold`: #d4af37
-  - `wots-blue`: #003366
+- Custom colors defined in `tailwind.config.js` under the `primary` and `accent` palettes
 
 ### Firebase/Firestore
 
