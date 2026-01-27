@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.18] - 2026-01-27
+
+### Fixed
+- PWA navigation fallback: Fixed "text/html is not a valid JavaScript MIME type" error when directly navigating to SPA routes (e.g., /schedule) or refreshing the page
+- Added workbox `navigateFallback` configuration to properly serve index.html for client-side routes
+
+---
+
 ## [0.4.17] - 2026-01-27
 
 ### Changed
