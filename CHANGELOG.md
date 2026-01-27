@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation alignment: updated AGENTS/README/CONTRIBUTING to match current roles, env vars, scripts, and project structure
 - Added clarification about Firestore rules/indexes deploy step and deploy-all script
 - Documented optional Sentry and Web Push (VAPID) environment variables
+- Added Firestore collections overview to README and noted functions install step for local dev
 
 ---
 

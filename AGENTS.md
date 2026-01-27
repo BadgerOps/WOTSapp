@@ -158,6 +158,7 @@ Generate from Terraform: `terraform output -raw firebase_config_env`
 ### Running the App
 ```bash
 npm install
+npm --prefix functions install
 npm run dev
 ```
 

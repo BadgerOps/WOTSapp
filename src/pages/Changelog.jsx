@@ -15,6 +15,7 @@ const changelog = [
               'Documentation alignment: updated AGENTS/README/CONTRIBUTING to match current roles, env vars, scripts, and project structure',
               'Clarified Firestore rules/indexes deploy step and deploy-all script',
               'Documented optional Sentry and Web Push (VAPID) environment variables',
+              'Added Firestore collections overview to README and noted functions install step for local dev',
             ],
           },
         ],

@@ -192,6 +192,37 @@ User → Google OAuth → Firebase Auth → AuthContext → Protected Routes
 - `detailTemplates/{templateId}` - Cleaning task templates
 - `detailAssignments/{assignmentId}` - Task assignments
 
+### Firestore Collections (per security rules)
+
+```
+users/{userId}
+posts/{postId}
+documents/{documentId}
+uniforms/{uniformId}
+settings/{settingId} (appConfig, uotdSchedule, weatherLocation, weatherRules, weatherCache)
+weatherRecommendations/{id}
+personnel/{personnelId}
+personnelImports/{importId}
+detailTemplates/{templateId}
+detailAssignments/{assignmentId}
+detailCompletions/{completionId}
+detailConfig/{configId}
+personnelConfig/{configId}
+cqSchedule/{scheduleId}
+cqShifts/{shiftId}
+cqRoster/{rosterId}
+cqSkips/{skipId}
+cqSwapRequests/{requestId}
+passApprovalRequests/{requestId}
+personnelStatus/{statusId}
+personnelStatusHistory/{logId}
+cqNotes/{noteId}
+daForms/{formId}
+passwordResets/{userId}
+surveys/{surveyId}
+surveyResponses/{responseId}
+```
+
 ### Real-Time Updates
 
 The app uses Firestore's `onSnapshot` listeners for real-time data synchronization. Custom hooks (`usePosts`, `useDocuments`, etc.) abstract the data fetching logic.
