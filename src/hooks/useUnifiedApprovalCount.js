@@ -1,12 +1,51 @@
-import { usePendingPassRequestCount } from './usePassApproval'
-import { usePendingDetailApprovals } from './useDetailAssignments'
-import { usePendingSwapRequestCount } from './useCQSwapRequests'
-import { usePendingCount as usePendingWeatherCount } from './useWeatherRecommendations'
+import { useState, useEffect } from 'react'
+import { collection, query, where, onSnapshot } from 'firebase/firestore'
+import { db } from '../config/firebase'
 import { useAuth } from '../contexts/AuthContext'
 
 /**
+ * Internal hook to fetch count for a collection with a specific status.
+ * Only queries when enabled, preventing permission errors for unauthorized users.
+ */
+function useCountWithPermission(collectionName, statusValue, enabled) {
+  const [count, setCount] = useState(0)
+  const [loading, setLoading] = useState(enabled)
+
+  useEffect(() => {
+    if (!enabled) {
+      setCount(0)
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    const q = query(
+      collection(db, collectionName),
+      where('status', '==', statusValue)
+    )
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setCount(snapshot.size)
+        setLoading(false)
+      },
+      (err) => {
+        console.error(`Error fetching ${collectionName} count:`, err)
+        setCount(0)
+        setLoading(false)
+      }
+    )
+
+    return unsubscribe
+  }, [collectionName, statusValue, enabled])
+
+  return { count, loading }
+}
+
+/**
  * Hook that provides unified approval counts across all approval types.
- * Filters counts based on user's approval authority:
+ * Only queries collections that the user has permission to access:
  * - candidate_leadership or admin: passes, details, swaps
  * - uniform_admin or admin: weather
  *
@@ -15,35 +54,36 @@ import { useAuth } from '../contexts/AuthContext'
 export function useUnifiedApprovalCount() {
   const { isCandidateLeadership, canApproveWeatherUOTD, isAdmin } = useAuth()
 
-  // Fetch counts from individual hooks
-  const { count: passCount, loading: passLoading } = usePendingPassRequestCount()
-  const { count: detailCount, loading: detailLoading } = usePendingDetailApprovals()
-  const { count: swapCount, loading: swapLoading } = usePendingSwapRequestCount()
-  const { count: weatherCount, loading: weatherLoading } = usePendingWeatherCount()
-
-  // Calculate permission-filtered counts
+  // Calculate permission flags first
   const canApprovePasses = isCandidateLeadership || isAdmin
   const canApproveDetails = isCandidateLeadership || isAdmin
   const canApproveSwaps = isCandidateLeadership || isAdmin
   const canApproveWeather = canApproveWeatherUOTD || isAdmin
 
-  // Build total count based on permissions
-  let total = 0
-  if (canApprovePasses) total += passCount || 0
-  if (canApproveDetails) total += detailCount || 0
-  if (canApproveSwaps) total += swapCount || 0
-  if (canApproveWeather) total += weatherCount || 0
+  // Only query collections user has permission to access
+  // Note: detailAssignments uses 'completed' status for items awaiting approval
+  const { count: passCount, loading: passLoading } = useCountWithPermission('passRequests', 'pending', canApprovePasses)
+  const { count: detailCount, loading: detailLoading } = useCountWithPermission('detailAssignments', 'completed', canApproveDetails)
+  const { count: swapCount, loading: swapLoading } = useCountWithPermission('cqSwapRequests', 'pending', canApproveSwaps)
+  const { count: weatherCount, loading: weatherLoading } = useCountWithPermission('weatherRecommendations', 'pending', canApproveWeather)
 
-  const loading = passLoading || detailLoading || swapLoading || weatherLoading
+  // Build total count based on permissions
+  const total = passCount + detailCount + swapCount + weatherCount
+
+  // Only count loading for enabled queries
+  const loading =
+    (canApprovePasses && passLoading) ||
+    (canApproveDetails && detailLoading) ||
+    (canApproveSwaps && swapLoading) ||
+    (canApproveWeather && weatherLoading)
 
   return {
     total,
     loading,
-    // Permission-filtered individual counts
-    passCount: canApprovePasses ? (passCount || 0) : 0,
-    detailCount: canApproveDetails ? (detailCount || 0) : 0,
-    swapCount: canApproveSwaps ? (swapCount || 0) : 0,
-    weatherCount: canApproveWeather ? (weatherCount || 0) : 0,
+    passCount,
+    detailCount,
+    swapCount,
+    weatherCount,
     // Permission flags for UI rendering
     canApprovePasses,
     canApproveDetails,
