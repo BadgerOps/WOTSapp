@@ -71,11 +71,11 @@ describe('PersonnelRosterUpload', () => {
     personnelCsvParser.parsePersonnelCSV.mockResolvedValueOnce({
       data: [
         {
-          email: 'john.doe@example.com',
+          email: 'user6@example.com',
           firstName: 'John',
           lastName: 'Doe',
           rank: 'SGT',
-          phoneNumber: '555-0123',
+          phoneNumber: '555-0100',
           squad: '1st Squad',
           platoon: '1st Platoon',
           detailEligible: true,
@@ -87,7 +87,7 @@ describe('PersonnelRosterUpload', () => {
 
     render(<PersonnelRosterUpload />);
 
-    const file = new File(['email,firstName,lastName,rank\njohn.doe@example.com,John,Doe,SGT'], 'roster.csv', {
+    const file = new File(['email,firstName,lastName,rank\nuser6@example.com,John,Doe,SGT'], 'roster.csv', {
       type: 'text/csv',
     });
     const input = screen.getByTestId('file-input');
@@ -152,7 +152,7 @@ describe('PersonnelRosterUpload', () => {
 
   it('should enable import button when CSV is valid', async () => {
     personnelCsvParser.parsePersonnelCSV.mockResolvedValueOnce({
-      data: [{ email: 'test@example.com', firstName: 'Test', lastName: 'User', rank: 'SGT' }],
+      data: [{ email: 'user11@example.com', firstName: 'Test', lastName: 'User', rank: 'SGT' }],
       errors: [],
       valid: true,
     });
@@ -175,11 +175,11 @@ describe('PersonnelRosterUpload', () => {
   it('should import personnel when form is submitted', async () => {
     const personnelData = [
       {
-        email: 'john.doe@example.com',
+        email: 'user6@example.com',
         firstName: 'John',
         lastName: 'Doe',
         rank: 'SGT',
-        phoneNumber: '555-0123',
+        phoneNumber: '555-0100',
         squad: '1st Squad',
         platoon: '1st Platoon',
         detailEligible: true,
@@ -219,7 +219,7 @@ describe('PersonnelRosterUpload', () => {
 
   it('should display error message when import fails', async () => {
     personnelCsvParser.parsePersonnelCSV.mockResolvedValueOnce({
-      data: [{ email: 'test@example.com', firstName: 'Test', lastName: 'User', rank: 'SGT' }],
+      data: [{ email: 'user11@example.com', firstName: 'Test', lastName: 'User', rank: 'SGT' }],
       errors: [],
       valid: true,
     });
@@ -242,7 +242,7 @@ describe('PersonnelRosterUpload', () => {
 
   it('should clear form after successful import', async () => {
     personnelCsvParser.parsePersonnelCSV.mockResolvedValueOnce({
-      data: [{ email: 'test@example.com', firstName: 'Test', lastName: 'User', rank: 'SGT' }],
+      data: [{ email: 'user11@example.com', firstName: 'Test', lastName: 'User', rank: 'SGT' }],
       errors: [],
       valid: true,
     });

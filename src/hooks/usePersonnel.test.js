@@ -19,7 +19,7 @@ vi.mock('firebase/firestore', () => ({
         {
           id: '1',
           data: () => ({
-            email: 'test@example.com',
+            email: 'user11@example.com',
             firstName: 'John',
             lastName: 'Doe',
             rank: 'SGT',
@@ -62,7 +62,7 @@ describe('usePersonnel', () => {
     expect(result.current.personnel).toHaveLength(1);
     expect(result.current.personnel[0]).toMatchObject({
       id: '1',
-      email: 'test@example.com',
+      email: 'user11@example.com',
       firstName: 'John',
       lastName: 'Doe',
       rank: 'SGT',
@@ -100,11 +100,11 @@ describe('usePersonnelActions', () => {
 
   it('should create a personnel record', async () => {
     const personnelData = {
-      email: 'new@example.com',
+      email: 'user8@example.com',
       firstName: 'Jane',
       lastName: 'Smith',
       rank: 'SSG',
-      phoneNumber: '555-0123',
+      phoneNumber: '555-0100',
       squad: '1st Squad',
       platoon: '1st Platoon',
       detailEligible: true,
@@ -139,21 +139,21 @@ describe('usePersonnelActions', () => {
   it('should import multiple personnel records', async () => {
     const personnelArray = [
       {
-        email: 'person1@example.com',
+        email: 'user9@example.com',
         firstName: 'Person',
         lastName: 'One',
         rank: 'SGT',
-        phoneNumber: '555-0001',
+        phoneNumber: '555-0101',
         squad: '1st Squad',
         platoon: '1st Platoon',
         detailEligible: true,
       },
       {
-        email: 'person2@example.com',
+        email: 'user10@example.com',
         firstName: 'Person',
         lastName: 'Two',
         rank: 'SSG',
-        phoneNumber: '555-0002',
+        phoneNumber: '555-0102',
         squad: '2nd Squad',
         platoon: '1st Platoon',
         detailEligible: true,
@@ -244,7 +244,7 @@ describe('usePersonnelActions', () => {
     addDoc.mockRejectedValueOnce(new Error('Database error'));
 
     const personnelData = {
-      email: 'error@example.com',
+      email: 'user3@example.com',
       firstName: 'Error',
       lastName: 'Test',
       rank: 'PFC',

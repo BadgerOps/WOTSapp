@@ -24,7 +24,7 @@ vi.mock("firebase/firestore", () => ({
         status: "pending",
         requesterId: "test-user-id",
         requesterName: "Test User",
-        requesterEmail: "test@example.com",
+        requesterEmail: "user11@example.com",
         destination: "PX",
         expectedReturn: "2026-01-24T18:00:00Z",
         companions: [],
@@ -48,7 +48,7 @@ vi.mock("../contexts/AuthContext", () => ({
     user: {
       uid: "test-user-id",
       displayName: "Test User",
-      email: "test@example.com",
+      email: "user11@example.com",
     },
   }),
 }));
@@ -173,7 +173,7 @@ describe("usePassRequestActions", () => {
       const response = await result.current.createPassRequest({
         destination: "BX",
         expectedReturn: "2026-01-24T20:00:00Z",
-        contactNumber: "555-1234",
+        contactNumber: "555-0100",
         notes: "Test notes",
         companions: [],
       });
@@ -229,7 +229,7 @@ describe("usePassApprovalActions", () => {
         status: "pending",
         requesterId: "user-1",
         requesterName: "Test User",
-        requesterEmail: "test@example.com",
+        requesterEmail: "user11@example.com",
         destination: "PX",
         companions: [],
       }),
