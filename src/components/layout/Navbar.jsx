@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNotifications } from '../../contexts/NotificationContext'
+import { useUnifiedApprovalCount } from '../../hooks/useUnifiedApprovalCount'
 
 export default function Navbar() {
-  const { user, isAdmin, logout } = useAuth()
+  const { user, isAdmin, hasApprovalAuthority, logout } = useAuth()
+  const { total: pendingApprovalCount } = useUnifiedApprovalCount()
   const { pushEnabled, pushSupported, enablePushNotifications } = useNotifications()
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -24,6 +26,15 @@ export default function Navbar() {
     { path: '/cq', label: 'CQ' },
     { path: '/surveys', label: 'Surveys' },
   ]
+
+  // Add Approvals tab for users with approval authority (before Admin)
+  if (hasApprovalAuthority) {
+    navLinks.push({
+      path: '/approvals',
+      label: 'Approvals',
+      badge: pendingApprovalCount > 0 ? pendingApprovalCount : null,
+    })
+  }
 
   if (isAdmin) {
     navLinks.push({ path: '/admin', label: 'Admin' })
@@ -46,13 +57,18 @@ export default function Navbar() {
               <Link
                 key={link.path}
                 to={link.path}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
                   isActive(link.path)
                     ? 'bg-primary-700 text-white'
                     : 'text-primary-100 hover:bg-primary-500'
                 }`}
               >
                 {link.label}
+                {link.badge && (
+                  <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+                    {link.badge}
+                  </span>
+                )}
               </Link>
             ))}
           </div>
@@ -140,13 +156,18 @@ export default function Navbar() {
                 key={link.path}
                 to={link.path}
                 onClick={() => setMenuOpen(false)}
-                className={`block px-3 py-2 rounded-md text-base font-medium ${
+                className={`flex items-center justify-between px-3 py-2 rounded-md text-base font-medium ${
                   isActive(link.path)
                     ? 'bg-primary-700 text-white'
                     : 'text-primary-100 hover:bg-primary-500'
                 }`}
               >
-                {link.label}
+                <span>{link.label}</span>
+                {link.badge && (
+                  <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full">
+                    {link.badge}
+                  </span>
+                )}
               </Link>
             ))}
             {user && (

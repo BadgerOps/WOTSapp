@@ -18,6 +18,7 @@ const CQView = lazy(() => import('./pages/CQView'))
 const Profile = lazy(() => import('./pages/Profile'))
 const Changelog = lazy(() => import('./pages/Changelog'))
 const Surveys = lazy(() => import('./pages/Surveys'))
+const Approvals = lazy(() => import('./pages/Approvals'))
 const Admin = lazy(() => import('./pages/Admin'))
 
 function ProtectedRoute({ children, adminOnly = false, routeName = 'unknown' }) {
@@ -148,6 +149,14 @@ export default function App() {
             element={
               <ProtectedRoute routeName="Surveys">
                 <Surveys />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/approvals"
+            element={
+              <ProtectedRoute routeName="Approvals">
+                <Approvals />
               </ProtectedRoute>
             }
           />

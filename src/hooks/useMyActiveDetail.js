@@ -134,7 +134,7 @@ export function useMyActiveDetail() {
           matchIds.push(personnelDocId)
         }
 
-        // Filter for today's assignments where user has tasks AND is active now
+        // Filter for today's assignments where user has tasks
         const myActiveAssignments = assignments.filter((assignment) => {
           // Filter by today's date (client-side)
           if (assignment.assignmentDate !== today) return false
@@ -144,6 +144,12 @@ export function useMyActiveDetail() {
             (task) => matchIds.includes(task.assignedTo?.personnelId)
           )
           if (!hasTasks) return false
+
+          // For in_progress or rejected status, always show (user needs to complete them)
+          // For assigned status, only show during the appropriate time window
+          if (assignment.status === 'in_progress' || assignment.status === 'rejected') {
+            return true
+          }
 
           // Check if detail is active for current time slot
           return isDetailActiveNow(assignment)
@@ -318,10 +324,51 @@ export function useDetailCardActions() {
     }
   }
 
+  /**
+   * Complete selected tasks (multi-select)
+   * @param {string} assignmentId - The assignment ID
+   * @param {Set<string>} selectedTaskKeys - Set of task keys in format "taskId-location"
+   * @param {Array} allTasks - All tasks in the assignment
+   */
+  async function completeSelectedTasks(assignmentId, selectedTaskKeys, allTasks) {
+    setLoading(true)
+    setError(null)
+    try {
+      const updatedTasks = allTasks.map((task) => {
+        const taskKey = `${task.taskId}-${task.location}`
+        if (
+          selectedTaskKeys.has(taskKey) &&
+          isCurrentUser(task.assignedTo?.personnelId) &&
+          !task.completed
+        ) {
+          return {
+            ...task,
+            completed: true,
+            completedAt: new Date().toISOString(),
+          }
+        }
+        return task
+      })
+
+      await updateDoc(doc(db, 'detailAssignments', assignmentId), {
+        tasks: updatedTasks,
+        status: 'in_progress',
+        updatedAt: serverTimestamp(),
+      })
+      setLoading(false)
+    } catch (err) {
+      console.error('Error completing selected tasks:', err)
+      setError(err.message)
+      setLoading(false)
+      throw err
+    }
+  }
+
   return {
     startDetail,
     completeTask,
     completeAllTasks,
+    completeSelectedTasks,
     submitForApproval,
     loading,
     error,
