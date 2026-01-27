@@ -30,6 +30,9 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+      - name: Check version sync
+        run: npm run check:version-sync
+
       - name: Run tests
         run: npm test
         env:
