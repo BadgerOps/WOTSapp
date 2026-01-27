@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`safeParseDate()` now validates Firestore Timestamp conversion** - the `.toDate()` result is now checked with `isValid()` before returning
 - **Fixed `DetailChecklistView` task completion time display** - was using `new Date(task.completedAt)` directly instead of `safeParseDate()`, causing `RangeError: Invalid time value` when viewing completed tasks
 
+#### Detail Assignment Completion Permission Error
+- **"Submit for Approval" button now checks assignment status** - buttons in `DetailChecklistView` and `MyDetailCard` now verify status is `in_progress` before showing
+- Firestore rules only allow `in_progress → completed` transition; showing the button without this check caused permission errors
+
 ---
 
 ## [0.5.0] - 2026-01-27

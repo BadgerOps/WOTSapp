@@ -897,7 +897,7 @@ export default function DetailChecklistView({ assignment, onClose }) {
             </button>
           )}
 
-          {allMyTasksCompleted && myTasks.length > 0 && (
+          {allMyTasksCompleted && myTasks.length > 0 && assignment.status === 'in_progress' && (
             <button
               onClick={handleComplete}
               disabled={actionLoading}

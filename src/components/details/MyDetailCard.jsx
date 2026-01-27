@@ -374,7 +374,7 @@ export default function MyDetailCard() {
             </button>
           )}
 
-          {allTasksCompleted && (
+          {allTasksCompleted && isInProgress && (
             <button
               onClick={handleSubmit}
               disabled={actionLoading}

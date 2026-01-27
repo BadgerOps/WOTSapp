@@ -23,6 +23,13 @@ const changelog = [
               'Fixed DetailChecklistView task completion time display (was using new Date() instead of safeParseDate)',
             ],
           },
+          {
+            category: 'Detail Assignment Completion',
+            details: [
+              '"Submit for Approval" button now checks assignment status is in_progress',
+              'Prevents permission errors when trying to complete assignments in wrong state',
+            ],
+          },
         ],
       },
     ],
