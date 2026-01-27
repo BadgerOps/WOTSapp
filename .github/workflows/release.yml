@@ -100,7 +100,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          # Disabled npm cache - 713MB upload on every cache miss is slower than npm ci
+          # cache: 'npm'
 
       - name: Install root dependencies
         run: npm ci
