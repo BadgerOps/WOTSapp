@@ -7,6 +7,22 @@ const changelog = [
     date: '2026-01-27',
     sections: [
       {
+        title: 'Fixed',
+        items: [
+          {
+            details: [
+              'PWA navigation fallback: Fixed "text/html is not a valid JavaScript MIME type" error when directly navigating to SPA routes or refreshing the page',
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.4.17',
+    date: '2026-01-27',
+    sections: [
+      {
         title: 'Changed',
         items: [
           {
