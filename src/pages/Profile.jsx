@@ -6,8 +6,7 @@ import { doc, updateDoc, serverTimestamp, collection, query, where, getDocs } fr
 import { db } from '../config/firebase'
 import Loading from '../components/common/Loading'
 import DebugPanel from '../components/common/DebugPanel'
-
-const APP_VERSION = '0.4.4'
+import { APP_VERSION } from '../config/appVersion'
 
 export default function Profile() {
   const { user } = useAuth()

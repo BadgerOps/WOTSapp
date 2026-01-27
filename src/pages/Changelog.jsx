@@ -1,8 +1,23 @@
 import { Link } from 'react-router-dom'
-
-const APP_VERSION = '0.4.16'
+import { APP_VERSION } from '../config/appVersion'
 
 const changelog = [
+  {
+    version: APP_VERSION,
+    date: '2026-01-27',
+    sections: [
+      {
+        title: 'Changed',
+        items: [
+          {
+            details: [
+              'Version display now derives from package.json for Profile and in-app changelog',
+            ],
+          },
+        ],
+      },
+    ],
+  },
   {
     version: '0.4.16',
     date: '2026-01-27',
