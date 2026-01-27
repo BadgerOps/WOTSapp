@@ -5,7 +5,34 @@ import { useMyPersonnelIds } from '../../hooks/useMyPersonnelIds'
 import { usePersonnel } from '../../hooks/usePersonnel'
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../config/firebase'
-import { format } from 'date-fns'
+import { format, isValid, parseISO } from 'date-fns'
+
+/**
+ * Safely parse a date value that could be a Firestore Timestamp, Date, or string
+ */
+function safeParseDate(value) {
+  if (!value) return null
+  // Firestore Timestamp
+  if (value?.toDate) return value.toDate()
+  // Already a Date
+  if (value instanceof Date) return isValid(value) ? value : null
+  // ISO string or other string format
+  if (typeof value === 'string') {
+    // Handle YYYY-MM-DD format specifically
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const parsed = new Date(value + 'T00:00:00')
+      return isValid(parsed) ? parsed : null
+    }
+    const parsed = parseISO(value)
+    return isValid(parsed) ? parsed : null
+  }
+  // Number (timestamp in ms)
+  if (typeof value === 'number') {
+    const date = new Date(value)
+    return isValid(date) ? date : null
+  }
+  return null
+}
 
 export default function DetailChecklistView({ assignment, onClose }) {
   const { user } = useAuth()
@@ -125,6 +152,8 @@ export default function DetailChecklistView({ assignment, onClose }) {
   async function handleStart() {
     try {
       await startAssignment(assignment.id)
+      // Close the modal after successfully starting - the home screen card will now show the detail
+      onClose()
     } catch (err) {
       setError('Failed to start assignment: ' + err.message)
     }
@@ -439,9 +468,8 @@ export default function DetailChecklistView({ assignment, onClose }) {
 
   if (!assignment) return null
 
-  const dueDate = assignment.dueDateTime?.toDate
-    ? assignment.dueDateTime.toDate()
-    : new Date(assignment.dueDateTime)
+  const dueDate = safeParseDate(assignment.dueDateTime)
+  const assignmentDate = safeParseDate(assignment.assignmentDate)
 
   // Group displayed tasks by area
   const tasksByArea = displayedTasks.reduce((acc, task, idx) => {
@@ -475,11 +503,15 @@ export default function DetailChecklistView({ assignment, onClose }) {
             <div>
               <h2 className="text-xl font-bold text-gray-900">{assignment.templateName}</h2>
               <div className="flex gap-3 mt-1 text-sm text-gray-600">
-                <span>{format(new Date(assignment.assignmentDate), 'EEEE, MMMM d, yyyy')}</span>
+                <span>{assignmentDate ? format(assignmentDate, 'EEEE, MMMM d, yyyy') : 'Unknown date'}</span>
                 <span>•</span>
                 <span className="capitalize">{assignment.timeSlot}</span>
-                <span>•</span>
-                <span>Due: {format(dueDate, 'h:mm a')}</span>
+                {dueDate && (
+                  <>
+                    <span>•</span>
+                    <span>Due: {format(dueDate, 'h:mm a')}</span>
+                  </>
+                )}
               </div>
               <div className="mt-2 text-sm">
                 <span className="font-medium text-gray-700">My Progress: </span>

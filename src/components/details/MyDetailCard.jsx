@@ -61,8 +61,15 @@ export default function MyDetailCard() {
 
   if (loading) return null // Don't show loading state on home - just hide if loading
 
-  // Only show if there's an active detail and we're in a valid time slot
-  if (!activeDetail || !currentTimeSlot) {
+  // Only show if there's an active detail
+  // For assigned status, require current time slot
+  // For in_progress or rejected status, always show (user needs to complete them)
+  if (!activeDetail) {
+    return null
+  }
+
+  const showWithoutTimeSlot = activeDetail.status === 'in_progress' || activeDetail.status === 'rejected'
+  if (!showWithoutTimeSlot && !currentTimeSlot) {
     return null
   }
 

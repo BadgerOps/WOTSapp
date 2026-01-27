@@ -134,7 +134,7 @@ export function useMyActiveDetail() {
           matchIds.push(personnelDocId)
         }
 
-        // Filter for today's assignments where user has tasks AND is active now
+        // Filter for today's assignments where user has tasks
         const myActiveAssignments = assignments.filter((assignment) => {
           // Filter by today's date (client-side)
           if (assignment.assignmentDate !== today) return false
@@ -144,6 +144,12 @@ export function useMyActiveDetail() {
             (task) => matchIds.includes(task.assignedTo?.personnelId)
           )
           if (!hasTasks) return false
+
+          // For in_progress or rejected status, always show (user needs to complete them)
+          // For assigned status, only show during the appropriate time window
+          if (assignment.status === 'in_progress' || assignment.status === 'rejected') {
+            return true
+          }
 
           // Check if detail is active for current time slot
           return isDetailActiveNow(assignment)
