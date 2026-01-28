@@ -12,6 +12,11 @@ import {
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import { useAuth } from '../contexts/AuthContext'
+import {
+  getTodayInTimezone,
+  getCurrentTimeMinutesInTimezone,
+  DEFAULT_TIMEZONE,
+} from '../lib/timezone'
 
 /**
  * Detail stages for tracking progress (similar to pass stages)
@@ -27,21 +32,19 @@ export const DETAIL_STAGES = {
 /**
  * Determine if current time is within the detail window
  * Morning window: 7:00 AM - 12:00 PM
- * Evening window: 7:30 PM - 11:59 PM
+ * Evening window: 7:00 PM - 11:59 PM
+ * Uses timezone-aware time calculations for consistency
  */
 function getCurrentTimeSlot() {
-  const now = new Date()
-  const hours = now.getHours()
-  const minutes = now.getMinutes()
-  const timeValue = hours * 60 + minutes // minutes since midnight
+  const timeValue = getCurrentTimeMinutesInTimezone(DEFAULT_TIMEZONE) // minutes since midnight
 
   // Morning: 7:00 AM (420) to 12:00 PM (720)
   if (timeValue >= 420 && timeValue < 720) {
     return 'morning'
   }
 
-  // Evening: 7:30 PM (1170) to 11:59 PM (1439)
-  if (timeValue >= 1170 && timeValue <= 1439) {
+  // Evening: 7:00 PM (1140) to 11:59 PM (1439)
+  if (timeValue >= 1140 && timeValue <= 1439) {
     return 'evening'
   }
 
@@ -122,7 +125,7 @@ export function useMyActiveDetail() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const today = new Date().toISOString().split('T')[0]
+        const today = getTodayInTimezone(DEFAULT_TIMEZONE)
         const assignments = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
