@@ -20,6 +20,7 @@ import { useAppConfig } from './useAppConfig'
 import {
   getTodayInTimezone,
   getTomorrowInTimezone,
+  getDayOfWeekInTimezone,
   DEFAULT_TIMEZONE,
 } from '../lib/timezone'
 
@@ -474,13 +475,22 @@ export function useCQScheduleActions() {
   }
 
   /**
-   * Skip a date (pushes all subsequent shifts)
+   * Skip a date (pushes all shifts forward by one day)
+   * Works for both future dates and retroactive skips (past dates)
+   *
+   * Example: Skip Jan 27
+   * - Jan 27's people move to Jan 28
+   * - Jan 28's people move to Jan 29
+   * - etc.
+   *
    * @param {string} date - Date to skip (YYYY-MM-DD)
    * @param {string} reason - Reason for skipping (e.g., "PT Test", "Exam")
    */
   async function skipDate(date, reason) {
     setLoading(true)
     setError(null)
+
+    const timezone = config?.timezone || DEFAULT_TIMEZONE
 
     try {
       // Add to skips collection
@@ -492,40 +502,36 @@ export function useCQScheduleActions() {
         skippedAt: serverTimestamp(),
       })
 
-      // Delete the scheduled entry for this date if it exists
-      const existingSchedule = await getDocs(
-        query(collection(db, 'cqSchedule'), where('date', '==', date))
+      // Get all schedule entries from this date onwards (includes the skipped date and all future)
+      const scheduleFromDate = await getDocs(
+        query(
+          collection(db, 'cqSchedule'),
+          where('date', '>=', date),
+          orderBy('date', 'asc')
+        )
       )
 
-      if (!existingSchedule.empty) {
+      if (!scheduleFromDate.empty) {
         const batch = writeBatch(db)
+        const docs = scheduleFromDate.docs
 
-        // Delete the skipped date
-        existingSchedule.docs.forEach((doc) => {
-          batch.delete(doc.ref)
-        })
+        // Process in reverse order: last entry first, working backwards
+        // This way each entry moves to the next day's slot
+        for (let i = docs.length - 1; i >= 0; i--) {
+          const currentDate = docs[i].data().date
 
-        // Get all scheduled dates after this one and shift them
-        const futureSchedule = await getDocs(
-          query(
-            collection(db, 'cqSchedule'),
-            where('date', '>', date),
-            where('status', '==', 'scheduled'),
-            orderBy('date', 'asc')
-          )
-        )
+          // Calculate the next day
+          const nextDate = new Date(currentDate + 'T12:00:00')
+          nextDate.setDate(nextDate.getDate() + 1)
+          const nextDateStr = nextDate.toISOString().split('T')[0]
+          const newDayOfWeek = getDayOfWeekInTimezone(nextDateStr, timezone)
 
-        // Shift each future date back by one day
-        let prevDate = date
-        futureSchedule.docs.forEach((docSnap) => {
-          const data = docSnap.data()
-          // Update the date to the previous slot
-          batch.update(docSnap.ref, {
-            date: prevDate,
+          batch.update(docs[i].ref, {
+            date: nextDateStr,
+            dayOfWeek: newDayOfWeek,
             updatedAt: serverTimestamp(),
           })
-          prevDate = data.date
-        })
+        }
 
         await batch.commit()
       }

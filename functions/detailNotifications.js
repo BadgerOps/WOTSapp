@@ -54,6 +54,121 @@ async function getTodaysAssignments(db, today, timeSlot) {
 }
 
 /**
+ * Check if an assignment already exists for today and time slot
+ * @param {Object} db - Firestore instance
+ * @param {string} today - Today's date in YYYY-MM-DD format
+ * @param {string} timeSlot - 'morning' or 'evening'
+ * @returns {Promise<boolean>} True if assignment exists
+ */
+async function hasAssignmentForToday(db, today, timeSlot) {
+  const snapshot = await db
+    .collection("detailAssignments")
+    .where("assignmentDate", "==", today)
+    .get();
+
+  return snapshot.docs.some((doc) => {
+    const data = doc.data();
+    return data.timeSlot === timeSlot || data.timeSlot === "both";
+  });
+}
+
+/**
+ * Get the most recent completed/approved assignment for a time slot
+ * @param {Object} db - Firestore instance
+ * @param {string} timeSlot - 'morning' or 'evening'
+ * @returns {Promise<Object|null>} Most recent assignment data or null
+ */
+async function getMostRecentCompletedAssignment(db, timeSlot) {
+  // Get recent completed/approved assignments
+  const snapshot = await db
+    .collection("detailAssignments")
+    .where("status", "in", ["completed", "approved"])
+    .orderBy("assignmentDate", "desc")
+    .limit(20)
+    .get();
+
+  // Find the most recent one matching this time slot
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    if (data.timeSlot === timeSlot || data.timeSlot === "both") {
+      return { id: doc.id, ...data };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Clone a completed assignment for a new date
+ * Resets all task completions and status fields
+ * @param {Object} db - Firestore instance
+ * @param {Object} sourceAssignment - The assignment to clone
+ * @param {string} newDate - The new assignment date (YYYY-MM-DD)
+ * @param {string} timeSlot - The time slot for the new assignment
+ * @returns {Promise<string>} The new assignment ID
+ */
+async function cloneAssignmentForDate(db, sourceAssignment, newDate, timeSlot) {
+  // Reset all tasks to not completed
+  const resetTasks = (sourceAssignment.tasks || []).map((task) => ({
+    ...task,
+    completed: false,
+    completedAt: null,
+    notes: "",
+  }));
+
+  // Calculate dueDateTime based on new date and time slot
+  const morningTime = sourceAssignment.morningTime || "08:00";
+  const eveningTime = sourceAssignment.eveningTime || "18:00";
+  const targetTime = timeSlot === "morning" ? morningTime : eveningTime;
+  const [hours, minutes] = targetTime.split(":").map(Number);
+  const dueDate = new Date(newDate + "T12:00:00");
+  dueDate.setHours(hours, minutes, 0, 0);
+
+  const newAssignment = {
+    // Preserve template and structure
+    templateId: sourceAssignment.templateId,
+    templateName: sourceAssignment.templateName,
+    timeSlot: timeSlot === "both" ? sourceAssignment.timeSlot : timeSlot,
+    morningTime,
+    eveningTime,
+
+    // Set new date
+    assignmentDate: newDate,
+    dueDateTime: dueDate,
+
+    // Reset status
+    status: "assigned",
+    tasks: resetTasks,
+
+    // Clear completion fields
+    startedAt: null,
+    startedBy: null,
+    completedAt: null,
+    completedBy: null,
+    approvedAt: null,
+    approvedBy: null,
+    approvedByName: null,
+    rejectedAt: null,
+    rejectedBy: null,
+    rejectionReason: null,
+    completionNotes: null,
+
+    // Preserve assignedTo for legacy assignments
+    assignedTo: sourceAssignment.assignedTo || [],
+
+    // Metadata
+    createdBy: "system",
+    createdByName: "Auto-generated",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    clonedFrom: sourceAssignment.id,
+  };
+
+  const docRef = await db.collection("detailAssignments").add(newAssignment);
+  return docRef.id;
+}
+
+/**
  * Extract unique personnel IDs from assignment tasks
  * @param {Array} assignments - Array of assignment documents
  * @returns {Set<string>} Set of unique personnel IDs
@@ -254,6 +369,7 @@ async function removeInvalidTokens(db, userDocs, invalidTokens) {
 
 /**
  * Send detail reminder notifications
+ * Also auto-creates assignments by cloning previous completed ones if none exist for today
  * @param {Object} db - Firestore instance
  * @param {Object} messaging - Firebase Messaging instance
  * @param {string} timeSlot - 'morning' or 'evening'
@@ -262,16 +378,41 @@ async function removeInvalidTokens(db, userDocs, invalidTokens) {
  */
 async function sendDetailReminders(db, messaging, timeSlot, timezone) {
   const today = getTodayInTimezone(timezone);
+  let clonedAssignment = null;
 
-  // Get today's assignments for this time slot
+  // Check if there's already an assignment for today
+  const hasExisting = await hasAssignmentForToday(db, today, timeSlot);
+
+  if (!hasExisting) {
+    // Try to clone the most recent completed assignment
+    const recentAssignment = await getMostRecentCompletedAssignment(db, timeSlot);
+
+    if (recentAssignment) {
+      try {
+        const newId = await cloneAssignmentForDate(db, recentAssignment, today, timeSlot);
+        clonedAssignment = {
+          id: newId,
+          clonedFrom: recentAssignment.id,
+          templateName: recentAssignment.templateName,
+        };
+        console.log(`Auto-cloned assignment ${recentAssignment.id} to ${newId} for ${today} ${timeSlot}`);
+      } catch (error) {
+        console.error("Error cloning assignment:", error);
+        // Continue without the clone - we can still send notifications if there are other assignments
+      }
+    }
+  }
+
+  // Get today's assignments for this time slot (including any just-cloned one)
   const assignments = await getTodaysAssignments(db, today, timeSlot);
 
   if (assignments.length === 0) {
     return {
       sent: false,
-      reason: "No assignments for today's time slot",
+      reason: "No assignments for today's time slot (and no previous to clone)",
       timeSlot,
       date: today,
+      clonedAssignment,
     };
   }
 
@@ -285,6 +426,7 @@ async function sendDetailReminders(db, messaging, timeSlot, timezone) {
       timeSlot,
       date: today,
       assignmentCount: assignments.length,
+      clonedAssignment,
     };
   }
 
@@ -298,6 +440,7 @@ async function sendDetailReminders(db, messaging, timeSlot, timezone) {
       timeSlot,
       date: today,
       personnelCount: personnelIds.size,
+      clonedAssignment,
     };
   }
 
@@ -363,6 +506,7 @@ async function sendDetailReminders(db, messaging, timeSlot, timezone) {
       tokenCount: tokens.length,
       personnelCount: personnelIds.size,
       assignmentCount: assignments.length,
+      clonedAssignment,
     };
   } catch (error) {
     console.error("Error sending detail reminder notifications:", error);
@@ -436,3 +580,6 @@ exports.scheduledDetailReminder = onSchedule(
 // Export for testing
 exports.sendDetailReminders = sendDetailReminders;
 exports.getDetailNotificationConfig = getDetailNotificationConfig;
+exports.cloneAssignmentForDate = cloneAssignmentForDate;
+exports.getMostRecentCompletedAssignment = getMostRecentCompletedAssignment;
+exports.hasAssignmentForToday = hasAssignmentForToday;

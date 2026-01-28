@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.5.2] - 2026-01-28
 
+### Added
+
+#### Automatic Daily Detail Assignment Cloning
+- **Details now auto-reset each day** at configured notification times (default 07:00 and 19:00)
+- When the scheduled reminder runs, if no assignment exists for today's time slot, the most recent completed/approved assignment is cloned
+- Cloned assignments have all tasks reset to uncompleted with fresh `assigned` status
+- The `clonedFrom` field tracks which assignment was used as the source
+- This eliminates the need for admins to manually create new assignments each day
+
 ### Fixed
+
+#### CQ Schedule Retroactive Skip
+- **`skipDate()` now supports retroactive skips** - previously only worked for future dates
+- Skipping a past date (e.g., last night's CQ) now correctly shifts all subsequent assignments forward by one day
+- **Day of week updates automatically** - when dates shift, the `dayOfWeek` field is recalculated using the configured timezone
+- Example: Skip Jan 27 → Jan 27's people move to Jan 28, Jan 28's people move to Jan 29, etc.
 
 #### Daily Detail Card Display Timing
 - **Evening time slot now starts at 19:00 (7:00 PM)** instead of 19:30 - cards were appearing 30 minutes late
