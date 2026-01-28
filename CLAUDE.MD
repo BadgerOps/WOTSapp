@@ -352,6 +352,28 @@ const postData = {
 };
 ```
 
+## Screenshots & Documentation
+
+The app includes automated screenshot generation for README and documentation.
+
+### Demo Mode
+Add `?demo=user` or `?demo=admin` to any URL to view the app with mock data (no Firebase required).
+
+### Generating Screenshots
+```bash
+npm run screenshots          # All screenshots
+npm run screenshots:desktop  # Desktop only
+npm run screenshots:mobile   # Mobile only
+npm run screenshots:video    # Record videos for GIFs
+npm run gifs                 # Convert videos to GIFs (requires ffmpeg)
+```
+
+### When to Update Screenshots
+**IMPORTANT:** After making significant UI changes, ask the user:
+> "Should I regenerate the screenshots for the README? Run `npm run screenshots` to update them."
+
+Screenshots are stored in `screenshots/output/` (gitignored). See `screenshots/README.md` for details.
+
 ## Known Issues & Limitations
 
 - No error boundary implemented yet

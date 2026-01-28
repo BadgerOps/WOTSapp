@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './contexts/AuthContext'
 import { NotificationProvider } from './contexts/NotificationContext'
+import { DemoProvider } from './contexts/DemoContext'
 import { SentryErrorBoundary } from './components/common/SentryErrorBoundary'
 import { initSentry } from './config/sentry'
 import './index.css'
@@ -15,11 +16,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <SentryErrorBoundary>
       <BrowserRouter>
-        <AuthProvider>
-          <NotificationProvider>
-            <App />
-          </NotificationProvider>
-        </AuthProvider>
+        <DemoProvider>
+          <AuthProvider>
+            <NotificationProvider>
+              <App />
+            </NotificationProvider>
+          </AuthProvider>
+        </DemoProvider>
       </BrowserRouter>
     </SentryErrorBoundary>
   </React.StrictMode>

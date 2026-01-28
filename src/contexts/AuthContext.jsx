@@ -9,11 +9,19 @@ import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp, collection,
 import { auth, db } from '../config/firebase'
 import { authLog } from '../lib/authDebugger'
 import { ROLES, PERMISSIONS, hasPermission, normalizeRole } from '../lib/roles'
+import { getDemoMode, useDemoAuth } from './DemoContext'
 
 const AuthContext = createContext()
 
 export function useAuth() {
   const context = useContext(AuthContext)
+  const demoAuth = useDemoAuth()
+
+  // If in demo mode, return demo auth instead
+  if (demoAuth) {
+    return demoAuth
+  }
+
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider')
   }
