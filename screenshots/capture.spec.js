@@ -10,7 +10,7 @@
  * Run with: npm run screenshots
  */
 
-import { test, expect } from '@playwright/test'
+import { test } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
 
