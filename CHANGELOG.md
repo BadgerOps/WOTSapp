@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-01-28
+
+### Fixed
+
+#### Daily Detail Card Display Timing
+- **Evening time slot now starts at 19:00 (7:00 PM)** instead of 19:30 - cards were appearing 30 minutes late
+- **Timezone-aware date comparison** - fixed UTC date bug where cards wouldn't show because `today` was calculated in UTC instead of the configured timezone (America/New_York)
+  - At 8 PM EST, UTC is already the next day, causing `assignmentDate === today` to fail
+  - Now uses `getTodayInTimezone()` for consistent date handling
+
+#### Time Windows
+- Morning: 07:00 - 12:00 (unchanged)
+- Evening: 19:00 - 23:59 (was 19:30 - 23:59)
+
+---
+
 ## [0.5.1] - 2026-01-27
 
 ### Fixed
