@@ -1,0 +1,11 @@
+# Ignore generated screenshots and videos (regenerate with npm run screenshots)
+output/
+test-results/
+playwright-report/
+
+# Keep the mockData and scripts
+!mockData.js
+!capture.spec.js
+!convert-to-gif.js
+!playwright.config.js
+!README.md

@@ -16,7 +16,13 @@
     "deploy:hosting": "npm run build && firebase deploy --only hosting --project wots-app-484617",
     "deploy:functions": "firebase deploy --only functions --project wots-app-484617",
     "deploy:rules": "firebase deploy --only firestore,storage --project wots-app-484617",
-    "deploy:all": "npm run build && firebase deploy --project wots-app-484617"
+    "deploy:all": "npm run build && firebase deploy --project wots-app-484617",
+    "screenshots": "npx playwright test --config=screenshots/playwright.config.js",
+    "screenshots:update": "npx playwright test --config=screenshots/playwright.config.js --update-snapshots",
+    "screenshots:desktop": "npx playwright test --config=screenshots/playwright.config.js --grep @desktop",
+    "screenshots:mobile": "npx playwright test --config=screenshots/playwright.config.js --grep @mobile",
+    "screenshots:video": "npx playwright test --config=screenshots/playwright.config.js --grep @video",
+    "gifs": "node screenshots/convert-to-gif.js"
   },
   "dependencies": {
     "@sentry/react": "^10.36.0",
@@ -30,6 +36,7 @@
     "react-router-dom": "^7.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.0",
     "@sentry/vite-plugin": "^4.7.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

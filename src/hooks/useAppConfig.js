@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { doc, onSnapshot } from 'firebase/firestore'
 import { db } from '../config/firebase'
+import { useDemoData } from '../contexts/DemoContext'
 
 export const DEFAULT_CONFIG = {
   timezone: 'America/New_York',
@@ -24,8 +25,19 @@ export function useAppConfig() {
   const [config, setConfig] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const demoConfig = useDemoData('appConfig')
 
   useEffect(() => {
+    // If in demo mode, use mock config
+    if (demoConfig) {
+      setConfig({
+        ...DEFAULT_CONFIG,
+        ...demoConfig,
+      })
+      setLoading(false)
+      return
+    }
+
     const docRef = doc(db, 'settings', 'appConfig')
 
     const unsubscribe = onSnapshot(
@@ -50,7 +62,7 @@ export function useAppConfig() {
     )
 
     return unsubscribe
-  }, [])
+  }, [demoConfig])
 
   return { config, loading, error }
 }

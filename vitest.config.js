@@ -29,7 +29,8 @@ export default defineConfig({
     // Exclude problematic test file that causes OOM on Node.js < 22.12
     // This test can be run manually with: npm test -- --run src/hooks/useCQSwapRequests.test.js
     // The OOM is likely due to jsdom + renderHook memory accumulation
-    exclude: ['**/node_modules/**', 'src/hooks/useCQSwapRequests.test.js'],
+    // Also exclude Playwright screenshot specs (run with npm run screenshots)
+    exclude: ['**/node_modules/**', 'src/hooks/useCQSwapRequests.test.js', 'screenshots/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

@@ -4,8 +4,24 @@ import { APP_VERSION } from '../config/appVersion'
 const changelog = [
   {
     version: APP_VERSION,
-    date: '2026-01-27',
+    date: '2026-01-28',
     sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Automated Screenshot & GIF Generation',
+            details: [
+              'Playwright-based screenshot capture for README documentation',
+              'Demo mode with mock data injection (Air Force terminology, Maxwell AFB context)',
+              'Desktop (1280x800) and mobile (375x667) screenshot capture',
+              'Video recording for GIF conversion workflow',
+              'npm scripts: screenshots, screenshots:desktop, screenshots:mobile, screenshots:video, gifs',
+              'Security: Demo mode only available in development builds',
+            ],
+          },
+        ],
+      },
       {
         title: 'Fixed',
         items: [
