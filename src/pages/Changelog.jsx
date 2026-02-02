@@ -4,6 +4,72 @@ import { APP_VERSION } from '../config/appVersion'
 const changelog = [
   {
     version: APP_VERSION,
+    date: '2026-02-01',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'CQ Schedule Visible to All Users',
+            details: [
+              'New "Upcoming CQ Schedule" section on the /cq page - all users can see who\'s on CQ duty',
+              'Shows both shifts (2000-0100 and 0100-0600) with assigned personnel for the next 14 days',
+              'Today\'s shift highlighted with "Tonight" badge for quick reference',
+              'Potential skip days (quiz/PT test) marked with orange highlighting',
+            ],
+          },
+          {
+            category: 'Tabbed CQ Page Layout',
+            details: [
+              '/cq page now uses tabs to separate CQ schedule from personnel accountability',
+              'Schedule tab: Current active shift + upcoming 14-day schedule',
+              'Accountability tab (default): Sign-out form, personnel status, and recent CQ notes',
+              'Badge on Accountability tab shows count of personnel currently out on pass',
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.5.2',
+    date: '2026-01-28',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Automatic Daily Detail Assignment Cloning',
+            details: [
+              'Details now auto-reset each day at configured notification times (default 07:00 and 19:00)',
+              'Cloned assignments have all tasks reset to uncompleted with fresh "assigned" status',
+            ],
+          },
+        ],
+      },
+      {
+        title: 'Fixed',
+        items: [
+          {
+            category: 'CQ Schedule Retroactive Skip',
+            details: [
+              'skipDate() now supports retroactive skips - previously only worked for future dates',
+              'Day of week updates automatically when dates shift',
+            ],
+          },
+          {
+            category: 'Daily Detail Card Display Timing',
+            details: [
+              'Evening time slot now starts at 19:00 (7:00 PM) instead of 19:30',
+              'Timezone-aware date comparison fixes UTC date bug',
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.5.1',
     date: '2026-01-27',
     sections: [
       {
@@ -718,8 +784,7 @@ const changelog = [
 ]
 
 const planned = [
-  'Cleaning details assignment and tracking',
-  'CQ status board with DA Form generation',
+  'CQ DA Form generation',
   'Remove BETA label when system is validated',
 ]
 
