@@ -2,6 +2,7 @@ import { useActiveShift } from "../hooks/useCQShifts";
 import { usePersonnelStatus, STATUS_TYPES } from "../hooks/usePersonnelStatus";
 import { useRecentCQNotes, NOTE_TYPES } from "../hooks/useCQNotes";
 import SelfSignOutForm from "../components/cq/SelfSignOutForm";
+import UpcomingCQSchedule from "../components/cq/UpcomingCQSchedule";
 import Loading from "../components/common/Loading";
 
 const STATUS_COLORS = {
@@ -91,6 +92,11 @@ export default function CQView() {
           No active CQ shift at this time.
         </div>
       )}
+
+      {/* Upcoming CQ Schedule */}
+      <div className="mb-6">
+        <UpcomingCQSchedule limit={7} />
+      </div>
 
       {/* Status Summary */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">

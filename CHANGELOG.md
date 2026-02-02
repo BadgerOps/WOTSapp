@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-02-01
+
+### Added
+
+#### CQ Schedule Visible to All Users
+- **New "Upcoming CQ Schedule" section on the /cq page** - all authenticated users can now see who's on CQ duty for the next 7 days
+- **Clean, read-only display** showing both shifts (2000-0100 and 0100-0600) with assigned personnel
+- **Today's shift highlighted** with "Tonight" badge for quick reference
+- **Potential skip days marked** with orange highlighting (for quiz/PT test days)
+- Component: `UpcomingCQSchedule.jsx` - reusable with configurable day limit
+
+---
+
 ## [0.5.2] - 2026-01-28
 
 ### Added
@@ -626,6 +639,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Cleaning details assignment and tracking
-- CQ status board with DA Form generation
+- CQ DA Form generation
 - Remove BETA label when system is validated
