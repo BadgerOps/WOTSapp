@@ -2,6 +2,7 @@ import { useActiveShift } from "../hooks/useCQShifts";
 import { usePersonnelStatus, STATUS_TYPES } from "../hooks/usePersonnelStatus";
 import { useRecentCQNotes, NOTE_TYPES } from "../hooks/useCQNotes";
 import SelfSignOutForm from "../components/cq/SelfSignOutForm";
+import LibertyRequestForm from "../components/cq/LibertyRequestForm";
 import Loading from "../components/common/Loading";
 
 const STATUS_COLORS = {
@@ -52,6 +53,11 @@ export default function CQView() {
       {/* Self Sign-Out Section */}
       <div className="mb-6">
         <SelfSignOutForm />
+      </div>
+
+      {/* Weekend Liberty Request Section */}
+      <div className="mb-6">
+        <LibertyRequestForm />
       </div>
 
       {/* Current Shift Info */}

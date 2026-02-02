@@ -2,6 +2,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useAppConfig } from '../hooks/useAppConfig'
 import PostFeed from '../components/posts/PostFeed'
 import MyPassStatusCard from '../components/cq/MyPassStatusCard'
+import MyLibertyCard from '../components/cq/MyLibertyCard'
 import MyDetailCard from '../components/details/MyDetailCard'
 import MyCQShiftCard from '../components/cq/MyCQShiftCard'
 import PendingSurveyCard from '../components/surveys/PendingSurveyCard'
@@ -49,6 +50,9 @@ export default function Home() {
 
       {/* Pass Status Card - shows if user is on pass */}
       <MyPassStatusCard />
+
+      {/* Liberty Card - shows pending/approved weekend liberty */}
+      <MyLibertyCard />
 
       {/* Detail Card - shows at 7am and 7:30pm if user has assigned details */}
       <MyDetailCard />

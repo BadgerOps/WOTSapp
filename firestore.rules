@@ -266,6 +266,27 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Liberty Requests collection (weekend liberty planning)
+    match /libertyRequests/{requestId} {
+      // Anyone authenticated can read their own requests
+      allow read: if isAuthenticated() &&
+        resource.data.requesterId == request.auth.uid;
+      // Candidate leadership and admins can read all requests
+      allow read: if isCandidateLeadership();
+      // Authenticated users can create their own requests
+      allow create: if isAuthenticated() &&
+        request.resource.data.requesterId == request.auth.uid;
+      // Users can cancel their own pending requests
+      allow update: if isAuthenticated() &&
+        resource.data.requesterId == request.auth.uid &&
+        resource.data.status == 'pending' &&
+        request.resource.data.status == 'cancelled';
+      // Candidate leadership can update (approve/reject)
+      allow update: if isCandidateLeadership();
+      // Only admins can delete
+      allow delete: if isAdmin();
+    }
+
     // Personnel Status collection (rolling current status)
     match /personnelStatus/{statusId} {
       // Users can read and update their own status (for self sign-out)
