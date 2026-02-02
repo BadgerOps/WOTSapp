@@ -30,6 +30,7 @@ import CQAuditLog from '../components/cq/CQAuditLog'
 import StatusCleanupTool from '../components/cq/StatusCleanupTool'
 import CQSwapApprovalQueue from '../components/cq/CQSwapApprovalQueue'
 import PassApprovalQueue from '../components/cq/PassApprovalQueue'
+import LibertyRequestsManager from '../components/cq/LibertyRequestsManager'
 import SurveyComposer from '../components/surveys/SurveyComposer'
 import SurveyManager from '../components/surveys/SurveyManager'
 import SurveyResults from '../components/surveys/SurveyResults'
@@ -411,6 +412,16 @@ export default function Admin() {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setCqSubTab('liberty')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cqSubTab === 'liberty'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Liberty Requests
+            </button>
           </div>
 
           {cqSubTab === 'dashboard' && <CQDashboard />}
@@ -422,6 +433,7 @@ export default function Admin() {
           {cqSubTab === 'maintenance' && <StatusCleanupTool />}
           {cqSubTab === 'swaps' && <CQSwapApprovalQueue />}
           {cqSubTab === 'passApprovals' && <PassApprovalQueue />}
+          {cqSubTab === 'liberty' && <LibertyRequestsManager />}
         </div>
       )}
 
