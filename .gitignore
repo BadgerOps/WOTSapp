@@ -43,3 +43,5 @@ handoff.md
 data/
 *.xlsx
 cq_list_converted.csv
+screenshots/
+test-results/

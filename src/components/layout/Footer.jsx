@@ -28,12 +28,10 @@ export default function Footer() {
 
   return (
     <footer className="fixed bottom-0 left-0 right-0 z-40">
-      <div className="bg-red-600 text-white py-1 px-4 text-xs text-center font-semibold">
-        NOTE: THIS IS NOT AN OFFICIAL WOTS Application, this is a candidate led app
-      </div>
       <div className="bg-gray-800 text-gray-300 py-2 px-4 text-xs">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <span className="text-gray-500">WOTS App v{APP_VERSION}</span>
+          <span className="text-red-500 font-semibold">Candidate Led App</span>
           <span className="font-mono">
             {formatTimeInTimezone(currentTime, timezone)} {timezoneLabel}
           </span>
