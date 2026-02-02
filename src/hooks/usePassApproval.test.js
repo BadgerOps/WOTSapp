@@ -346,3 +346,126 @@ describe("usePendingPassRequestCount", () => {
     });
   });
 });
+
+describe("usePassAdminActions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should create a pass request for another user with auto-approve", async () => {
+    const { getDoc, writeBatch } = await import("firebase/firestore");
+
+    const mockBatch = {
+      set: vi.fn(),
+      update: vi.fn(),
+      commit: vi.fn(() => Promise.resolve()),
+    };
+    writeBatch.mockReturnValue(mockBatch);
+
+    // Mock getDoc for personnel lookup
+    getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        firstName: "Admin",
+        lastName: "User",
+      }),
+    });
+
+    const { usePassAdminActions } = await import("./usePassApproval");
+    const { result } = renderHook(() => usePassAdminActions());
+
+    await act(async () => {
+      const response = await result.current.createPassRequestForUser({
+        targetUserId: "target-user-id",
+        targetUserName: "Target User",
+        targetUserEmail: "target@example.com",
+        destination: "BX",
+        expectedReturn: "2026-01-24T20:00:00Z",
+        contactNumber: "555-0100",
+        notes: "Created by admin",
+        companions: [],
+        autoApprove: true,
+      });
+      expect(response.success).toBe(true);
+      expect(response.autoApproved).toBe(true);
+    });
+
+    // Should use batch for auto-approve (creates multiple docs)
+    expect(mockBatch.set).toHaveBeenCalled();
+    expect(mockBatch.commit).toHaveBeenCalled();
+    expect(result.current.loading).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
+
+  it("should create a pass request for another user without auto-approve", async () => {
+    const { getDoc, addDoc } = await import("firebase/firestore");
+
+    // Mock getDoc for personnel lookup
+    getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        firstName: "Admin",
+        lastName: "User",
+      }),
+    });
+
+    addDoc.mockResolvedValue({ id: "new-request-id" });
+
+    const { usePassAdminActions } = await import("./usePassApproval");
+    const { result } = renderHook(() => usePassAdminActions());
+
+    await act(async () => {
+      const response = await result.current.createPassRequestForUser({
+        targetUserId: "target-user-id",
+        targetUserName: "Target User",
+        targetUserEmail: "target@example.com",
+        destination: "BX",
+        autoApprove: false,
+      });
+      expect(response.success).toBe(true);
+      expect(response.autoApproved).toBe(false);
+      expect(response.requestId).toBe("new-request-id");
+    });
+
+    expect(addDoc).toHaveBeenCalled();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it("should handle errors when creating pass request for user", async () => {
+    const { getDoc, writeBatch } = await import("firebase/firestore");
+
+    const mockBatch = {
+      set: vi.fn(),
+      update: vi.fn(),
+      commit: vi.fn(() => Promise.reject(new Error("Permission denied"))),
+    };
+    writeBatch.mockReturnValue(mockBatch);
+
+    getDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({
+        firstName: "Admin",
+        lastName: "User",
+      }),
+    });
+
+    const { usePassAdminActions } = await import("./usePassApproval");
+    const { result } = renderHook(() => usePassAdminActions());
+
+    await act(async () => {
+      try {
+        await result.current.createPassRequestForUser({
+          targetUserId: "target-user-id",
+          targetUserName: "Target User",
+          targetUserEmail: "target@example.com",
+          destination: "BX",
+          autoApprove: true,
+        });
+      } catch (err) {
+        expect(err.message).toBe("Permission denied");
+      }
+    });
+
+    expect(result.current.error).toBe("Permission denied");
+  });
+});

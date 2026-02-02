@@ -520,6 +520,223 @@ export function usePassApprovalActions() {
 }
 
 /**
+ * Hook for leave admins to create pass requests on behalf of other users
+ */
+export function usePassAdminActions() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  /**
+   * Create a pass request on behalf of another user and optionally auto-approve
+   * @param {Object} requestData - Pass request details
+   * @param {string} requestData.targetUserId - The user ID to create the request for
+   * @param {string} requestData.targetUserName - The user's display name
+   * @param {string} requestData.targetUserEmail - The user's email
+   * @param {string} requestData.destination - Where they're going
+   * @param {string} requestData.expectedReturn - Expected return time (ISO string)
+   * @param {string} requestData.contactNumber - Contact number while out
+   * @param {string} requestData.notes - Additional notes
+   * @param {Array} requestData.companions - Array of companion objects {id, name, rank}
+   * @param {boolean} requestData.autoApprove - If true, auto-approve and sign out (default true)
+   */
+  async function createPassRequestForUser(requestData) {
+    setLoading(true);
+    setError(null);
+    try {
+      const companions = requestData.companions || [];
+      const autoApprove = requestData.autoApprove !== false; // Default to true
+
+      // Get admin's initials for approval tracking
+      const personnelQuery = await getDoc(doc(db, "personnel", user.uid));
+      let adminInitials = "";
+      let adminFirstName = "";
+      let adminLastName = "";
+
+      if (personnelQuery.exists()) {
+        const personnelData = personnelQuery.data();
+        adminFirstName = personnelData.firstName || "";
+        adminLastName = personnelData.lastName || "";
+      }
+
+      if (!adminFirstName && !adminLastName && user.displayName) {
+        const nameParts = user.displayName.split(" ");
+        adminFirstName = nameParts[0] || "";
+        adminLastName = nameParts.slice(1).join(" ") || "";
+      }
+
+      adminInitials = (adminFirstName.charAt(0) + adminLastName.charAt(0)).toUpperCase();
+
+      if (autoApprove) {
+        // Auto-approve: create as approved and sign out immediately
+        const batch = writeBatch(db);
+        const timeOut = new Date().toISOString();
+
+        // Create the request as approved
+        const requestRef = doc(collection(db, "passApprovalRequests"));
+        batch.set(requestRef, {
+          requesterId: requestData.targetUserId,
+          requesterName: requestData.targetUserName,
+          requesterEmail: requestData.targetUserEmail,
+          destination: requestData.destination || null,
+          expectedReturn: requestData.expectedReturn || null,
+          contactNumber: requestData.contactNumber || null,
+          notes: requestData.notes || null,
+          companions,
+          status: "approved",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          approvedAt: serverTimestamp(),
+          approvedBy: user.uid,
+          approvedByName: user.displayName || user.email,
+          approverInitials: adminInitials,
+          // Track that this was created on behalf of the user
+          createdOnBehalfOf: true,
+          createdByAdminId: user.uid,
+          createdByAdminName: user.displayName || user.email,
+        });
+
+        // Create personnel status for the requester
+        const requesterStatusRef = doc(db, "personnelStatus", requestData.targetUserId);
+        batch.set(requesterStatusRef, {
+          personnelId: requestData.targetUserId,
+          status: "pass",
+          passStage: "enroute_to",
+          timeOut,
+          destination: requestData.destination || null,
+          expectedReturn: requestData.expectedReturn || null,
+          contactNumber: requestData.contactNumber || null,
+          notes: requestData.notes || null,
+          companions,
+          updatedBy: user.uid,
+          updatedByName: user.displayName || user.email,
+          userEmail: requestData.targetUserEmail,
+          updatedAt: serverTimestamp(),
+          passApprovalRequestId: requestRef.id,
+          approvedBy: user.uid,
+          approvedByName: user.displayName || user.email,
+          approverInitials: adminInitials,
+          createdOnBehalfOf: true,
+        });
+
+        // Create history entry for requester
+        const requesterHistoryRef = doc(collection(db, "personnelStatusHistory"));
+        batch.set(requesterHistoryRef, {
+          personnelId: requestData.targetUserId,
+          personnelName: requestData.targetUserName,
+          status: "pass",
+          passStage: "enroute_to",
+          previousStatus: "present",
+          action: "sign_out",
+          timeOut,
+          destination: requestData.destination || null,
+          expectedReturn: requestData.expectedReturn || null,
+          contactNumber: requestData.contactNumber || null,
+          notes: requestData.notes || null,
+          companions,
+          updatedBy: user.uid,
+          updatedByName: user.displayName || user.email,
+          timestamp: serverTimestamp(),
+          passApprovalRequestId: requestRef.id,
+          approvedBy: user.uid,
+          approvedByName: user.displayName || user.email,
+          approverInitials: adminInitials,
+          createdOnBehalfOf: true,
+        });
+
+        // Also sign out companions
+        for (const companion of companions) {
+          const companionStatusRef = doc(db, "personnelStatus", companion.id);
+          batch.set(companionStatusRef, {
+            personnelId: companion.id,
+            status: "pass",
+            passStage: "enroute_to",
+            timeOut,
+            destination: requestData.destination || null,
+            expectedReturn: requestData.expectedReturn || null,
+            contactNumber: requestData.contactNumber || null,
+            notes: `With ${requestData.targetUserName}`,
+            withPersonId: requestData.targetUserId,
+            withPersonName: requestData.targetUserName,
+            updatedBy: user.uid,
+            updatedByName: user.displayName || user.email,
+            updatedAt: serverTimestamp(),
+            passApprovalRequestId: requestRef.id,
+            approvedBy: user.uid,
+            approvedByName: user.displayName || user.email,
+            approverInitials: adminInitials,
+            groupSignOut: true,
+            createdOnBehalfOf: true,
+          });
+
+          // Create history entry for companion
+          const companionHistoryRef = doc(collection(db, "personnelStatusHistory"));
+          batch.set(companionHistoryRef, {
+            personnelId: companion.id,
+            personnelName: companion.name,
+            personnelRank: companion.rank || null,
+            status: "pass",
+            passStage: "enroute_to",
+            previousStatus: "present",
+            action: "sign_out",
+            timeOut,
+            destination: requestData.destination || null,
+            expectedReturn: requestData.expectedReturn || null,
+            notes: `Group sign-out with ${requestData.targetUserName} (created by admin)`,
+            updatedBy: user.uid,
+            updatedByName: user.displayName || user.email,
+            timestamp: serverTimestamp(),
+            passApprovalRequestId: requestRef.id,
+            approvedBy: user.uid,
+            approvedByName: user.displayName || user.email,
+            approverInitials: adminInitials,
+            groupSignOut: true,
+            createdOnBehalfOf: true,
+          });
+        }
+
+        await batch.commit();
+        setLoading(false);
+        return { success: true, requestId: requestRef.id, autoApproved: true };
+      } else {
+        // Create as pending (not auto-approved)
+        const requestDoc = await addDoc(collection(db, "passApprovalRequests"), {
+          requesterId: requestData.targetUserId,
+          requesterName: requestData.targetUserName,
+          requesterEmail: requestData.targetUserEmail,
+          destination: requestData.destination || null,
+          expectedReturn: requestData.expectedReturn || null,
+          contactNumber: requestData.contactNumber || null,
+          notes: requestData.notes || null,
+          companions,
+          status: "pending",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          // Track that this was created on behalf of the user
+          createdOnBehalfOf: true,
+          createdByAdminId: user.uid,
+          createdByAdminName: user.displayName || user.email,
+        });
+
+        setLoading(false);
+        return { success: true, requestId: requestDoc.id, autoApproved: false };
+      }
+    } catch (err) {
+      console.error("Error creating pass request for user:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
+  return {
+    createPassRequestForUser,
+    loading,
+    error,
+  };
+}
+
+/**
  * Hook to get pending pass request count (for badge display)
  */
 export function usePendingPassRequestCount() {

@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-02-02
+
+### Added
+
+#### New Leave Admin Role
+- **New `leave_admin` role** - Specialized role for managing leave and pass requests
+- Role positioned between `uniform_admin` and `candidate_leadership` in hierarchy
+- Leave admins can approve/reject pass and liberty requests
+- Leave admins can create requests on behalf of other users
+
+#### Leave Admin Panel
+- **New "Leave Admin" tab** in Admin → CQ section
+- **Create pass requests on behalf of users**:
+  - Select personnel from searchable dropdown
+  - Specify destination, expected return time, contact number, and notes
+  - Option to auto-approve and sign out immediately (default) or create as pending
+  - Auto-approves create personnel status, history entries, and sign out the user
+- **Create liberty requests on behalf of users**:
+  - Select personnel and choose from standard locations or specify custom
+  - Set departure/return dates and times
+  - Add purpose, contact number, and notes
+  - Create as approved (default) or pending status
+  - Weekend date auto-calculated
+
+#### Admin Leave Request Hooks
+- `useLeaveAdminActions()` hook with `createLibertyRequestForUser()` function
+- `usePassAdminActions()` hook with `createPassRequestForUser()` function
+- Both hooks support creating requests with `createdOnBehalfOf` tracking
+- Auto-approval flow signs out users and creates history entries
+- Batch operations for efficient database writes
+
+### New Files
+- `src/components/cq/LeaveAdminPanel.jsx` - Admin UI for creating leave/pass requests for others
+- `src/hooks/useLibertyRequests.test.js` - Unit tests for liberty request hooks
+
+### Modified Files
+- `src/lib/roles.js` - Added `LEAVE_ADMIN` role with permissions: `APPROVE_PASS_REQUESTS`, `VIEW_PASS_REQUESTS`, `CREATE_LEAVE_FOR_OTHERS`
+- `src/lib/roles.test.js` - Updated tests for new role
+- `src/contexts/AuthContext.jsx` - Added `isLeaveAdmin`, `canCreateLeaveForOthers`, updated `hasApprovalAuthority`
+- `src/hooks/useLibertyRequests.js` - Added `useLeaveAdminActions()` hook
+- `src/hooks/usePassApproval.js` - Added `usePassAdminActions()` hook
+- `src/hooks/usePassApproval.test.js` - Added tests for `usePassAdminActions`
+- `src/pages/Admin.jsx` - Added Leave Admin sub-tab to CQ section
+- `src/components/personnel/PersonnelRoleCell.test.jsx` - Updated for new role option
+- `firestore.rules` - Added `isLeaveAdmin()` function, updated passApprovalRequests and libertyRequests rules
+
+### Security
+- Firestore rules allow leave_admin to read all pass/liberty requests
+- Firestore rules allow leave_admin to create requests on behalf of others (when `createdOnBehalfOf` is true)
+- Firestore rules allow leave_admin to approve/reject requests
+
+---
+
 ## [0.5.4] - 2026-02-02
 
 ### Added

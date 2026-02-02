@@ -372,12 +372,14 @@ export function AuthProvider({ children }) {
     isAdmin: userRole === ROLES.ADMIN,
     isUniformAdmin: userRole === ROLES.UNIFORM_ADMIN || userRole === ROLES.ADMIN,
     canManageWeather: userRole === ROLES.UNIFORM_ADMIN || userRole === ROLES.ADMIN,
+    isLeaveAdmin: userRole === ROLES.LEAVE_ADMIN || userRole === ROLES.CANDIDATE_LEADERSHIP || userRole === ROLES.ADMIN,
     isCandidateLeadership: userRole === ROLES.CANDIDATE_LEADERSHIP || userRole === ROLES.ADMIN,
 
     // Approval authority check (used for showing Approvals tab)
     hasApprovalAuthority:
       userRole === ROLES.ADMIN ||
       userRole === ROLES.UNIFORM_ADMIN ||
+      userRole === ROLES.LEAVE_ADMIN ||
       userRole === ROLES.CANDIDATE_LEADERSHIP,
 
     // New permission-based check function
@@ -399,6 +401,7 @@ export function AuthProvider({ children }) {
     canManageConfig: hasPermission(userRole, PERMISSIONS.MANAGE_CONFIG),
     canApprovePassRequests: hasPermission(userRole, PERMISSIONS.APPROVE_PASS_REQUESTS),
     canViewPassRequests: hasPermission(userRole, PERMISSIONS.VIEW_PASS_REQUESTS),
+    canCreateLeaveForOthers: hasPermission(userRole, PERMISSIONS.CREATE_LEAVE_FOR_OTHERS),
     canManageCQOperations: hasPermission(userRole, PERMISSIONS.MANAGE_CQ_OPERATIONS),
 
     signInWithGoogle,

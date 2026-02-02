@@ -540,6 +540,119 @@ export function useLibertyApprovalActions() {
 }
 
 /**
+ * Hook for leave admins to create liberty requests on behalf of other users
+ */
+export function useLeaveAdminActions() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  /**
+   * Create a liberty request on behalf of another user
+   * @param {Object} requestData - Liberty request details
+   * @param {string} requestData.targetUserId - The user ID to create the request for
+   * @param {string} requestData.targetUserName - The user's display name
+   * @param {string} requestData.targetUserEmail - The user's email
+   * @param {string} requestData.location - Where they're going
+   * @param {string} requestData.customLocation - Custom location if "other" selected
+   * @param {string} requestData.departureDate - Departure date (ISO string)
+   * @param {string} requestData.departureTime - Departure time
+   * @param {string} requestData.returnDate - Return date (ISO string)
+   * @param {string} requestData.returnTime - Return time
+   * @param {string} requestData.contactNumber - Contact number while out
+   * @param {string} requestData.purpose - Reason for liberty
+   * @param {string} requestData.notes - Additional notes
+   * @param {Array} requestData.companions - Array of companion objects {id, name, rank}
+   * @param {string} requestData.weekendDate - The weekend this is for (Saturday date as ISO string)
+   * @param {string} requestData.status - Optional status (pending or approved), defaults to approved
+   */
+  async function createLibertyRequestForUser(requestData) {
+    setLoading(true);
+    setError(null);
+    try {
+      const companions = requestData.companions || [];
+
+      // Build the destination string
+      const destination = requestData.location === "other"
+        ? requestData.customLocation
+        : LIBERTY_LOCATIONS.find(l => l.value === requestData.location)?.label || requestData.location;
+
+      // Get admin's initials for approval tracking
+      const personnelQuery = await getDoc(doc(db, "personnel", user.uid));
+      let adminInitials = "";
+      let adminFirstName = "";
+      let adminLastName = "";
+
+      if (personnelQuery.exists()) {
+        const personnelData = personnelQuery.data();
+        adminFirstName = personnelData.firstName || "";
+        adminLastName = personnelData.lastName || "";
+      }
+
+      if (!adminFirstName && !adminLastName && user.displayName) {
+        const nameParts = user.displayName.split(" ");
+        adminFirstName = nameParts[0] || "";
+        adminLastName = nameParts.slice(1).join(" ") || "";
+      }
+
+      adminInitials = (adminFirstName.charAt(0) + adminLastName.charAt(0)).toUpperCase();
+
+      const status = requestData.status || "approved";
+      const isApproved = status === "approved";
+
+      // Create the request
+      const docData = {
+        requesterId: requestData.targetUserId,
+        requesterName: requestData.targetUserName,
+        requesterEmail: requestData.targetUserEmail,
+        location: requestData.location,
+        destination,
+        departureDate: requestData.departureDate || null,
+        departureTime: requestData.departureTime || null,
+        returnDate: requestData.returnDate || null,
+        returnTime: requestData.returnTime || null,
+        contactNumber: requestData.contactNumber || null,
+        purpose: requestData.purpose || null,
+        notes: requestData.notes || null,
+        companions,
+        weekendDate: requestData.weekendDate,
+        status,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        // Track that this was created on behalf of the user
+        createdOnBehalfOf: true,
+        createdByAdminId: user.uid,
+        createdByAdminName: user.displayName || user.email,
+      };
+
+      // If auto-approved, add approval info
+      if (isApproved) {
+        docData.approvedAt = serverTimestamp();
+        docData.approvedBy = user.uid;
+        docData.approvedByName = user.displayName || user.email;
+        docData.approverInitials = adminInitials;
+      }
+
+      const requestDoc = await addDoc(collection(db, "libertyRequests"), docData);
+
+      setLoading(false);
+      return { success: true, requestId: requestDoc.id };
+    } catch (err) {
+      console.error("Error creating liberty request for user:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
+  return {
+    createLibertyRequestForUser,
+    loading,
+    error,
+  };
+}
+
+/**
  * Hook to get pending liberty request count (for badge display)
  */
 export function usePendingLibertyRequestCount() {
