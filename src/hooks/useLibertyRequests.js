@@ -26,13 +26,13 @@ export const LIBERTY_REQUEST_STATUS = {
 };
 
 /**
- * Common liberty locations
+ * Common liberty locations (matches pass request destinations)
  */
 export const LIBERTY_LOCATIONS = [
-  { value: "san_antonio", label: "San Antonio" },
-  { value: "austin", label: "Austin" },
-  { value: "local_area", label: "Local Area" },
-  { value: "home", label: "Home (Family Visit)" },
+  { value: "shoppette", label: "Shoppette" },
+  { value: "bx_commissary", label: "BX/Commissary" },
+  { value: "gym", label: "Gym" },
+  { value: "library", label: "Library" },
   { value: "other", label: "Other" },
 ];
 
