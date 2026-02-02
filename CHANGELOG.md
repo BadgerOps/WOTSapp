@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] - 2026-02-02
+
+### Fixed
+
+#### Daily Detail Reset Timing
+- **Details now properly reset at configured morning/evening times** - Previously, details would not reset if an existing assignment was still in `assigned`, `in_progress`, or `rejected` status
+- **New `resetExistingAssignments()` function** resets all existing assignments for the current time slot when the scheduled reminder fires
+- Tasks are reset to `completed: false` and all completion timestamps are cleared
+- Status is reset to `assigned` so users can start fresh each morning/evening
+- **`lastResetAt` field** added to track when assignments were last reset
+
+#### Detail Card Visibility for All Users
+- **Detail card now shows on Home screen for ALL users** during morning (7:00 AM - 12:00 PM) and evening (7:00 PM - 11:59 PM) windows
+- Users without assigned tasks see a read-only info card with overall detail progress
+- Users with assigned tasks continue to see the full interactive card
+- **New `useActiveDetailForTimeSlot()` hook** fetches the active detail regardless of user assignment
+
+#### Complete Daily Reset
+- **ALL assignments are reset regardless of status** - Even approved/completed details are reset each morning/evening
+- Approval fields (`approvedAt`, `approvedBy`, `approvedByName`, `approverNotes`) are cleared on reset
+- `clonedFrom` field tracks lineage for audit purposes
+
+### New Files
+- `functions/detailNotifications.test.js` - 21 unit tests for detail reset functionality
+
+### Modified Files
+- `functions/detailNotifications.js` - Added `resetAssignmentForNewDay()`, `getAssignmentsToReset()`, `resetExistingAssignments()` functions
+- `src/hooks/useMyActiveDetail.js` - Added `useActiveDetailForTimeSlot()` hook
+- `src/components/details/MyDetailCard.jsx` - Shows read-only card for users without assigned tasks
+- `vitest.config.js` - Added aliases for firebase-functions and firebase-admin for functions tests
+
+---
+
 ## [0.5.4] - 2026-02-02
 
 ### Added
