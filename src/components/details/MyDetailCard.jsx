@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useMyActiveDetail, useDetailCardActions, DETAIL_STAGES } from '../../hooks/useMyActiveDetail'
+import { useMyActiveDetail, useActiveDetailForTimeSlot, useDetailCardActions, DETAIL_STAGES } from '../../hooks/useMyActiveDetail'
 import { useMyPersonnelIds } from '../../hooks/useMyPersonnelIds'
 import Loading from '../common/Loading'
 
 export default function MyDetailCard() {
   const { user } = useAuth()
   const { isCurrentUser } = useMyPersonnelIds()
-  const { activeDetail, loading, error, currentTimeSlot } = useMyActiveDetail()
+  // Get user's specific detail assignment
+  const { activeDetail: myActiveDetail, loading: myLoading, error: myError, currentTimeSlot } = useMyActiveDetail()
+  // Get any active detail for the time slot (for showing to all users)
+  const { activeDetail: slotDetail, loading: slotLoading } = useActiveDetailForTimeSlot()
   const {
     startDetail,
     completeTask,
@@ -20,10 +23,16 @@ export default function MyDetailCard() {
   const [expandedTasks, setExpandedTasks] = useState(false)
   const [selectedTaskKeys, setSelectedTaskKeys] = useState(new Set())
 
-  // Get user's tasks from the assignment
+  // Use user's detail if they have tasks, otherwise use slot detail for read-only view
+  const activeDetail = myActiveDetail || slotDetail
+  const loading = myLoading || slotLoading
+  const error = myError
+
+  // Check if user has tasks assigned
   const myTasks = activeDetail?.tasks?.filter(
     (t) => isCurrentUser(t.assignedTo?.personnelId)
   ) || []
+  const hasMyTasks = myTasks.length > 0
 
   const completedTasks = myTasks.filter((t) => t.completed)
   const remainingTasks = myTasks.filter((t) => !t.completed)
@@ -62,15 +71,58 @@ export default function MyDetailCard() {
   if (loading) return null // Don't show loading state on home - just hide if loading
 
   // Only show if there's an active detail
-  // For assigned status, require current time slot
-  // For in_progress or rejected status, always show (user needs to complete them)
   if (!activeDetail) {
     return null
   }
 
-  const showWithoutTimeSlot = activeDetail.status === 'in_progress' || activeDetail.status === 'rejected'
+  // For users with tasks: show in_progress/rejected at any time, assigned only during time slot
+  // For users without tasks: only show during time slot (read-only info)
+  const showWithoutTimeSlot = hasMyTasks && (activeDetail.status === 'in_progress' || activeDetail.status === 'rejected')
   if (!showWithoutTimeSlot && !currentTimeSlot) {
     return null
+  }
+
+  // If user has no tasks assigned, show a read-only info card
+  if (!hasMyTasks) {
+    return (
+      <div className="rounded-lg border p-4 mb-6 bg-gray-50 border-gray-200">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                {currentTimeSlot === 'morning' ? 'Morning' : 'Evening'} Detail
+              </span>
+              <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                Active
+              </span>
+            </div>
+            <h3 className="font-semibold text-gray-900">{activeDetail.templateName}</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Detail is in progress. You have no tasks assigned.
+            </p>
+            {/* Show overall progress */}
+            {activeDetail.tasks && activeDetail.tasks.length > 0 && (
+              <div className="mt-3">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-gray-600">
+                    {activeDetail.tasks.filter(t => t.completed).length}/{activeDetail.tasks.length} tasks completed
+                  </span>
+                  <span className="text-gray-600">
+                    {Math.round((activeDetail.tasks.filter(t => t.completed).length / activeDetail.tasks.length) * 100)}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="h-2 rounded-full bg-primary-500 transition-all"
+                    style={{ width: `${(activeDetail.tasks.filter(t => t.completed).length / activeDetail.tasks.length) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const allTasksCompleted = myTasks.length > 0 && remainingTasks.length === 0

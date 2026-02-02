@@ -73,6 +73,101 @@ async function hasAssignmentForToday(db, today, timeSlot) {
 }
 
 /**
+ * Reset an existing assignment for today's time slot
+ * This resets all tasks to uncompleted and sets status back to 'assigned'
+ * Resets ALL assignments regardless of current status (including approved)
+ * @param {Object} db - Firestore instance
+ * @param {string} assignmentId - The assignment document ID
+ * @param {Object} assignmentData - The current assignment data
+ * @returns {Promise<Object>} Result with reset status
+ */
+async function resetAssignmentForNewDay(db, assignmentId, assignmentData) {
+  // Reset all tasks to not completed
+  const resetTasks = (assignmentData.tasks || []).map((task) => ({
+    ...task,
+    completed: false,
+    completedAt: null,
+    notes: "",
+  }));
+
+  const updates = {
+    status: "assigned",
+    tasks: resetTasks,
+    // Clear all workflow fields
+    startedAt: null,
+    startedBy: null,
+    completedAt: null,
+    completedBy: null,
+    rejectedAt: null,
+    rejectedBy: null,
+    rejectionReason: null,
+    completionNotes: null,
+    approvedAt: null,
+    approvedBy: null,
+    approvedByName: null,
+    approverNotes: null,
+    // Update timestamp
+    updatedAt: new Date(),
+    lastResetAt: new Date(),
+  };
+
+  await db.collection("detailAssignments").doc(assignmentId).update(updates);
+
+  return {
+    id: assignmentId,
+    wasReset: true,
+    previousStatus: assignmentData.status,
+  };
+}
+
+/**
+ * Get existing assignments for today that need to be reset
+ * Returns ALL assignments for today's time slot regardless of status
+ * @param {Object} db - Firestore instance
+ * @param {string} today - Today's date in YYYY-MM-DD format
+ * @param {string} timeSlot - 'morning' or 'evening'
+ * @returns {Promise<Array>} Array of assignment documents to reset
+ */
+async function getAssignmentsToReset(db, today, timeSlot) {
+  const snapshot = await db
+    .collection("detailAssignments")
+    .where("assignmentDate", "==", today)
+    .get();
+
+  // Filter to matching time slot (include 'both')
+  return snapshot.docs.filter((doc) => {
+    const data = doc.data();
+    return data.timeSlot === timeSlot || data.timeSlot === "both";
+  });
+}
+
+/**
+ * Reset all existing assignments for today's time slot
+ * This ensures detail cards are fresh each morning/evening
+ * @param {Object} db - Firestore instance
+ * @param {string} today - Today's date in YYYY-MM-DD format
+ * @param {string} timeSlot - 'morning' or 'evening'
+ * @returns {Promise<Array>} Array of reset results
+ */
+async function resetExistingAssignments(db, today, timeSlot) {
+  const assignmentsToReset = await getAssignmentsToReset(db, today, timeSlot);
+  const results = [];
+
+  for (const doc of assignmentsToReset) {
+    try {
+      const result = await resetAssignmentForNewDay(db, doc.id, doc.data());
+      results.push(result);
+      console.log(`Reset assignment ${doc.id} from ${result.previousStatus} to assigned`);
+    } catch (error) {
+      console.error(`Error resetting assignment ${doc.id}:`, error);
+      results.push({ id: doc.id, wasReset: false, error: error.message });
+    }
+  }
+
+  return results;
+}
+
+/**
  * Get the most recent completed/approved assignment for a time slot
  * @param {Object} db - Firestore instance
  * @param {string} timeSlot - 'morning' or 'evening'
@@ -369,7 +464,7 @@ async function removeInvalidTokens(db, userDocs, invalidTokens) {
 
 /**
  * Send detail reminder notifications
- * Also auto-creates assignments by cloning previous completed ones if none exist for today
+ * Resets existing assignments and/or clones from previous completed ones
  * @param {Object} db - Firestore instance
  * @param {Object} messaging - Firebase Messaging instance
  * @param {string} timeSlot - 'morning' or 'evening'
@@ -379,8 +474,21 @@ async function removeInvalidTokens(db, userDocs, invalidTokens) {
 async function sendDetailReminders(db, messaging, timeSlot, timezone) {
   const today = getTodayInTimezone(timezone);
   let clonedAssignment = null;
+  let resetResults = [];
 
-  // Check if there's already an assignment for today
+  // First, reset any existing assignments for today's time slot
+  // This ensures the detail card is fresh each morning/evening
+  try {
+    resetResults = await resetExistingAssignments(db, today, timeSlot);
+    if (resetResults.length > 0) {
+      console.log(`Reset ${resetResults.length} existing assignment(s) for ${today} ${timeSlot}`);
+    }
+  } catch (error) {
+    console.error("Error resetting existing assignments:", error);
+    // Continue - we can still clone or send notifications
+  }
+
+  // Check if there's already an assignment for today (after reset)
   const hasExisting = await hasAssignmentForToday(db, today, timeSlot);
 
   if (!hasExisting) {
@@ -413,6 +521,7 @@ async function sendDetailReminders(db, messaging, timeSlot, timezone) {
       timeSlot,
       date: today,
       clonedAssignment,
+      resetResults,
     };
   }
 
@@ -427,6 +536,7 @@ async function sendDetailReminders(db, messaging, timeSlot, timezone) {
       date: today,
       assignmentCount: assignments.length,
       clonedAssignment,
+      resetResults,
     };
   }
 
@@ -441,6 +551,7 @@ async function sendDetailReminders(db, messaging, timeSlot, timezone) {
       date: today,
       personnelCount: personnelIds.size,
       clonedAssignment,
+      resetResults,
     };
   }
 
@@ -507,6 +618,7 @@ async function sendDetailReminders(db, messaging, timeSlot, timezone) {
       personnelCount: personnelIds.size,
       assignmentCount: assignments.length,
       clonedAssignment,
+      resetResults,
     };
   } catch (error) {
     console.error("Error sending detail reminder notifications:", error);
@@ -583,3 +695,6 @@ exports.getDetailNotificationConfig = getDetailNotificationConfig;
 exports.cloneAssignmentForDate = cloneAssignmentForDate;
 exports.getMostRecentCompletedAssignment = getMostRecentCompletedAssignment;
 exports.hasAssignmentForToday = hasAssignmentForToday;
+exports.resetAssignmentForNewDay = resetAssignmentForNewDay;
+exports.resetExistingAssignments = resetExistingAssignments;
+exports.getAssignmentsToReset = getAssignmentsToReset;
