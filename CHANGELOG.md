@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Weekend Liberty Request System
 - **New liberty request workflow** for submitting weekend plans prior to the weekend
 - **LibertyRequestForm component** (`/cq` page, Accountability tab) - Submit liberty requests with:
-  - Destination (San Antonio, Austin, Local Area, Home, or custom)
+  - Destination (Shoppette, BX/Commissary, Gym, Library, or custom)
   - Departure date and time
   - Return date and time
   - Contact number (auto-populated from personnel record)
@@ -29,6 +29,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Rejection modal with optional reason
 - **Liberty tab in Approvals page** with real-time badge count
 
+#### Liberty Request Administration
+- **LibertyRequestsManager component** in Admin → CQ → Liberty Requests tab:
+  - Table view of all liberty requests with filters (status, weekend)
+  - Expandable row details showing full request information
+  - CSV export with all request data for OPLAN loading
+  - Status summary showing counts by status
+
+#### Liberty Group Join System
+- **ApprovedLibertyList component** on `/cq` page (Accountability tab):
+  - View all liberty groups (pending and approved) for the upcoming weekend
+  - See group leader, companions, destination, and times
+  - Status badges show "Pending Approval" (yellow) or "Approved" (green)
+  - "Request to Join" button to join existing groups
+- **Join request workflow**:
+  - Users can request to join pending OR approved liberty groups (before deadline lockdown)
+  - Group leaders see pending join requests with badge count
+  - Approve/Decline buttons for group leaders
+  - Approved members automatically added as companions
+  - Cancel pending join request option
+
 #### Configurable Liberty Deadline
 - **Liberty Request Deadline settings** in Admin → Config tab:
   - Day of week dropdown (Sunday through Saturday, default: Tuesday)
@@ -37,20 +57,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Deadline display** shows configured day and time in forms and cards
 
 ### New Files
-- `src/hooks/useLibertyRequests.js` - Liberty request data operations and deadline utilities
+- `src/hooks/useLibertyRequests.js` - Liberty request data operations, deadline utilities, and join actions
 - `src/components/cq/LibertyRequestForm.jsx` - User form for submitting liberty requests
 - `src/components/cq/LibertyApprovalQueue.jsx` - Leadership approval queue
 - `src/components/cq/MyLibertyCard.jsx` - Home page liberty status card
+- `src/components/cq/LibertyRequestsManager.jsx` - Admin table view with CSV export
+- `src/components/cq/ApprovedLibertyList.jsx` - Public approved groups list with join functionality
 
 ### Modified Files
 - `src/hooks/useAppConfig.js` - Added `libertyDeadlineDayOfWeek` and `libertyDeadlineTime` defaults
 - `src/hooks/useUnifiedApprovalCount.js` - Added `libertyCount` and `canApproveLiberty`
 - `src/components/admin/ConfigManager.jsx` - Added Liberty Request Deadline section
+- `src/pages/Admin.jsx` - Added Liberty Requests sub-tab to CQ section
 - `src/pages/Approvals.jsx` - Added Liberty tab
-- `src/pages/CQView.jsx` - Added LibertyRequestForm to Accountability tab
+- `src/pages/CQView.jsx` - Added LibertyRequestForm and ApprovedLibertyList to Accountability tab
 - `src/pages/Home.jsx` - Added MyLibertyCard component
-- `firestore.rules` - Added libertyRequests collection rules
-- `firestore.indexes.json` - Added libertyRequests indexes
+- `firestore.rules` - Added libertyRequests collection rules with join request support
+- `firestore.indexes.json` - Added libertyRequests indexes including approved+weekend query
 
 ---
 

@@ -4,6 +4,7 @@ import { usePersonnelStatus, STATUS_TYPES } from "../hooks/usePersonnelStatus";
 import { useRecentCQNotes, NOTE_TYPES } from "../hooks/useCQNotes";
 import SelfSignOutForm from "../components/cq/SelfSignOutForm";
 import LibertyRequestForm from "../components/cq/LibertyRequestForm";
+import ApprovedLibertyList from "../components/cq/ApprovedLibertyList";
 import UpcomingCQSchedule from "../components/cq/UpcomingCQSchedule";
 import Loading from "../components/common/Loading";
 
@@ -132,6 +133,9 @@ export default function CQView() {
 
           {/* Weekend Liberty Request Section */}
           <LibertyRequestForm />
+
+          {/* Approved Liberty Groups - Join a Group */}
+          <ApprovedLibertyList />
 
           {/* Status Summary */}
           {personnelLoading ? (

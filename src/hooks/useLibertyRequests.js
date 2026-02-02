@@ -569,3 +569,378 @@ export function usePendingLibertyRequestCount() {
 
   return { count, loading };
 }
+
+/**
+ * Hook to fetch all liberty requests (for admin view)
+ * @param {string} filterStatus - Optional status filter (pending, approved, rejected, cancelled)
+ * @param {string} filterWeekend - Optional weekend date filter (ISO date string)
+ */
+export function useAllLibertyRequests(filterStatus = null, filterWeekend = null) {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let q = query(
+      collection(db, "libertyRequests"),
+      orderBy("createdAt", "desc")
+    );
+
+    // Note: Firestore doesn't support multiple inequality filters,
+    // so we filter in memory for complex queries
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        let data = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        // Apply filters in memory
+        if (filterStatus) {
+          data = data.filter((r) => r.status === filterStatus);
+        }
+        if (filterWeekend) {
+          data = data.filter((r) => r.weekendDate === filterWeekend);
+        }
+
+        setRequests(data);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error fetching all liberty requests:", err);
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+
+    return unsubscribe;
+  }, [filterStatus, filterWeekend]);
+
+  return { requests, loading, error };
+}
+
+/**
+ * Hook to fetch available liberty requests for the upcoming weekend
+ * Shows both pending and approved requests so users can join before deadline
+ * This is publicly visible to all authenticated users
+ */
+export function useAvailableLibertyRequests() {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const { saturday } = getNextWeekendDates();
+  const weekendDate = saturday.toISOString().split('T')[0];
+
+  useEffect(() => {
+    // Fetch all requests for this weekend, filter in memory for pending/approved
+    const q = query(
+      collection(db, "libertyRequests"),
+      where("weekendDate", "==", weekendDate),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          // Only show pending and approved requests (not cancelled or rejected)
+          .filter((r) => r.status === "pending" || r.status === "approved");
+        setRequests(data);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Error fetching available liberty requests:", err);
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+
+    return unsubscribe;
+  }, [weekendDate]);
+
+  return { requests, loading, error, weekendDate };
+}
+
+/**
+ * @deprecated Use useAvailableLibertyRequests instead
+ */
+export function useApprovedLibertyRequests() {
+  return useAvailableLibertyRequests();
+}
+
+/**
+ * Hook for managing join requests on liberty groups
+ */
+export function useLibertyJoinActions() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  /**
+   * Request to join an existing approved liberty group
+   * @param {string} libertyRequestId - The liberty request to join
+   */
+  async function requestToJoin(libertyRequestId) {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRef = doc(db, "libertyRequests", libertyRequestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error("Liberty request not found");
+      }
+
+      const requestData = requestDoc.data();
+
+      if (requestData.status !== "approved" && requestData.status !== "pending") {
+        throw new Error("Can only join pending or approved liberty groups");
+      }
+
+      // Check if user already requested to join
+      const existingJoinRequests = requestData.joinRequests || [];
+      const existingRequest = existingJoinRequests.find(
+        (jr) => jr.userId === user.uid
+      );
+      if (existingRequest) {
+        throw new Error("You have already requested to join this group");
+      }
+
+      // Check if user is the original requester
+      if (requestData.requesterId === user.uid) {
+        throw new Error("You cannot join your own liberty group");
+      }
+
+      // Check if user is already a companion
+      const isCompanion = (requestData.companions || []).some(
+        (c) => c.id === user.uid
+      );
+      if (isCompanion) {
+        throw new Error("You are already in this group");
+      }
+
+      // Get user's personnel record for rank
+      const personnelDoc = await getDoc(doc(db, "personnel", user.uid));
+      let userRank = "";
+      let firstName = "";
+      let lastName = "";
+
+      if (personnelDoc.exists()) {
+        const personnelData = personnelDoc.data();
+        userRank = personnelData.rank || "";
+        firstName = personnelData.firstName || "";
+        lastName = personnelData.lastName || "";
+      }
+
+      const displayName = firstName && lastName
+        ? `${firstName} ${lastName}`
+        : user.displayName || user.email;
+
+      // Add join request
+      const newJoinRequest = {
+        userId: user.uid,
+        userName: displayName,
+        userRank,
+        requestedAt: new Date(),
+        status: "pending",
+      };
+
+      await updateDoc(requestRef, {
+        joinRequests: [...existingJoinRequests, newJoinRequest],
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error("Error requesting to join liberty group:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
+  /**
+   * Approve a join request (by liberty request owner or leadership)
+   * @param {string} libertyRequestId - The liberty request
+   * @param {string} joiningUserId - The user requesting to join
+   */
+  async function approveJoinRequest(libertyRequestId, joiningUserId) {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRef = doc(db, "libertyRequests", libertyRequestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error("Liberty request not found");
+      }
+
+      const requestData = requestDoc.data();
+      const joinRequests = requestData.joinRequests || [];
+      const companions = requestData.companions || [];
+
+      const joinRequestIndex = joinRequests.findIndex(
+        (jr) => jr.userId === joiningUserId
+      );
+
+      if (joinRequestIndex === -1) {
+        throw new Error("Join request not found");
+      }
+
+      const joinRequest = joinRequests[joinRequestIndex];
+
+      if (joinRequest.status !== "pending") {
+        throw new Error("Join request has already been processed");
+      }
+
+      // Update the join request status
+      joinRequests[joinRequestIndex] = {
+        ...joinRequest,
+        status: "approved",
+        respondedAt: new Date(),
+        respondedBy: user.uid,
+        respondedByName: user.displayName || user.email,
+      };
+
+      // Add to companions list
+      const newCompanion = {
+        id: joinRequest.userId,
+        name: joinRequest.userName,
+        rank: joinRequest.userRank || "",
+        joinedViaRequest: true,
+      };
+
+      await updateDoc(requestRef, {
+        joinRequests,
+        companions: [...companions, newCompanion],
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error("Error approving join request:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
+  /**
+   * Reject a join request
+   * @param {string} libertyRequestId - The liberty request
+   * @param {string} joiningUserId - The user requesting to join
+   * @param {string} reason - Optional rejection reason
+   */
+  async function rejectJoinRequest(libertyRequestId, joiningUserId, reason = "") {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRef = doc(db, "libertyRequests", libertyRequestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error("Liberty request not found");
+      }
+
+      const requestData = requestDoc.data();
+      const joinRequests = requestData.joinRequests || [];
+
+      const joinRequestIndex = joinRequests.findIndex(
+        (jr) => jr.userId === joiningUserId
+      );
+
+      if (joinRequestIndex === -1) {
+        throw new Error("Join request not found");
+      }
+
+      if (joinRequests[joinRequestIndex].status !== "pending") {
+        throw new Error("Join request has already been processed");
+      }
+
+      // Update the join request status
+      joinRequests[joinRequestIndex] = {
+        ...joinRequests[joinRequestIndex],
+        status: "rejected",
+        rejectionReason: reason || null,
+        respondedAt: new Date(),
+        respondedBy: user.uid,
+        respondedByName: user.displayName || user.email,
+      };
+
+      await updateDoc(requestRef, {
+        joinRequests,
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error("Error rejecting join request:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
+  /**
+   * Cancel a pending join request (by the requester)
+   * @param {string} libertyRequestId - The liberty request
+   */
+  async function cancelJoinRequest(libertyRequestId) {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRef = doc(db, "libertyRequests", libertyRequestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error("Liberty request not found");
+      }
+
+      const requestData = requestDoc.data();
+      const joinRequests = requestData.joinRequests || [];
+
+      const joinRequestIndex = joinRequests.findIndex(
+        (jr) => jr.userId === user.uid && jr.status === "pending"
+      );
+
+      if (joinRequestIndex === -1) {
+        throw new Error("No pending join request found");
+      }
+
+      // Remove the join request
+      joinRequests.splice(joinRequestIndex, 1);
+
+      await updateDoc(requestRef, {
+        joinRequests,
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error("Error cancelling join request:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
+  return {
+    requestToJoin,
+    approveJoinRequest,
+    rejectJoinRequest,
+    cancelJoinRequest,
+    loading,
+    error,
+  };
+}

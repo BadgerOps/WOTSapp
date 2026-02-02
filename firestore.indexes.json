@@ -158,6 +158,23 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "weekendDate", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "libertyRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "weekendDate", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "libertyRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "weekendDate", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
