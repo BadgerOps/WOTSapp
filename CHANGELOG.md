@@ -10,11 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### CQ Schedule Visible to All Users
-- **New "Upcoming CQ Schedule" section on the /cq page** - all authenticated users can now see who's on CQ duty for the next 7 days
+- **New "Upcoming CQ Schedule" section on the /cq page** - all authenticated users can now see who's on CQ duty for the next 14 days
 - **Clean, read-only display** showing both shifts (2000-0100 and 0100-0600) with assigned personnel
 - **Today's shift highlighted** with "Tonight" badge for quick reference
 - **Potential skip days marked** with orange highlighting (for quiz/PT test days)
 - Component: `UpcomingCQSchedule.jsx` - reusable with configurable day limit
+
+#### Tabbed CQ Page Layout
+- **/cq page now uses tabs** to separate CQ schedule from personnel accountability
+- **Schedule tab** (default): Current active shift + upcoming 14-day schedule
+- **Accountability tab**: Sign-out form, personnel status summary, status table, and recent CQ notes
+- **Badge on Accountability tab** shows count of personnel currently out on pass
 
 ---
 
