@@ -31,6 +31,7 @@ import StatusCleanupTool from '../components/cq/StatusCleanupTool'
 import CQSwapApprovalQueue from '../components/cq/CQSwapApprovalQueue'
 import PassApprovalQueue from '../components/cq/PassApprovalQueue'
 import LibertyRequestsManager from '../components/cq/LibertyRequestsManager'
+import LeaveAdminPanel from '../components/cq/LeaveAdminPanel'
 import SurveyComposer from '../components/surveys/SurveyComposer'
 import SurveyManager from '../components/surveys/SurveyManager'
 import SurveyResults from '../components/surveys/SurveyResults'
@@ -422,6 +423,16 @@ export default function Admin() {
             >
               Liberty Requests
             </button>
+            <button
+              onClick={() => setCqSubTab('leaveAdmin')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                cqSubTab === 'leaveAdmin'
+                  ? 'bg-teal-100 text-teal-700'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Leave Admin
+            </button>
           </div>
 
           {cqSubTab === 'dashboard' && <CQDashboard />}
@@ -434,6 +445,7 @@ export default function Admin() {
           {cqSubTab === 'swaps' && <CQSwapApprovalQueue />}
           {cqSubTab === 'passApprovals' && <PassApprovalQueue />}
           {cqSubTab === 'liberty' && <LibertyRequestsManager />}
+          {cqSubTab === 'leaveAdmin' && <LeaveAdminPanel />}
         </div>
       )}
 

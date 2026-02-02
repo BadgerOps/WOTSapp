@@ -13,6 +13,7 @@
 export const ROLES = {
   USER: 'user',
   UNIFORM_ADMIN: 'uniform_admin',
+  LEAVE_ADMIN: 'leave_admin',
   CANDIDATE_LEADERSHIP: 'candidate_leadership',
   ADMIN: 'admin',
 };
@@ -29,6 +30,11 @@ export const ROLE_INFO = {
     description: 'Can manage UOTD and approve weather recommendations',
     color: 'blue',
   },
+  [ROLES.LEAVE_ADMIN]: {
+    label: 'Leave Admin',
+    description: 'Can approve and create leave/pass requests on behalf of users',
+    color: 'teal',
+  },
   [ROLES.CANDIDATE_LEADERSHIP]: {
     label: 'Candidate Leadership',
     description: 'Can approve pass requests and manage CQ operations',
@@ -42,7 +48,7 @@ export const ROLE_INFO = {
 };
 
 // Role hierarchy (higher index = more permissions)
-export const ROLE_HIERARCHY = [ROLES.USER, ROLES.UNIFORM_ADMIN, ROLES.CANDIDATE_LEADERSHIP, ROLES.ADMIN];
+export const ROLE_HIERARCHY = [ROLES.USER, ROLES.UNIFORM_ADMIN, ROLES.LEAVE_ADMIN, ROLES.CANDIDATE_LEADERSHIP, ROLES.ADMIN];
 
 // Permission definitions
 export const PERMISSIONS = {
@@ -56,9 +62,12 @@ export const PERMISSIONS = {
   APPROVE_WEATHER_UOTD: 'approve_weather_uotd',
   MODIFY_UNIFORMS: 'modify_uniforms',
 
-  // Candidate leadership permissions
+  // Leave admin permissions
   APPROVE_PASS_REQUESTS: 'approve_pass_requests',
   VIEW_PASS_REQUESTS: 'view_pass_requests',
+  CREATE_LEAVE_FOR_OTHERS: 'create_leave_for_others',
+
+  // Candidate leadership permissions
   MANAGE_CQ_OPERATIONS: 'manage_cq_operations',
 
   // Admin permissions
@@ -88,6 +97,16 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.APPROVE_WEATHER_UOTD,
     PERMISSIONS.MODIFY_UNIFORMS,
   ],
+  [ROLES.LEAVE_ADMIN]: [
+    // Inherits USER permissions
+    PERMISSIONS.VIEW_ASSIGNED_DETAILS,
+    PERMISSIONS.SIGN_OTHERS_ON_PASS,
+    PERMISSIONS.VIEW_UPDATES,
+    // Leave admin permissions - manage leave/pass requests
+    PERMISSIONS.APPROVE_PASS_REQUESTS,
+    PERMISSIONS.VIEW_PASS_REQUESTS,
+    PERMISSIONS.CREATE_LEAVE_FOR_OTHERS,
+  ],
   [ROLES.CANDIDATE_LEADERSHIP]: [
     // Inherits USER permissions
     PERMISSIONS.VIEW_ASSIGNED_DETAILS,
@@ -96,6 +115,7 @@ export const ROLE_PERMISSIONS = {
     // Candidate leadership permissions - full control over CQ/pass operations
     PERMISSIONS.APPROVE_PASS_REQUESTS,
     PERMISSIONS.VIEW_PASS_REQUESTS,
+    PERMISSIONS.CREATE_LEAVE_FOR_OTHERS,
     PERMISSIONS.MANAGE_CQ_OPERATIONS,
     PERMISSIONS.MANAGE_CQ,
   ],

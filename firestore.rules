@@ -22,6 +22,13 @@ service cloud.firestore {
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
     }
 
+    function isLeaveAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'leave_admin' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'candidate_leadership' ||
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+    }
+
     function isCandidateLeadership() {
       return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'candidate_leadership' ||
@@ -255,13 +262,16 @@ service cloud.firestore {
       // Anyone authenticated can read their own requests
       allow read: if isAuthenticated() &&
         resource.data.requesterId == request.auth.uid;
-      // Candidate leadership and admins can read all requests
-      allow read: if isCandidateLeadership();
+      // Leave admins, candidate leadership and admins can read all requests
+      allow read: if isLeaveAdmin();
       // Authenticated users can create their own requests
       allow create: if isAuthenticated() &&
         request.resource.data.requesterId == request.auth.uid;
-      // Candidate leadership can update (approve/reject)
-      allow update: if isCandidateLeadership();
+      // Leave admins can create requests on behalf of other users
+      allow create: if isLeaveAdmin() &&
+        request.resource.data.createdOnBehalfOf == true;
+      // Leave admins and candidate leadership can update (approve/reject)
+      allow update: if isLeaveAdmin();
       // Only admins can delete
       allow delete: if isAdmin();
     }
@@ -274,11 +284,14 @@ service cloud.firestore {
       // Anyone authenticated can read pending or approved requests (for joining groups)
       allow read: if isAuthenticated() &&
         (resource.data.status == 'approved' || resource.data.status == 'pending');
-      // Candidate leadership and admins can read all requests
-      allow read: if isCandidateLeadership();
+      // Leave admins, candidate leadership and admins can read all requests
+      allow read: if isLeaveAdmin();
       // Authenticated users can create their own requests
       allow create: if isAuthenticated() &&
         request.resource.data.requesterId == request.auth.uid;
+      // Leave admins can create requests on behalf of other users
+      allow create: if isLeaveAdmin() &&
+        request.resource.data.createdOnBehalfOf == true;
       // Users can cancel their own pending requests
       allow update: if isAuthenticated() &&
         resource.data.requesterId == request.auth.uid &&
@@ -291,8 +304,8 @@ service cloud.firestore {
       // Any authenticated user can update pending or approved requests (submit join request)
       allow update: if isAuthenticated() &&
         (resource.data.status == 'approved' || resource.data.status == 'pending');
-      // Candidate leadership can update (approve/reject)
-      allow update: if isCandidateLeadership();
+      // Leave admins and candidate leadership can update (approve/reject)
+      allow update: if isLeaveAdmin();
       // Only admins can delete
       allow delete: if isAdmin();
     }
