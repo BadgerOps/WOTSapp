@@ -7,13 +7,16 @@ import {
   getNextWeekendDates,
   isBeforeDeadline,
   getDeadlineDate,
+  getDeadlineDayName,
 } from "../../hooks/useLibertyRequests";
 import { usePersonnel } from "../../hooks/usePersonnel";
 import { useAuth } from "../../contexts/AuthContext";
+import { useAppConfig } from "../../hooks/useAppConfig";
 import Loading from "../common/Loading";
 
 export default function LibertyRequestForm() {
   const { user } = useAuth();
+  const { config, loading: configLoading } = useAppConfig();
   const {
     requests: myLibertyRequests,
     loading: requestsLoading,
@@ -44,8 +47,9 @@ export default function LibertyRequestForm() {
   // Get weekend dates
   const { saturday, sunday } = getNextWeekendDates();
   const weekendDateStr = saturday.toISOString().split("T")[0];
-  const canSubmit = isBeforeDeadline();
-  const deadline = getDeadlineDate();
+  const canSubmit = isBeforeDeadline(config);
+  const deadline = getDeadlineDate(config);
+  const deadlineDayName = getDeadlineDayName(config?.libertyDeadlineDayOfWeek);
 
   // Find current user's personnel record
   const myPersonnelRecord = useMemo(() => {
@@ -112,7 +116,7 @@ export default function LibertyRequestForm() {
       .slice(0, 5);
   }, [companionSearch, personnel, companions, user]);
 
-  if (requestsLoading) return <Loading />;
+  if (requestsLoading || configLoading) return <Loading />;
 
   const loading = requestActionLoading;
   const error = requestError;
@@ -251,7 +255,7 @@ export default function LibertyRequestForm() {
             <div>
               <p className="text-red-700 text-sm font-medium">Deadline Passed</p>
               <p className="text-red-600 text-sm mt-1">
-                Liberty requests for this weekend must be submitted by Tuesday.
+                Liberty requests for this weekend must be submitted by {deadlineDayName}.
                 Check back next week to submit a request for the following weekend.
               </p>
             </div>
@@ -263,7 +267,7 @@ export default function LibertyRequestForm() {
       {canSubmit && !pendingRequest && !approvedRequest && !showForm && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-blue-700 text-sm">
-            <span className="font-medium">Deadline:</span> Tuesday at 23:59 ({deadline.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })})
+            <span className="font-medium">Deadline:</span> {deadlineDayName} at {config?.libertyDeadlineTime || '23:59'} ({deadline.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })})
           </p>
         </div>
       )}

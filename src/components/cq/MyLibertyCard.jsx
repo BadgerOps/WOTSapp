@@ -5,7 +5,9 @@ import {
   getNextWeekendDates,
   isBeforeDeadline,
   getDeadlineDate,
+  getDeadlineDayName,
 } from '../../hooks/useLibertyRequests'
+import { useAppConfig } from '../../hooks/useAppConfig'
 import Loading from '../common/Loading'
 
 function formatDate(dateString) {
@@ -29,12 +31,14 @@ function formatTime(timeString) {
 
 export default function MyLibertyCard() {
   const { requests, loading, error } = useMyLibertyRequests()
+  const { config, loading: configLoading } = useAppConfig()
 
   // Get weekend dates
   const { saturday, sunday } = getNextWeekendDates()
   const weekendDateStr = saturday.toISOString().split('T')[0]
-  const canSubmit = isBeforeDeadline()
-  const deadline = getDeadlineDate()
+  const canSubmit = isBeforeDeadline(config)
+  const deadline = getDeadlineDate(config)
+  const deadlineDayName = getDeadlineDayName(config?.libertyDeadlineDayOfWeek)
 
   // Get pending or approved liberty request for this weekend
   const weekendRequest = useMemo(() => {
@@ -46,7 +50,7 @@ export default function MyLibertyCard() {
   }, [requests, weekendDateStr])
 
   // Don't show if loading or no relevant request and deadline passed
-  if (loading) return null
+  if (loading || configLoading) return null
 
   // Don't show card if no request and can't submit
   if (!weekendRequest && !canSubmit) return null
@@ -172,7 +176,7 @@ export default function MyLibertyCard() {
               Submit your liberty request for {saturday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </p>
             <p className="text-xs text-blue-600 mt-1">
-              Deadline: Tuesday {deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              Deadline: {deadlineDayName} {deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </p>
             <Link
               to="/cq"

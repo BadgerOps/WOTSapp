@@ -389,6 +389,54 @@ export default function ConfigManager() {
           </p>
         </div>
 
+        {/* Liberty Request Deadline */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Liberty Request Deadline
+          </label>
+          <div className="p-3 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Day of Week
+                </label>
+                <select
+                  value={config.libertyDeadlineDayOfWeek ?? 2}
+                  onChange={(e) =>
+                    setConfig({ ...config, libertyDeadlineDayOfWeek: parseInt(e.target.value, 10) })
+                  }
+                  className="input text-sm"
+                >
+                  <option value={0}>Sunday</option>
+                  <option value={1}>Monday</option>
+                  <option value={2}>Tuesday</option>
+                  <option value={3}>Wednesday</option>
+                  <option value={4}>Thursday</option>
+                  <option value={5}>Friday</option>
+                  <option value={6}>Saturday</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Deadline Time
+                </label>
+                <input
+                  type="time"
+                  value={config.libertyDeadlineTime || '23:59'}
+                  onChange={(e) =>
+                    setConfig({ ...config, libertyDeadlineTime: e.target.value })
+                  }
+                  className="input text-sm"
+                />
+              </div>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            Weekend liberty requests must be submitted by this deadline for OPLAN loading.
+            Default: Tuesday at 23:59.
+          </p>
+        </div>
+
         {/* Flights */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">

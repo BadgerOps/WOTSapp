@@ -58,37 +58,78 @@ export function getNextWeekendDates() {
 }
 
 /**
- * Check if today is before the Tuesday deadline for liberty requests
- * Deadline is Tuesday 23:59 for the upcoming weekend
+ * Check if today is before the deadline for liberty requests
+ * @param {Object} config - App config with libertyDeadlineDayOfWeek and libertyDeadlineTime
+ * @returns {boolean} True if current time is before the deadline
  */
-export function isBeforeDeadline() {
-  const today = new Date();
-  const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, 2 = Tuesday, etc.
+export function isBeforeDeadline(config) {
+  const deadlineDayOfWeek = config?.libertyDeadlineDayOfWeek ?? 2; // Default Tuesday
+  const deadlineTime = config?.libertyDeadlineTime || '23:59';
 
-  // Deadline is Tuesday end of day (before Wednesday)
-  // Can submit: Sunday (0), Monday (1), Tuesday (2)
-  return dayOfWeek >= 0 && dayOfWeek <= 2;
+  const now = new Date();
+  const currentDayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, 2 = Tuesday, etc.
+
+  // Parse deadline time
+  const [deadlineHour, deadlineMinute] = deadlineTime.split(':').map(Number);
+
+  // If we're before the deadline day, we can still submit
+  if (currentDayOfWeek < deadlineDayOfWeek) {
+    return true;
+  }
+
+  // If we're on the deadline day, check the time
+  if (currentDayOfWeek === deadlineDayOfWeek) {
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    if (currentHour < deadlineHour) return true;
+    if (currentHour === deadlineHour && currentMinute <= deadlineMinute) return true;
+    return false;
+  }
+
+  // If we're after the deadline day (but still in the same week cycle)
+  // For weekend submission: after deadline day means no submission
+  return false;
 }
 
 /**
  * Get the deadline date for the current request period
+ * @param {Object} config - App config with libertyDeadlineDayOfWeek and libertyDeadlineTime
+ * @returns {Date} The deadline date/time
  */
-export function getDeadlineDate() {
-  const today = new Date();
-  const dayOfWeek = today.getDay();
+export function getDeadlineDate(config) {
+  const deadlineDayOfWeek = config?.libertyDeadlineDayOfWeek ?? 2; // Default Tuesday
+  const deadlineTime = config?.libertyDeadlineTime || '23:59';
 
-  // Calculate days until Tuesday
-  let daysUntilTuesday = (2 - dayOfWeek + 7) % 7;
-  if (dayOfWeek > 2) {
-    // If after Tuesday, get next Tuesday
-    daysUntilTuesday = (2 - dayOfWeek + 7) % 7 || 7;
+  const today = new Date();
+  const currentDayOfWeek = today.getDay();
+
+  // Calculate days until deadline day
+  let daysUntilDeadline = (deadlineDayOfWeek - currentDayOfWeek + 7) % 7;
+
+  // If we're past the deadline day, get next week's deadline
+  if (currentDayOfWeek > deadlineDayOfWeek) {
+    daysUntilDeadline = (deadlineDayOfWeek - currentDayOfWeek + 7) % 7 || 7;
   }
 
-  const tuesday = new Date(today);
-  tuesday.setDate(today.getDate() + daysUntilTuesday);
-  tuesday.setHours(23, 59, 59, 999);
+  const deadlineDate = new Date(today);
+  deadlineDate.setDate(today.getDate() + daysUntilDeadline);
 
-  return tuesday;
+  // Parse and set deadline time
+  const [deadlineHour, deadlineMinute] = deadlineTime.split(':').map(Number);
+  deadlineDate.setHours(deadlineHour, deadlineMinute, 59, 999);
+
+  return deadlineDate;
+}
+
+/**
+ * Get the day name for the deadline
+ * @param {number} dayOfWeek - Day of week (0-6)
+ * @returns {string} Day name
+ */
+export function getDeadlineDayName(dayOfWeek) {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[dayOfWeek ?? 2];
 }
 
 /**
