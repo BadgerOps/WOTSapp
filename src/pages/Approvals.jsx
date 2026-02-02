@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUnifiedApprovalCount } from '../hooks/useUnifiedApprovalCount'
 import PassApprovalQueue from '../components/cq/PassApprovalQueue'
+import LibertyApprovalQueue from '../components/cq/LibertyApprovalQueue'
 import DetailApprovalQueue from '../components/details/DetailApprovalQueue'
 import CQSwapApprovalQueue from '../components/cq/CQSwapApprovalQueue'
 import WeatherApprovalQueue from '../components/admin/WeatherApprovalQueue'
@@ -12,10 +13,12 @@ export default function Approvals() {
   const {
     total,
     passCount,
+    libertyCount,
     detailCount,
     swapCount,
     weatherCount,
     canApprovePasses,
+    canApproveLiberty,
     canApproveDetails,
     canApproveSwaps,
     canApproveWeather,
@@ -53,6 +56,9 @@ export default function Approvals() {
   const visibleTabs = []
   if (canApprovePasses) {
     visibleTabs.push({ key: 'passes', label: 'Passes', count: passCount })
+  }
+  if (canApproveLiberty) {
+    visibleTabs.push({ key: 'liberty', label: 'Liberty', count: libertyCount })
   }
   if (canApproveDetails) {
     visibleTabs.push({ key: 'details', label: 'Details', count: detailCount })
@@ -118,6 +124,7 @@ export default function Approvals() {
 
       {/* Tab Content */}
       {activeTab === 'passes' && canApprovePasses && <PassApprovalQueue />}
+      {activeTab === 'liberty' && canApproveLiberty && <LibertyApprovalQueue />}
       {activeTab === 'details' && canApproveDetails && <DetailApprovalQueue />}
       {activeTab === 'swaps' && canApproveSwaps && <CQSwapApprovalQueue />}
       {activeTab === 'weather' && canApproveWeather && <WeatherApprovalQueue />}

@@ -14,6 +14,9 @@ export const DEFAULT_CONFIG = {
   cqFirstShiftEnd: '01:00',   // 1:00 AM (next day)
   cqSecondShiftStart: '01:00', // 1:00 AM
   cqSecondShiftEnd: '06:00',   // 6:00 AM
+  // Liberty Request Configuration
+  libertyDeadlineDayOfWeek: 2, // 0=Sunday, 1=Monday, 2=Tuesday, etc.
+  libertyDeadlineTime: '23:59', // 24-hour format
 }
 
 /**

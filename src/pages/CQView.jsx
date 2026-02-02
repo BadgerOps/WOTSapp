@@ -3,6 +3,7 @@ import { useActiveShift } from "../hooks/useCQShifts";
 import { usePersonnelStatus, STATUS_TYPES } from "../hooks/usePersonnelStatus";
 import { useRecentCQNotes, NOTE_TYPES } from "../hooks/useCQNotes";
 import SelfSignOutForm from "../components/cq/SelfSignOutForm";
+import LibertyRequestForm from "../components/cq/LibertyRequestForm";
 import UpcomingCQSchedule from "../components/cq/UpcomingCQSchedule";
 import Loading from "../components/common/Loading";
 
@@ -128,6 +129,9 @@ export default function CQView() {
         <div className="space-y-6">
           {/* Self Sign-Out Section */}
           <SelfSignOutForm />
+
+          {/* Weekend Liberty Request Section */}
+          <LibertyRequestForm />
 
           {/* Status Summary */}
           {personnelLoading ? (

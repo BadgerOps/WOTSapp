@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] - 2026-02-02
+
+### Added
+
+#### Weekend Liberty Request System
+- **New liberty request workflow** for submitting weekend plans prior to the weekend
+- **LibertyRequestForm component** (`/cq` page, Accountability tab) - Submit liberty requests with:
+  - Destination (San Antonio, Austin, Local Area, Home, or custom)
+  - Departure date and time
+  - Return date and time
+  - Contact number (auto-populated from personnel record)
+  - Purpose/reason for liberty
+  - Optional companions (searchable personnel list)
+- **MyLibertyCard component** on Home page showing:
+  - Approved liberty details (green card with destination, times, companions)
+  - Pending request status (yellow card with submission details)
+  - Prompt to submit request when within deadline window (blue card)
+- **LibertyApprovalQueue component** for candidate leadership to:
+  - View all pending liberty requests
+  - Bulk select and approve/reject requests
+  - Expandable detail view showing full request information
+  - Rejection modal with optional reason
+- **Liberty tab in Approvals page** with real-time badge count
+
+#### Configurable Liberty Deadline
+- **Liberty Request Deadline settings** in Admin → Config tab:
+  - Day of week dropdown (Sunday through Saturday, default: Tuesday)
+  - Time picker for deadline cutoff (default: 23:59)
+- **Dynamic deadline enforcement** - requests blocked after configured deadline
+- **Deadline display** shows configured day and time in forms and cards
+
+### New Files
+- `src/hooks/useLibertyRequests.js` - Liberty request data operations and deadline utilities
+- `src/components/cq/LibertyRequestForm.jsx` - User form for submitting liberty requests
+- `src/components/cq/LibertyApprovalQueue.jsx` - Leadership approval queue
+- `src/components/cq/MyLibertyCard.jsx` - Home page liberty status card
+
+### Modified Files
+- `src/hooks/useAppConfig.js` - Added `libertyDeadlineDayOfWeek` and `libertyDeadlineTime` defaults
+- `src/hooks/useUnifiedApprovalCount.js` - Added `libertyCount` and `canApproveLiberty`
+- `src/components/admin/ConfigManager.jsx` - Added Liberty Request Deadline section
+- `src/pages/Approvals.jsx` - Added Liberty tab
+- `src/pages/CQView.jsx` - Added LibertyRequestForm to Accountability tab
+- `src/pages/Home.jsx` - Added MyLibertyCard component
+- `firestore.rules` - Added libertyRequests collection rules
+- `firestore.indexes.json` - Added libertyRequests indexes
+
+---
+
 ## [0.5.3] - 2026-02-01
 
 ### Added

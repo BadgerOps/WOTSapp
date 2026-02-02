@@ -46,7 +46,7 @@ function useCountWithPermission(collectionName, statusValue, enabled) {
 /**
  * Hook that provides unified approval counts across all approval types.
  * Only queries collections that the user has permission to access:
- * - candidate_leadership or admin: passes, details, swaps
+ * - candidate_leadership or admin: passes, liberty, details, swaps
  * - uniform_admin or admin: weather
  *
  * @returns {Object} Object containing total and individual counts
@@ -56,6 +56,7 @@ export function useUnifiedApprovalCount() {
 
   // Calculate permission flags first
   const canApprovePasses = isCandidateLeadership || isAdmin
+  const canApproveLiberty = isCandidateLeadership || isAdmin
   const canApproveDetails = isCandidateLeadership || isAdmin
   const canApproveSwaps = isCandidateLeadership || isAdmin
   const canApproveWeather = canApproveWeatherUOTD || isAdmin
@@ -63,16 +64,18 @@ export function useUnifiedApprovalCount() {
   // Only query collections user has permission to access
   // Note: detailAssignments uses 'completed' status for items awaiting approval
   const { count: passCount, loading: passLoading } = useCountWithPermission('passApprovalRequests', 'pending', canApprovePasses)
+  const { count: libertyCount, loading: libertyLoading } = useCountWithPermission('libertyRequests', 'pending', canApproveLiberty)
   const { count: detailCount, loading: detailLoading } = useCountWithPermission('detailAssignments', 'completed', canApproveDetails)
   const { count: swapCount, loading: swapLoading } = useCountWithPermission('cqSwapRequests', 'pending', canApproveSwaps)
   const { count: weatherCount, loading: weatherLoading } = useCountWithPermission('weatherRecommendations', 'pending', canApproveWeather)
 
   // Build total count based on permissions
-  const total = passCount + detailCount + swapCount + weatherCount
+  const total = passCount + libertyCount + detailCount + swapCount + weatherCount
 
   // Only count loading for enabled queries
   const loading =
     (canApprovePasses && passLoading) ||
+    (canApproveLiberty && libertyLoading) ||
     (canApproveDetails && detailLoading) ||
     (canApproveSwaps && swapLoading) ||
     (canApproveWeather && weatherLoading)
@@ -81,11 +84,13 @@ export function useUnifiedApprovalCount() {
     total,
     loading,
     passCount,
+    libertyCount,
     detailCount,
     swapCount,
     weatherCount,
     // Permission flags for UI rendering
     canApprovePasses,
+    canApproveLiberty,
     canApproveDetails,
     canApproveSwaps,
     canApproveWeather,
