@@ -622,10 +622,11 @@ export function useAllLibertyRequests(filterStatus = null, filterWeekend = null)
 }
 
 /**
- * Hook to fetch approved liberty requests for the upcoming weekend
+ * Hook to fetch available liberty requests for the upcoming weekend
+ * Shows both pending and approved requests so users can join before deadline
  * This is publicly visible to all authenticated users
  */
-export function useApprovedLibertyRequests() {
+export function useAvailableLibertyRequests() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -634,9 +635,9 @@ export function useApprovedLibertyRequests() {
   const weekendDate = saturday.toISOString().split('T')[0];
 
   useEffect(() => {
+    // Fetch all requests for this weekend, filter in memory for pending/approved
     const q = query(
       collection(db, "libertyRequests"),
-      where("status", "==", "approved"),
       where("weekendDate", "==", weekendDate),
       orderBy("createdAt", "desc")
     );
@@ -644,15 +645,18 @@ export function useApprovedLibertyRequests() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const data = snapshot.docs
+          .map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+          // Only show pending and approved requests (not cancelled or rejected)
+          .filter((r) => r.status === "pending" || r.status === "approved");
         setRequests(data);
         setLoading(false);
       },
       (err) => {
-        console.error("Error fetching approved liberty requests:", err);
+        console.error("Error fetching available liberty requests:", err);
         setError(err.message);
         setLoading(false);
       }
@@ -662,6 +666,13 @@ export function useApprovedLibertyRequests() {
   }, [weekendDate]);
 
   return { requests, loading, error, weekendDate };
+}
+
+/**
+ * @deprecated Use useAvailableLibertyRequests instead
+ */
+export function useApprovedLibertyRequests() {
+  return useAvailableLibertyRequests();
 }
 
 /**
@@ -689,8 +700,8 @@ export function useLibertyJoinActions() {
 
       const requestData = requestDoc.data();
 
-      if (requestData.status !== "approved") {
-        throw new Error("Can only join approved liberty groups");
+      if (requestData.status !== "approved" && requestData.status !== "pending") {
+        throw new Error("Can only join pending or approved liberty groups");
       }
 
       // Check if user already requested to join

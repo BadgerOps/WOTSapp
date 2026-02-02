@@ -271,9 +271,9 @@ service cloud.firestore {
       // Anyone authenticated can read their own requests
       allow read: if isAuthenticated() &&
         resource.data.requesterId == request.auth.uid;
-      // Anyone authenticated can read approved requests (for joining groups)
+      // Anyone authenticated can read pending or approved requests (for joining groups)
       allow read: if isAuthenticated() &&
-        resource.data.status == 'approved';
+        (resource.data.status == 'approved' || resource.data.status == 'pending');
       // Candidate leadership and admins can read all requests
       allow read: if isCandidateLeadership();
       // Authenticated users can create their own requests
@@ -284,13 +284,13 @@ service cloud.firestore {
         resource.data.requesterId == request.auth.uid &&
         resource.data.status == 'pending' &&
         request.resource.data.status == 'cancelled';
-      // Owner can update their approved request (manage join requests, companions)
+      // Owner can update their pending or approved request (manage join requests, companions)
       allow update: if isAuthenticated() &&
         resource.data.requesterId == request.auth.uid &&
-        resource.data.status == 'approved';
-      // Any authenticated user can update approved requests (submit join request)
+        (resource.data.status == 'approved' || resource.data.status == 'pending');
+      // Any authenticated user can update pending or approved requests (submit join request)
       allow update: if isAuthenticated() &&
-        resource.data.status == 'approved';
+        (resource.data.status == 'approved' || resource.data.status == 'pending');
       // Candidate leadership can update (approve/reject)
       allow update: if isCandidateLeadership();
       // Only admins can delete

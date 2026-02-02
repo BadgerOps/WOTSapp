@@ -38,11 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Liberty Group Join System
 - **ApprovedLibertyList component** on `/cq` page (Accountability tab):
-  - View approved liberty groups for the upcoming weekend
+  - View all liberty groups (pending and approved) for the upcoming weekend
   - See group leader, companions, destination, and times
+  - Status badges show "Pending Approval" (yellow) or "Approved" (green)
   - "Request to Join" button to join existing groups
 - **Join request workflow**:
-  - Users can request to join any approved liberty group
+  - Users can request to join pending OR approved liberty groups (before deadline lockdown)
   - Group leaders see pending join requests with badge count
   - Approve/Decline buttons for group leaders
   - Approved members automatically added as companions
