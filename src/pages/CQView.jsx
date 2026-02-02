@@ -26,7 +26,7 @@ const TABS = {
 };
 
 export default function CQView() {
-  const [activeTab, setActiveTab] = useState(TABS.schedule.id);
+  const [activeTab, setActiveTab] = useState(TABS.accountability.id);
   const { activeShift, loading: shiftLoading } = useActiveShift();
   const { personnelWithStatus, loading: personnelLoading } =
     usePersonnelStatus();
