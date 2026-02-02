@@ -244,7 +244,7 @@ export default function Profile() {
           onClick={handleVersionTap}
           className="text-xs text-gray-400 cursor-default select-none"
         >
-          WOTSapp v{APP_VERSION} < NOTE: THIS IS NOT AN OFFICIAL WOTS Application\, this is a candidate led app>
+          WOTSapp v{APP_VERSION} &lt; NOTE: THIS IS NOT AN OFFICIAL WOTS Application, this is a candidate led app&gt;
         </p>
         <Link
           to="/changelog"
