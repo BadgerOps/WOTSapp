@@ -66,6 +66,78 @@ function isDetailActiveNow(assignment) {
 }
 
 /**
+ * Hook to get any active detail for the current time slot (regardless of user assignment)
+ * This is used to show the detail card to ALL users during the time window
+ */
+export function useActiveDetailForTimeSlot() {
+  const [activeDetail, setActiveDetail] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [currentTimeSlot, setCurrentTimeSlot] = useState(getCurrentTimeSlot())
+
+  // Update time slot every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTimeSlot(getCurrentTimeSlot())
+    }, 60000) // Check every minute
+
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    // Don't fetch if not in a time slot
+    if (!currentTimeSlot) {
+      setActiveDetail(null)
+      setLoading(false)
+      return
+    }
+
+    // Query for active assignments (filter by date client-side to avoid extra index)
+    const q = query(
+      collection(db, 'detailAssignments'),
+      where('status', 'in', ['assigned', 'in_progress', 'rejected']),
+      orderBy('dueDateTime', 'asc')
+    )
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const today = getTodayInTimezone(DEFAULT_TIMEZONE)
+        const assignments = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+
+        // Filter for today's assignments that match current time slot
+        const activeAssignments = assignments.filter((assignment) => {
+          // Filter by today's date
+          if (assignment.assignmentDate !== today) return false
+
+          // Check if assignment matches current time slot
+          if (assignment.timeSlot === 'both') return true
+          if (assignment.timeSlot === currentTimeSlot) return true
+
+          return false
+        })
+
+        // Return the first active assignment
+        setActiveDetail(activeAssignments[0] || null)
+        setLoading(false)
+      },
+      (err) => {
+        console.error('Error fetching active detail for time slot:', err)
+        setError(err.message)
+        setLoading(false)
+      }
+    )
+
+    return unsubscribe
+  }, [currentTimeSlot])
+
+  return { activeDetail, loading, error, currentTimeSlot }
+}
+
+/**
  * Hook to get the current user's active detail for the current time window
  * Returns the detail assignment that should be shown on the home screen
  */

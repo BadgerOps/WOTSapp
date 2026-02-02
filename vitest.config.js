@@ -44,6 +44,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
+      // Allow functions tests to find their dependencies
+      'firebase-functions': resolve(__dirname, './functions/node_modules/firebase-functions'),
+      'firebase-admin': resolve(__dirname, './functions/node_modules/firebase-admin'),
     },
   },
 });
