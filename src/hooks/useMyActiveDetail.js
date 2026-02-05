@@ -220,13 +220,9 @@ export function useMyActiveDetail() {
           )
           if (!hasTasks) return false
 
-          // For in_progress or rejected status, always show (user needs to complete them)
-          // For assigned status, only show during the appropriate time window
-          if (assignment.status === 'in_progress' || assignment.status === 'rejected') {
-            return true
-          }
-
-          // Check if detail is active for current time slot
+          // Only show cards during their respective time window
+          // Once the time window elapses, the card should no longer be visible
+          // This applies to ALL statuses (assigned, in_progress, rejected)
           return isDetailActiveNow(assignment)
         })
 
