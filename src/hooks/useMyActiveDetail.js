@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../config/firebase'
 import { useAuth } from '../contexts/AuthContext'
+import { useDetailConfig } from './useDetailConfig'
 import {
   getTodayInTimezone,
   getCurrentTimeMinutesInTimezone,
@@ -30,35 +31,43 @@ export const DETAIL_STAGES = {
 }
 
 /**
- * Determine if current time is within the detail window
- * Morning window: 7:00 AM - 12:00 PM
- * Evening window: 7:00 PM - 11:59 PM
- * Uses timezone-aware time calculations for consistency
+ * Convert a time string "HH:MM" to minutes since midnight
  */
-function getCurrentTimeSlot() {
+function timeToMinutes(timeStr) {
+  const [h, m] = timeStr.split(':').map(Number)
+  return h * 60 + m
+}
+
+/**
+ * Determine the current time slot based on configured times.
+ * Uses threshold logic: at or after the configured time, the slot activates
+ * and stays active until the next slot begins.
+ *   - At/after evening time → evening
+ *   - At/after morning time → morning
+ *   - Before morning time → null (no active slot)
+ */
+function getCurrentTimeSlot(morningTime = '07:00', eveningTime = '19:00') {
   const timeValue = getCurrentTimeMinutesInTimezone(DEFAULT_TIMEZONE) // minutes since midnight
+  const eveningMinutes = timeToMinutes(eveningTime)
+  const morningMinutes = timeToMinutes(morningTime)
 
-  // Morning: 7:00 AM (420) to 12:00 PM (720)
-  if (timeValue >= 420 && timeValue < 720) {
-    return 'morning'
-  }
+  // At or after evening time → evening slot
+  if (timeValue >= eveningMinutes) return 'evening'
 
-  // Evening: 7:00 PM (1140) to 11:59 PM (1439)
-  if (timeValue >= 1140 && timeValue <= 1439) {
-    return 'evening'
-  }
+  // At or after morning time → morning slot
+  if (timeValue >= morningMinutes) return 'morning'
 
+  // Before morning time → no active slot
   return null
 }
 
 /**
- * Check if a detail assignment is active for the current time window
+ * Check if a detail assignment is active for the current time slot
  */
-function isDetailActiveNow(assignment) {
-  const currentSlot = getCurrentTimeSlot()
+function isDetailActiveNow(assignment, morningTime, eveningTime) {
+  const currentSlot = getCurrentTimeSlot(morningTime, eveningTime)
   if (!currentSlot) return false
 
-  // Check if assignment matches current time slot
   if (assignment.timeSlot === 'both') return true
   if (assignment.timeSlot === currentSlot) return true
 
@@ -70,19 +79,24 @@ function isDetailActiveNow(assignment) {
  * This is used to show the detail card to ALL users during the time window
  */
 export function useActiveDetailForTimeSlot() {
+  const { config } = useDetailConfig()
+  const morningTime = config?.morningNotificationTime || '07:00'
+  const eveningTime = config?.eveningNotificationTime || '19:00'
+
   const [activeDetail, setActiveDetail] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [currentTimeSlot, setCurrentTimeSlot] = useState(getCurrentTimeSlot())
+  const [currentTimeSlot, setCurrentTimeSlot] = useState(getCurrentTimeSlot(morningTime, eveningTime))
 
-  // Update time slot every minute
+  // Update time slot every minute and when config changes
   useEffect(() => {
+    setCurrentTimeSlot(getCurrentTimeSlot(morningTime, eveningTime))
     const interval = setInterval(() => {
-      setCurrentTimeSlot(getCurrentTimeSlot())
-    }, 60000) // Check every minute
+      setCurrentTimeSlot(getCurrentTimeSlot(morningTime, eveningTime))
+    }, 60000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [morningTime, eveningTime])
 
   useEffect(() => {
     // Don't fetch if not in a time slot
@@ -92,11 +106,10 @@ export function useActiveDetailForTimeSlot() {
       return
     }
 
-    // Query for active assignments (filter by date client-side to avoid extra index)
+    // Query all assignments (filter by date and time slot client-side)
     const q = query(
       collection(db, 'detailAssignments'),
-      where('status', 'in', ['assigned', 'in_progress', 'rejected']),
-      orderBy('dueDateTime', 'asc')
+      orderBy('dueDateTime', 'desc')
     )
 
     const unsubscribe = onSnapshot(
@@ -143,20 +156,25 @@ export function useActiveDetailForTimeSlot() {
  */
 export function useMyActiveDetail() {
   const { user } = useAuth()
+  const { config } = useDetailConfig()
+  const morningTime = config?.morningNotificationTime || '07:00'
+  const eveningTime = config?.eveningNotificationTime || '19:00'
+
   const [activeDetail, setActiveDetail] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [currentTimeSlot, setCurrentTimeSlot] = useState(getCurrentTimeSlot())
+  const [currentTimeSlot, setCurrentTimeSlot] = useState(getCurrentTimeSlot(morningTime, eveningTime))
   const [personnelDocId, setPersonnelDocId] = useState(null)
 
-  // Update time slot every minute
+  // Update time slot every minute and when config changes
   useEffect(() => {
+    setCurrentTimeSlot(getCurrentTimeSlot(morningTime, eveningTime))
     const interval = setInterval(() => {
-      setCurrentTimeSlot(getCurrentTimeSlot())
-    }, 60000) // Check every minute
+      setCurrentTimeSlot(getCurrentTimeSlot(morningTime, eveningTime))
+    }, 60000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [morningTime, eveningTime])
 
   // Look up the user's personnel record by email to get their personnel document ID
   useEffect(() => {
@@ -187,11 +205,10 @@ export function useMyActiveDetail() {
       return
     }
 
-    // Query for active assignments (filter by date client-side to avoid extra index)
+    // Query all assignments (filter by date and time slot client-side)
     const q = query(
       collection(db, 'detailAssignments'),
-      where('status', 'in', ['assigned', 'in_progress', 'rejected']),
-      orderBy('dueDateTime', 'asc')
+      orderBy('dueDateTime', 'desc')
     )
 
     const unsubscribe = onSnapshot(
@@ -220,14 +237,8 @@ export function useMyActiveDetail() {
           )
           if (!hasTasks) return false
 
-          // For in_progress or rejected status, always show (user needs to complete them)
-          // For assigned status, only show during the appropriate time window
-          if (assignment.status === 'in_progress' || assignment.status === 'rejected') {
-            return true
-          }
-
-          // Check if detail is active for current time slot
-          return isDetailActiveNow(assignment)
+          // Show if assignment matches current time slot (status doesn't matter)
+          return isDetailActiveNow(assignment, morningTime, eveningTime)
         })
 
         // Return the first active assignment (should typically only be one)

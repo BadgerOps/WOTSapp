@@ -3,6 +3,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useMyPersonnelIds } from '../../hooks/useMyPersonnelIds'
 import { usePersonnel } from '../../hooks/usePersonnel'
 import { useDetailAssignmentActions } from '../../hooks/useDetailAssignments'
+import { useDetailConfig } from '../../hooks/useDetailConfig'
+import { getCurrentTimeMinutesInTimezone, DEFAULT_TIMEZONE } from '../../lib/timezone'
 import { format, addHours } from 'date-fns'
 
 export default function TemplateTaskSelector({ template, onClose, onSuccess }) {
@@ -10,6 +12,7 @@ export default function TemplateTaskSelector({ template, onClose, onSuccess }) {
   const { personnelDocId } = useMyPersonnelIds()
   const { personnel } = usePersonnel()
   const { createAssignment, loading: creating } = useDetailAssignmentActions()
+  const { config: detailConfig } = useDetailConfig()
 
   const [selectedTasks, setSelectedTasks] = useState(new Set())
   const [areaFilter, setAreaFilter] = useState('')
@@ -130,17 +133,24 @@ export default function TemplateTaskSelector({ template, onClose, onSuccess }) {
           notes: ''
         }))
 
-      // Create assignment with today's date, evening time slot
+      // Create assignment with today's date, auto-detect time slot from configured times
       const today = new Date()
       const assignmentDate = format(today, 'yyyy-MM-dd')
+
+      const cfgMorningTime = detailConfig?.morningNotificationTime || '07:00'
+      const cfgEveningTime = detailConfig?.eveningNotificationTime || '19:00'
+      const [eH, eM] = cfgEveningTime.split(':').map(Number)
+      const eveningMinutes = eH * 60 + eM
+      const currentMinutes = getCurrentTimeMinutesInTimezone(DEFAULT_TIMEZONE)
+      const timeSlot = currentMinutes >= eveningMinutes ? 'evening' : 'morning'
 
       await createAssignment({
         templateId: template.id,
         templateName: template.name,
         assignmentDate,
-        timeSlot: 'evening',
-        morningTime: '08:00',
-        eveningTime: '18:00',
+        timeSlot,
+        morningTime: detailConfig?.morningStartTime || '08:00',
+        eveningTime: detailConfig?.eveningStartTime || '18:00',
         tasks: assignedTasks,
         assignedTo: [{
           personnelId: personnelDocId || user.uid,

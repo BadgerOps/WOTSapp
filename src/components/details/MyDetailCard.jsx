@@ -75,12 +75,7 @@ export default function MyDetailCard() {
     return null
   }
 
-  // For users with tasks: show in_progress/rejected at any time, assigned only during time slot
-  // For users without tasks: only show during time slot (read-only info)
-  const showWithoutTimeSlot = hasMyTasks && (activeDetail.status === 'in_progress' || activeDetail.status === 'rejected')
-  if (!showWithoutTimeSlot && !currentTimeSlot) {
-    return null
-  }
+  // The hook handles all time-based filtering — if activeDetail is set, it should be shown
 
   // If user has no tasks assigned, show a read-only info card
   if (!hasMyTasks) {
