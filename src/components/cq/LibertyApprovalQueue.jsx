@@ -3,6 +3,8 @@ import {
   usePendingLibertyRequests,
   useLibertyApprovalActions,
   LIBERTY_REQUEST_STATUS,
+  getTimeSlotLabel,
+  buildDestinationString,
 } from '../../hooks/useLibertyRequests'
 import { useAuth } from '../../contexts/AuthContext'
 import Loading from '../common/Loading'
@@ -288,10 +290,15 @@ export default function LibertyApprovalQueue() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-gray-900">
                               {request.requesterName}
                             </h3>
+                            {request.isDriver && (
+                              <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-medium rounded-full">
+                                Driver ({request.passengerCapacity} seats)
+                              </span>
+                            )}
                             {companionCount > 0 && (
                               <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
                                 +{companionCount} companion{companionCount > 1 ? 's' : ''}
@@ -318,21 +325,29 @@ export default function LibertyApprovalQueue() {
 
                       {/* Quick Info */}
                       <div className="flex flex-wrap gap-4 text-sm">
-                        {request.departureDate && (
+                        {(request.timeSlots || []).length > 0 ? (
                           <div>
-                            <span className="text-gray-500">Depart:</span>{' '}
-                            <span className="font-medium">
-                              {formatDate(request.departureDate)} {formatTime(request.departureTime)}
-                            </span>
+                            <span className="text-gray-500">{request.timeSlots.length} time slot{request.timeSlots.length > 1 ? 's' : ''}</span>
                           </div>
-                        )}
-                        {request.returnDate && (
-                          <div>
-                            <span className="text-gray-500">Return:</span>{' '}
-                            <span className="font-medium">
-                              {formatDate(request.returnDate)} {formatTime(request.returnTime)}
-                            </span>
-                          </div>
+                        ) : (
+                          <>
+                            {request.departureDate && (
+                              <div>
+                                <span className="text-gray-500">Depart:</span>{' '}
+                                <span className="font-medium">
+                                  {formatDate(request.departureDate)} {formatTime(request.departureTime)}
+                                </span>
+                              </div>
+                            )}
+                            {request.returnDate && (
+                              <div>
+                                <span className="text-gray-500">Return:</span>{' '}
+                                <span className="font-medium">
+                                  {formatDate(request.returnDate)} {formatTime(request.returnTime)}
+                                </span>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
 
@@ -362,22 +377,46 @@ export default function LibertyApprovalQueue() {
                             </div>
                           )}
 
-                          {request.departureDate && (
+                          {/* Time Slots Itinerary */}
+                          {(request.timeSlots || []).length > 0 ? (
                             <div>
-                              <span className="text-sm font-medium text-gray-700">Departure: </span>
-                              <span className="text-sm text-gray-600">
-                                {formatDate(request.departureDate)} at {formatTime(request.departureTime)}
-                              </span>
+                              <span className="text-sm font-medium text-gray-700">Itinerary:</span>
+                              <div className="mt-1 space-y-1.5">
+                                {request.timeSlots.map((slot, idx) => {
+                                  const slotParticipants = slot.participants || []
+                                  return (
+                                    <div key={idx} className="text-sm text-gray-600 p-2 bg-gray-50 rounded">
+                                      <span className="font-medium">{getTimeSlotLabel(slot)}</span>: {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                                      <span className="text-gray-400 mx-1">&middot;</span>
+                                      {buildDestinationString(slot.locations, request.customLocation || '')}
+                                      {slotParticipants.length > 0 && (
+                                        <span className="text-primary-600 ml-1">({slotParticipants.length} joined)</span>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
                             </div>
-                          )}
+                          ) : (
+                            <>
+                              {request.departureDate && (
+                                <div>
+                                  <span className="text-sm font-medium text-gray-700">Departure: </span>
+                                  <span className="text-sm text-gray-600">
+                                    {formatDate(request.departureDate)} at {formatTime(request.departureTime)}
+                                  </span>
+                                </div>
+                              )}
 
-                          {request.returnDate && (
-                            <div>
-                              <span className="text-sm font-medium text-gray-700">Return: </span>
-                              <span className="text-sm text-gray-600">
-                                {formatDate(request.returnDate)} at {formatTime(request.returnTime)}
-                              </span>
-                            </div>
+                              {request.returnDate && (
+                                <div>
+                                  <span className="text-sm font-medium text-gray-700">Return: </span>
+                                  <span className="text-sm text-gray-600">
+                                    {formatDate(request.returnDate)} at {formatTime(request.returnTime)}
+                                  </span>
+                                </div>
+                              )}
+                            </>
                           )}
 
                           {request.contactNumber && (
@@ -398,6 +437,24 @@ export default function LibertyApprovalQueue() {
                             <div>
                               <span className="text-sm font-medium text-gray-700">Notes: </span>
                               <span className="text-sm text-gray-600">{request.notes}</span>
+                            </div>
+                          )}
+
+                          {request.isDriver && (
+                            <div>
+                              <span className="text-sm font-medium text-gray-700">Driver: </span>
+                              <span className="text-sm text-gray-600">
+                                Yes - {request.passengerCapacity} seat{request.passengerCapacity !== 1 ? 's' : ''} available
+                              </span>
+                              {(request.passengers || []).length > 0 && (
+                                <ul className="mt-1 pl-4">
+                                  {request.passengers.map((p, idx) => (
+                                    <li key={idx} className="text-sm text-gray-600">
+                                      {p.rank && `${p.rank} `}{p.name} (passenger)
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                             </div>
                           )}
 

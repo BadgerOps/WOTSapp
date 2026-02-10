@@ -3,6 +3,8 @@ import {
   useAllLibertyRequests,
   getNextWeekendDates,
   LIBERTY_REQUEST_STATUS,
+  getTimeSlotLabel,
+  buildDestinationString,
 } from '../../hooks/useLibertyRequests'
 import Loading from '../common/Loading'
 
@@ -104,8 +106,12 @@ export default function LibertyRequestsManager() {
       'Departure Time',
       'Return Date',
       'Return Time',
+      'Time Slots',
       'Contact Number',
       'Purpose',
+      'Driver',
+      'Passenger Capacity',
+      'Passengers',
       'Companions',
       'Status',
       'Submitted At',
@@ -113,21 +119,30 @@ export default function LibertyRequestsManager() {
       'Notes',
     ]
 
-    const rows = requests.map((r) => [
-      r.requesterName || '',
-      r.destination || '',
-      r.departureDate || '',
-      r.departureTime || '',
-      r.returnDate || '',
-      r.returnTime || '',
-      r.contactNumber || '',
-      r.purpose || '',
-      r.companions?.map((c) => c.name).join('; ') || '',
-      r.status || '',
-      r.createdAt?.toDate ? r.createdAt.toDate().toISOString() : '',
-      r.approvedByName || r.rejectedByName || '',
-      r.notes || '',
-    ])
+    const rows = requests.map((r) => {
+      const slotsStr = (r.timeSlots || []).map((s) =>
+        `${getTimeSlotLabel(s)} ${s.startTime}-${s.endTime} (${buildDestinationString(s.locations, r.customLocation || '')})`
+      ).join('; ')
+      return [
+        r.requesterName || '',
+        r.destination || '',
+        r.departureDate || '',
+        r.departureTime || '',
+        r.returnDate || '',
+        r.returnTime || '',
+        slotsStr,
+        r.contactNumber || '',
+        r.purpose || '',
+        r.isDriver ? 'Yes' : 'No',
+        r.isDriver ? (r.passengerCapacity || 0) : '',
+        r.passengers?.map((p) => p.name).join('; ') || '',
+        r.companions?.map((c) => c.name).join('; ') || '',
+        r.status || '',
+        r.createdAt?.toDate ? r.createdAt.toDate().toISOString() : '',
+        r.approvedByName || r.rejectedByName || '',
+        r.notes || '',
+      ]
+    })
 
     const csvContent = [
       headers.join(','),
@@ -327,23 +342,34 @@ export default function LibertyRequestsManager() {
                           <div className="font-medium text-gray-900">
                             {request.requesterName}
                           </div>
-                          {companionCount > 0 && (
-                            <div className="text-xs text-gray-500">
-                              +{companionCount} companion
-                              {companionCount > 1 ? 's' : ''}
-                            </div>
-                          )}
+                          <div className="flex gap-1 flex-wrap">
+                            {request.isDriver && (
+                              <span className="text-xs text-indigo-600 font-medium">
+                                Driver
+                              </span>
+                            )}
+                            {companionCount > 0 && (
+                              <span className="text-xs text-gray-500">
+                                +{companionCount} companion
+                                {companionCount > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                           {request.destination}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 hidden md:table-cell">
-                          {formatDate(request.departureDate)}{' '}
-                          {formatTime(request.departureTime)}
+                          {(request.timeSlots || []).length > 0
+                            ? `${request.timeSlots.length} slots`
+                            : `${formatDate(request.departureDate)} ${formatTime(request.departureTime)}`
+                          }
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600 hidden md:table-cell">
-                          {formatDate(request.returnDate)}{' '}
-                          {formatTime(request.returnTime)}
+                          {(request.timeSlots || []).length > 0
+                            ? ''
+                            : `${formatDate(request.returnDate)} ${formatTime(request.returnTime)}`
+                          }
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span
@@ -400,6 +426,45 @@ export default function LibertyRequestsManager() {
                                   {request.purpose || '--'}
                                 </span>
                               </div>
+                              {(request.timeSlots || []).length > 0 && (
+                                <div className="md:col-span-2 lg:col-span-3">
+                                  <span className="font-medium text-gray-700">
+                                    Time Slots:{' '}
+                                  </span>
+                                  <div className="mt-1 space-y-1">
+                                    {request.timeSlots.map((slot, idx) => (
+                                      <div key={idx} className="text-gray-600 text-xs p-1.5 bg-white rounded border">
+                                        <span className="font-medium">{getTimeSlotLabel(slot)}</span>: {formatTime(slot.startTime)} - {formatTime(slot.endTime)} &middot; {buildDestinationString(slot.locations, request.customLocation || '')}
+                                        {(slot.participants || []).length > 0 && (
+                                          <span className="text-primary-600"> ({slot.participants.map(p => p.name).join(', ')})</span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {request.isDriver && (
+                                <div>
+                                  <span className="font-medium text-gray-700">
+                                    Driver:{' '}
+                                  </span>
+                                  <span className="text-gray-600">
+                                    Yes - {request.passengerCapacity} seat{request.passengerCapacity !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              )}
+                              {(request.passengers || []).length > 0 && (
+                                <div className="md:col-span-2 lg:col-span-3">
+                                  <span className="font-medium text-gray-700">
+                                    Passengers:{' '}
+                                  </span>
+                                  <span className="text-gray-600">
+                                    {request.passengers
+                                      .map((p) => p.name)
+                                      .join(', ')}
+                                  </span>
+                                </div>
+                              )}
                               {companionCount > 0 && (
                                 <div className="md:col-span-2 lg:col-span-3">
                                   <span className="font-medium text-gray-700">

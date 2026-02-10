@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { useLeaveAdminActions, LIBERTY_LOCATIONS, getNextWeekendDates } from '../../hooks/useLibertyRequests';
+import { useLeaveAdminActions, LIBERTY_LOCATIONS, buildDestinationString, getTimeSlotLabel, getNextWeekendDates } from '../../hooks/useLibertyRequests';
 import { usePassAdminActions } from '../../hooks/usePassApproval';
 
 /**
@@ -34,14 +34,12 @@ export default function LeaveAdminPanel() {
   const [autoApprove, setAutoApprove] = useState(true);
 
   // Form fields for liberty request
-  const [location, setLocation] = useState('');
   const [customLocation, setCustomLocation] = useState('');
-  const [departureDate, setDepartureDate] = useState('');
-  const [departureTime, setDepartureTime] = useState('');
-  const [returnDate, setReturnDate] = useState('');
-  const [returnTime, setReturnTime] = useState('');
   const [purpose, setPurpose] = useState('');
   const [libertyStatus, setLibertyStatus] = useState('approved');
+  const [isDriver, setIsDriver] = useState(false);
+  const [passengerCapacity, setPassengerCapacity] = useState(1);
+  const [timeSlots, setTimeSlots] = useState([]);
 
   // Get next weekend dates for liberty default
   const { saturday } = getNextWeekendDates();
@@ -96,14 +94,12 @@ export default function LeaveAdminPanel() {
     setContactNumber('');
     setNotes('');
     setAutoApprove(true);
-    setLocation('');
+    setTimeSlots([]);
     setCustomLocation('');
-    setDepartureDate('');
-    setDepartureTime('');
-    setReturnDate('');
-    setReturnTime('');
     setPurpose('');
     setLibertyStatus('approved');
+    setIsDriver(false);
+    setPassengerCapacity(1);
   }
 
   // Handle pass request submission
@@ -148,18 +144,16 @@ export default function LeaveAdminPanel() {
         targetUserId: selectedPerson.userId || selectedPerson.id,
         targetUserName: `${selectedPerson.firstName} ${selectedPerson.lastName}`,
         targetUserEmail: selectedPerson.email,
-        location,
+        timeSlots: timeSlots.map((slot) => ({ ...slot, participants: [] })),
         customLocation,
-        departureDate,
-        departureTime,
-        returnDate,
-        returnTime,
         contactNumber,
         purpose,
         notes,
         companions: [],
         weekendDate,
         status: libertyStatus,
+        isDriver,
+        passengerCapacity: isDriver ? passengerCapacity : 0,
       });
 
       if (result.success) {
@@ -374,26 +368,115 @@ export default function LeaveAdminPanel() {
         {/* Liberty Request Form */}
         {requestType === 'liberty' && (
           <form onSubmit={handleSubmitLibertyRequest} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Location *
-              </label>
-              <select
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="">Select location...</option>
-                {LIBERTY_LOCATIONS.map((loc) => (
-                  <option key={loc.value} value={loc.value}>
-                    {loc.label}
-                  </option>
-                ))}
-              </select>
+            {/* Time Slots */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700">
+                  Time Slots *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const lastSlot = timeSlots[timeSlots.length - 1];
+                    const newDate = lastSlot?.date || saturday.toISOString().split('T')[0];
+                    setTimeSlots((prev) => [
+                      ...prev,
+                      { date: newDate, startTime: '13:00', endTime: '17:00', locations: [] },
+                    ]);
+                  }}
+                  className="text-xs font-medium text-primary-600 hover:text-primary-800"
+                >
+                  + Add Time Slot
+                </button>
+              </div>
+
+              {timeSlots.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTimeSlots([{ date: saturday.toISOString().split('T')[0], startTime: '08:00', endTime: '12:00', locations: [] }])}
+                  className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-primary-400 hover:text-primary-600"
+                >
+                  Click to add first time slot
+                </button>
+              )}
+
+              {timeSlots.map((slot, slotIdx) => (
+                <div key={slotIdx} className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-800">
+                      {getTimeSlotLabel(slot) || `Slot ${slotIdx + 1}`}
+                    </span>
+                    {timeSlots.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setTimeSlots((prev) => prev.filter((_, i) => i !== slotIdx))}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Date</label>
+                      <input
+                        type="date"
+                        value={slot.date}
+                        onChange={(e) => setTimeSlots((prev) => prev.map((s, i) => i === slotIdx ? { ...s, date: e.target.value } : s))}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Start</label>
+                      <input
+                        type="time"
+                        value={slot.startTime}
+                        onChange={(e) => setTimeSlots((prev) => prev.map((s, i) => i === slotIdx ? { ...s, startTime: e.target.value } : s))}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">End</label>
+                      <input
+                        type="time"
+                        value={slot.endTime}
+                        onChange={(e) => setTimeSlots((prev) => prev.map((s, i) => i === slotIdx ? { ...s, endTime: e.target.value } : s))}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Locations</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {LIBERTY_LOCATIONS.map((loc) => (
+                        <button
+                          key={loc.value}
+                          type="button"
+                          onClick={() => setTimeSlots((prev) => prev.map((s, i) => {
+                            if (i !== slotIdx) return s;
+                            const locs = s.locations || [];
+                            return { ...s, locations: locs.includes(loc.value) ? locs.filter((v) => v !== loc.value) : [...locs, loc.value] };
+                          }))}
+                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                            (slot.locations || []).includes(loc.value)
+                              ? 'bg-primary-100 border-primary-500 text-primary-800 font-medium'
+                              : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+                          }`}
+                        >
+                          {(slot.locations || []).includes(loc.value) && <span className="mr-0.5">&#10003;</span>}
+                          {loc.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {location === 'other' && (
+            {/* Custom location if any slot has "other" */}
+            {timeSlots.some((s) => (s.locations || []).includes('other')) && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Custom Location *
@@ -409,54 +492,36 @@ export default function LeaveAdminPanel() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Departure Date
-                </label>
+            {/* Driver Checkbox & Passenger Capacity */}
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-2">
                 <input
-                  type="date"
-                  value={departureDate}
-                  onChange={(e) => setDepartureDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  type="checkbox"
+                  id="adminIsDriver"
+                  checked={isDriver}
+                  onChange={(e) => setIsDriver(e.target.checked)}
+                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Departure Time
+                <label htmlFor="adminIsDriver" className="text-sm font-medium text-gray-700">
+                  Person is driving
                 </label>
-                <input
-                  type="time"
-                  value={departureTime}
-                  onChange={(e) => setDepartureTime(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Return Date
-                </label>
-                <input
-                  type="date"
-                  value={returnDate}
-                  onChange={(e) => setReturnDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Return Time
-                </label>
-                <input
-                  type="time"
-                  value={returnTime}
-                  onChange={(e) => setReturnTime(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
+              {isDriver && (
+                <div className="mt-3 ml-6">
+                  <label className="block text-sm text-gray-600 mb-1">
+                    Available passenger seats
+                  </label>
+                  <select
+                    value={passengerCapacity}
+                    onChange={(e) => setPassengerCapacity(parseInt(e.target.value, 10))}
+                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div>
@@ -518,7 +583,7 @@ export default function LeaveAdminPanel() {
 
             <button
               type="submit"
-              disabled={!selectedPerson || !location || (location === 'other' && !customLocation) || loading}
+              disabled={!selectedPerson || timeSlots.length === 0 || !timeSlots.every((s) => (s.locations || []).length > 0 && s.date && s.startTime && s.endTime) || (timeSlots.some((s) => (s.locations || []).includes('other')) && !customLocation) || loading}
               className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Creating...' : 'Create Liberty Request'}

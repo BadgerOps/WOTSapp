@@ -6,6 +6,8 @@ import {
   isBeforeDeadline,
   getDeadlineDate,
   getDeadlineDayName,
+  getTimeSlotLabel,
+  buildDestinationString,
 } from '../../hooks/useLibertyRequests'
 import { useAppConfig } from '../../hooks/useAppConfig'
 import Loading from '../common/Loading'
@@ -83,12 +85,29 @@ export default function MyLibertyCard() {
               <p>
                 <span className="font-medium">Destination:</span> {weekendRequest.destination}
               </p>
-              <p>
-                <span className="font-medium">Depart:</span> {formatDate(weekendRequest.departureDate)} at {formatTime(weekendRequest.departureTime)}
-              </p>
-              <p>
-                <span className="font-medium">Return:</span> {formatDate(weekendRequest.returnDate)} at {formatTime(weekendRequest.returnTime)}
-              </p>
+              {(weekendRequest.timeSlots || []).length > 0 ? (
+                <div className="space-y-0.5">
+                  {weekendRequest.timeSlots.map((slot, idx) => (
+                    <p key={idx} className="text-xs">
+                      <span className="font-medium">{getTimeSlotLabel(slot)}:</span> {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <p>
+                    <span className="font-medium">Depart:</span> {formatDate(weekendRequest.departureDate)} at {formatTime(weekendRequest.departureTime)}
+                  </p>
+                  <p>
+                    <span className="font-medium">Return:</span> {formatDate(weekendRequest.returnDate)} at {formatTime(weekendRequest.returnTime)}
+                  </p>
+                </>
+              )}
+              {weekendRequest.isDriver && (
+                <p>
+                  <span className="font-medium">Driver:</span> {weekendRequest.passengerCapacity} seats
+                </p>
+              )}
               {weekendRequest.companions?.length > 0 && (
                 <p>
                   <span className="font-medium">With:</span> {weekendRequest.companions.map(c => c.name).join(', ')}
@@ -135,7 +154,10 @@ export default function MyLibertyCard() {
             <div className="mt-1 text-sm text-yellow-700">
               <p>{weekendRequest.destination}</p>
               <p className="text-xs mt-1">
-                {formatDate(weekendRequest.departureDate)} - {formatDate(weekendRequest.returnDate)}
+                {(weekendRequest.timeSlots || []).length > 0
+                  ? `${weekendRequest.timeSlots.length} time slot${weekendRequest.timeSlots.length > 1 ? 's' : ''}`
+                  : `${formatDate(weekendRequest.departureDate)} - ${formatDate(weekendRequest.returnDate)}`
+                }
               </p>
             </div>
             <Link

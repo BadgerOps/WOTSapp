@@ -26,15 +26,67 @@ export const LIBERTY_REQUEST_STATUS = {
 };
 
 /**
- * Common liberty locations (matches pass request destinations)
+ * Common liberty locations (multi-select supported)
  */
 export const LIBERTY_LOCATIONS = [
   { value: "shoppette", label: "Shoppette" },
   { value: "bx_commissary", label: "BX/Commissary" },
   { value: "gym", label: "Gym" },
   { value: "library", label: "Library" },
+  { value: "px", label: "PX" },
+  { value: "dfac", label: "DFAC" },
+  { value: "off_post", label: "Off Post" },
   { value: "other", label: "Other" },
 ];
+
+/**
+ * Build a human-readable destination string from selected locations
+ * @param {Array<string>} locations - Array of location values
+ * @param {string} customLocation - Custom location text if "other" is selected
+ * @returns {string} Comma-separated destination string
+ */
+export function buildDestinationString(locations, customLocation) {
+  if (!locations || locations.length === 0) return "";
+  const labels = locations
+    .map((loc) => {
+      if (loc === "other") return customLocation || "Other";
+      return LIBERTY_LOCATIONS.find((l) => l.value === loc)?.label || loc;
+    })
+    .filter(Boolean);
+  return labels.join(", ");
+}
+
+/**
+ * Build a summary destination string from all time slots
+ * @param {Array} timeSlots - Array of time slot objects
+ * @param {string} customLocation - Custom location text if "other" is selected
+ * @returns {string} Combined destination string
+ */
+export function buildTimeSlotsDestination(timeSlots, customLocation) {
+  if (!timeSlots || timeSlots.length === 0) return "";
+  const allLocations = new Set();
+  timeSlots.forEach((slot) => {
+    (slot.locations || []).forEach((loc) => allLocations.add(loc));
+  });
+  return buildDestinationString([...allLocations], customLocation);
+}
+
+/**
+ * Generate a label for a time slot (e.g. "Sat Morning", "Sun Afternoon")
+ * @param {Object} slot - Time slot object with date, startTime, endTime
+ * @returns {string} Human-readable label
+ */
+export function getTimeSlotLabel(slot) {
+  if (!slot || !slot.date) return "";
+  const date = new Date(slot.date + "T00:00:00");
+  const dayName = date.toLocaleDateString("en-US", { weekday: "short" });
+  const startHour = slot.startTime ? parseInt(slot.startTime.split(":")[0], 10) : 0;
+  let period = "";
+  if (startHour < 12) period = "Morning";
+  else if (startHour < 17) period = "Afternoon";
+  else period = "Evening";
+  return `${dayName} ${period}`;
+}
 
 /**
  * Get the next upcoming weekend dates
@@ -243,7 +295,8 @@ export function useLibertyRequestActions() {
   /**
    * Create a new liberty request
    * @param {Object} requestData - Liberty request details
-   * @param {string} requestData.location - Where they're going
+   * @param {Array<string>} requestData.locations - Array of selected location values (multi-select)
+   * @param {string} requestData.location - Single location (legacy, converted to locations array)
    * @param {string} requestData.customLocation - Custom location if "other" selected
    * @param {string} requestData.departureDate - Departure date (ISO string)
    * @param {string} requestData.departureTime - Departure time
@@ -255,6 +308,8 @@ export function useLibertyRequestActions() {
    * @param {Array} requestData.companions - Array of companion objects {id, name, rank}
    * @param {string} requestData.weekendDate - The weekend this is for (Saturday date as ISO string)
    * @param {boolean} requestData.forceSubmit - If true, cancel existing and create new
+   * @param {boolean} requestData.isDriver - Whether the requester is driving
+   * @param {number} requestData.passengerCapacity - Number of available passenger seats (if driver)
    */
   async function createLibertyRequest(requestData) {
     setLoading(true);
@@ -291,27 +346,45 @@ export function useLibertyRequestActions() {
         }
       }
 
-      // Build the destination string
-      const destination = requestData.location === "other"
-        ? requestData.customLocation
-        : LIBERTY_LOCATIONS.find(l => l.value === requestData.location)?.label || requestData.location;
+      // Build time slots (new) or fallback to single departure/return (legacy)
+      const timeSlots = requestData.timeSlots || [];
+
+      // Derive aggregate locations and destination from time slots if available
+      let locations, destination;
+      if (timeSlots.length > 0) {
+        // Initialize participants array on each slot
+        timeSlots.forEach((slot) => {
+          if (!slot.participants) slot.participants = [];
+        });
+        locations = [...new Set(timeSlots.flatMap((s) => s.locations || []))];
+        destination = buildTimeSlotsDestination(timeSlots, requestData.customLocation);
+      } else {
+        locations = requestData.locations || (requestData.location ? [requestData.location] : []);
+        destination = buildDestinationString(locations, requestData.customLocation);
+      }
 
       // Create the main request
       const requestDoc = await addDoc(collection(db, "libertyRequests"), {
         requesterId: user.uid,
         requesterName: user.displayName || user.email,
         requesterEmail: user.email,
-        location: requestData.location,
+        locations,
+        location: locations[0] || null, // Keep legacy field for backward compat
         destination,
-        departureDate: requestData.departureDate || null,
-        departureTime: requestData.departureTime || null,
-        returnDate: requestData.returnDate || null,
-        returnTime: requestData.returnTime || null,
+        // Keep legacy single-window fields for backward compat
+        departureDate: requestData.departureDate || (timeSlots[0]?.date || null),
+        departureTime: requestData.departureTime || (timeSlots[0]?.startTime || null),
+        returnDate: requestData.returnDate || (timeSlots[timeSlots.length - 1]?.date || null),
+        returnTime: requestData.returnTime || (timeSlots[timeSlots.length - 1]?.endTime || null),
         contactNumber: requestData.contactNumber || null,
         purpose: requestData.purpose || null,
         notes: requestData.notes || null,
         companions,
         weekendDate,
+        isDriver: requestData.isDriver || false,
+        passengerCapacity: requestData.isDriver ? (requestData.passengerCapacity || 0) : 0,
+        passengers: [], // Legacy - kept for backward compat
+        timeSlots: timeSlots.length > 0 ? timeSlots : [],
         status: "pending",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -572,10 +645,20 @@ export function useLeaveAdminActions() {
     try {
       const companions = requestData.companions || [];
 
-      // Build the destination string
-      const destination = requestData.location === "other"
-        ? requestData.customLocation
-        : LIBERTY_LOCATIONS.find(l => l.value === requestData.location)?.label || requestData.location;
+      // Build time slots (new) or fallback to single departure/return (legacy)
+      const timeSlots = requestData.timeSlots || [];
+
+      let locations, destination;
+      if (timeSlots.length > 0) {
+        timeSlots.forEach((slot) => {
+          if (!slot.participants) slot.participants = [];
+        });
+        locations = [...new Set(timeSlots.flatMap((s) => s.locations || []))];
+        destination = buildTimeSlotsDestination(timeSlots, requestData.customLocation);
+      } else {
+        locations = requestData.locations || (requestData.location ? [requestData.location] : []);
+        destination = buildDestinationString(locations, requestData.customLocation);
+      }
 
       // Get admin's initials for approval tracking
       const personnelQuery = await getDoc(doc(db, "personnel", user.uid));
@@ -605,17 +688,22 @@ export function useLeaveAdminActions() {
         requesterId: requestData.targetUserId,
         requesterName: requestData.targetUserName,
         requesterEmail: requestData.targetUserEmail,
-        location: requestData.location,
+        locations,
+        location: locations[0] || null, // Keep legacy field for backward compat
         destination,
-        departureDate: requestData.departureDate || null,
-        departureTime: requestData.departureTime || null,
-        returnDate: requestData.returnDate || null,
-        returnTime: requestData.returnTime || null,
+        departureDate: requestData.departureDate || (timeSlots[0]?.date || null),
+        departureTime: requestData.departureTime || (timeSlots[0]?.startTime || null),
+        returnDate: requestData.returnDate || (timeSlots[timeSlots.length - 1]?.date || null),
+        returnTime: requestData.returnTime || (timeSlots[timeSlots.length - 1]?.endTime || null),
         contactNumber: requestData.contactNumber || null,
         purpose: requestData.purpose || null,
         notes: requestData.notes || null,
         companions,
         weekendDate: requestData.weekendDate,
+        isDriver: requestData.isDriver || false,
+        passengerCapacity: requestData.isDriver ? (requestData.passengerCapacity || 0) : 0,
+        passengers: [],
+        timeSlots: timeSlots.length > 0 ? timeSlots : [],
         status,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -748,34 +836,80 @@ export function useAvailableLibertyRequests() {
   const weekendDate = saturday.toISOString().split('T')[0];
 
   useEffect(() => {
-    // Fetch all requests for this weekend, filter in memory for pending/approved
-    const q = query(
+    // We need two queries since Firestore doesn't support OR in where clauses
+    // Query for pending requests for this weekend
+    const pendingQuery = query(
       collection(db, "libertyRequests"),
       where("weekendDate", "==", weekendDate),
+      where("status", "==", "pending"),
       orderBy("createdAt", "desc")
     );
 
-    const unsubscribe = onSnapshot(
-      q,
+    // Query for approved requests for this weekend
+    const approvedQuery = query(
+      collection(db, "libertyRequests"),
+      where("weekendDate", "==", weekendDate),
+      where("status", "==", "approved"),
+      orderBy("createdAt", "desc")
+    );
+
+    let pendingData = [];
+    let approvedData = [];
+    let pendingDone = false;
+    let approvedDone = false;
+
+    function mergeAndSet() {
+      if (!pendingDone || !approvedDone) return;
+      // Combine and sort by createdAt desc
+      const all = [...pendingData, ...approvedData].sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.()?.getTime() || 0;
+        const bTime = b.createdAt?.toDate?.()?.getTime() || 0;
+        return bTime - aTime;
+      });
+      setRequests(all);
+      setLoading(false);
+    }
+
+    const unsubPending = onSnapshot(
+      pendingQuery,
       (snapshot) => {
-        const data = snapshot.docs
-          .map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }))
-          // Only show pending and approved requests (not cancelled or rejected)
-          .filter((r) => r.status === "pending" || r.status === "approved");
-        setRequests(data);
-        setLoading(false);
+        pendingData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        pendingDone = true;
+        mergeAndSet();
       },
       (err) => {
-        console.error("Error fetching available liberty requests:", err);
+        console.error("Error fetching pending liberty requests:", err);
         setError(err.message);
-        setLoading(false);
+        pendingDone = true;
+        mergeAndSet();
       }
     );
 
-    return unsubscribe;
+    const unsubApproved = onSnapshot(
+      approvedQuery,
+      (snapshot) => {
+        approvedData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        approvedDone = true;
+        mergeAndSet();
+      },
+      (err) => {
+        console.error("Error fetching approved liberty requests:", err);
+        setError(err.message);
+        approvedDone = true;
+        mergeAndSet();
+      }
+    );
+
+    return () => {
+      unsubPending();
+      unsubApproved();
+    };
   }, [weekendDate]);
 
   return { requests, loading, error, weekendDate };
@@ -1048,11 +1182,267 @@ export function useLibertyJoinActions() {
     }
   }
 
+  /**
+   * Sign up as a passenger with a driver
+   * @param {string} libertyRequestId - The liberty request with a driver
+   */
+  async function signUpAsPassenger(libertyRequestId) {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRef = doc(db, "libertyRequests", libertyRequestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error("Liberty request not found");
+      }
+
+      const requestData = requestDoc.data();
+
+      if (!requestData.isDriver) {
+        throw new Error("This person is not offering a ride");
+      }
+
+      if (requestData.requesterId === user.uid) {
+        throw new Error("You cannot sign up as a passenger on your own request");
+      }
+
+      const passengers = requestData.passengers || [];
+      const alreadyPassenger = passengers.some((p) => p.id === user.uid);
+      if (alreadyPassenger) {
+        throw new Error("You are already signed up as a passenger");
+      }
+
+      if (passengers.length >= (requestData.passengerCapacity || 0)) {
+        throw new Error("No available seats");
+      }
+
+      // Get user's personnel record for rank/name
+      const personnelDoc = await getDoc(doc(db, "personnel", user.uid));
+      let userRank = "";
+      let firstName = "";
+      let lastName = "";
+
+      if (personnelDoc.exists()) {
+        const personnelData = personnelDoc.data();
+        userRank = personnelData.rank || "";
+        firstName = personnelData.firstName || "";
+        lastName = personnelData.lastName || "";
+      }
+
+      const displayName = firstName && lastName
+        ? `${firstName} ${lastName}`
+        : user.displayName || user.email;
+
+      const newPassenger = {
+        id: user.uid,
+        name: displayName,
+        rank: userRank,
+        signedUpAt: new Date(),
+      };
+
+      await updateDoc(requestRef, {
+        passengers: [...passengers, newPassenger],
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error("Error signing up as passenger:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
+  /**
+   * Remove yourself as a passenger
+   * @param {string} libertyRequestId - The liberty request
+   */
+  async function cancelPassengerSignUp(libertyRequestId) {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRef = doc(db, "libertyRequests", libertyRequestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error("Liberty request not found");
+      }
+
+      const requestData = requestDoc.data();
+      const passengers = requestData.passengers || [];
+
+      const updatedPassengers = passengers.filter((p) => p.id !== user.uid);
+
+      if (updatedPassengers.length === passengers.length) {
+        throw new Error("You are not signed up as a passenger");
+      }
+
+      await updateDoc(requestRef, {
+        passengers: updatedPassengers,
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error("Error cancelling passenger sign-up:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
+  /**
+   * Join a specific time slot on a liberty request (replaces separate join/passenger concepts)
+   * @param {string} libertyRequestId - The liberty request
+   * @param {number} slotIndex - Index of the time slot to join
+   */
+  async function joinTimeSlot(libertyRequestId, slotIndex) {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRef = doc(db, "libertyRequests", libertyRequestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error("Liberty request not found");
+      }
+
+      const requestData = requestDoc.data();
+      const timeSlots = requestData.timeSlots || [];
+
+      if (slotIndex < 0 || slotIndex >= timeSlots.length) {
+        throw new Error("Invalid time slot");
+      }
+
+      if (requestData.requesterId === user.uid) {
+        throw new Error("You cannot join your own liberty request");
+      }
+
+      const slot = timeSlots[slotIndex];
+      const participants = slot.participants || [];
+
+      if (participants.some((p) => p.id === user.uid)) {
+        throw new Error("You are already in this time slot");
+      }
+
+      // Check driver capacity if applicable
+      if (requestData.isDriver) {
+        const passengerCapacity = requestData.passengerCapacity || 0;
+        if (participants.length >= passengerCapacity) {
+          throw new Error("No available seats for this time slot");
+        }
+      }
+
+      // Get user info from personnel record
+      const personnelDoc = await getDoc(doc(db, "personnel", user.uid));
+      let userRank = "";
+      let firstName = "";
+      let lastName = "";
+
+      if (personnelDoc.exists()) {
+        const personnelData = personnelDoc.data();
+        userRank = personnelData.rank || "";
+        firstName = personnelData.firstName || "";
+        lastName = personnelData.lastName || "";
+      }
+
+      const displayName = firstName && lastName
+        ? `${firstName} ${lastName}`
+        : user.displayName || user.email;
+
+      // Add participant to the slot
+      timeSlots[slotIndex] = {
+        ...slot,
+        participants: [
+          ...participants,
+          {
+            id: user.uid,
+            name: displayName,
+            rank: userRank,
+            joinedAt: new Date(),
+          },
+        ],
+      };
+
+      await updateDoc(requestRef, {
+        timeSlots,
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error("Error joining time slot:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
+  /**
+   * Leave a specific time slot on a liberty request
+   * @param {string} libertyRequestId - The liberty request
+   * @param {number} slotIndex - Index of the time slot to leave
+   */
+  async function leaveTimeSlot(libertyRequestId, slotIndex) {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRef = doc(db, "libertyRequests", libertyRequestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error("Liberty request not found");
+      }
+
+      const requestData = requestDoc.data();
+      const timeSlots = requestData.timeSlots || [];
+
+      if (slotIndex < 0 || slotIndex >= timeSlots.length) {
+        throw new Error("Invalid time slot");
+      }
+
+      const slot = timeSlots[slotIndex];
+      const participants = slot.participants || [];
+      const updatedParticipants = participants.filter((p) => p.id !== user.uid);
+
+      if (updatedParticipants.length === participants.length) {
+        throw new Error("You are not in this time slot");
+      }
+
+      timeSlots[slotIndex] = {
+        ...slot,
+        participants: updatedParticipants,
+      };
+
+      await updateDoc(requestRef, {
+        timeSlots,
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error("Error leaving time slot:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
   return {
     requestToJoin,
     approveJoinRequest,
     rejectJoinRequest,
     cancelJoinRequest,
+    signUpAsPassenger,
+    cancelPassengerSignUp,
+    joinTimeSlot,
+    leaveTimeSlot,
     loading,
     error,
   };

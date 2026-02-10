@@ -4,6 +4,9 @@ import {
   useLibertyRequestActions,
   LIBERTY_REQUEST_STATUS,
   LIBERTY_LOCATIONS,
+  buildDestinationString,
+  buildTimeSlotsDestination,
+  getTimeSlotLabel,
   getNextWeekendDates,
   isBeforeDeadline,
   getDeadlineDate,
@@ -30,12 +33,7 @@ export default function LibertyRequestForm() {
   const { personnel } = usePersonnel();
 
   const [showForm, setShowForm] = useState(false);
-  const [location, setLocation] = useState("");
   const [customLocation, setCustomLocation] = useState("");
-  const [departureDate, setDepartureDate] = useState("");
-  const [departureTime, setDepartureTime] = useState("");
-  const [returnDate, setReturnDate] = useState("");
-  const [returnTime, setReturnTime] = useState("");
   const [contactNumber, setContactNumber] = useState("");
   const [purpose, setPurpose] = useState("");
   const [notes, setNotes] = useState("");
@@ -43,6 +41,11 @@ export default function LibertyRequestForm() {
   const [companionSearch, setCompanionSearch] = useState("");
   const [showCompanionDropdown, setShowCompanionDropdown] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState(null);
+  const [isDriver, setIsDriver] = useState(false);
+  const [passengerCapacity, setPassengerCapacity] = useState(1);
+
+  // Time slots state - each slot: { date, startTime, endTime, locations: [] }
+  const [timeSlots, setTimeSlots] = useState([]);
 
   // Get weekend dates
   const { saturday, sunday } = getNextWeekendDates();
@@ -91,15 +94,19 @@ export default function LibertyRequestForm() {
     }
   }, [myPersonnelRecord]);
 
-  // Set default dates when form opens
+  // Set default time slot when form opens
   useEffect(() => {
-    if (showForm && !departureDate) {
-      setDepartureDate(saturday.toISOString().split("T")[0]);
-      setDepartureTime("08:00");
-      setReturnDate(sunday.toISOString().split("T")[0]);
-      setReturnTime("18:00");
+    if (showForm && timeSlots.length === 0) {
+      setTimeSlots([
+        {
+          date: saturday.toISOString().split("T")[0],
+          startTime: "08:00",
+          endTime: "12:00",
+          locations: [],
+        },
+      ]);
     }
-  }, [showForm, departureDate, saturday, sunday]);
+  }, [showForm, timeSlots.length, saturday]);
 
   // Filter personnel for companion search (exclude current user)
   const filteredPersonnel = useMemo(() => {
@@ -122,11 +129,59 @@ export default function LibertyRequestForm() {
   const error = requestError;
 
   function getDestination() {
-    if (location === "other") {
-      return customLocation;
+    return buildTimeSlotsDestination(timeSlots, customLocation);
+  }
+
+  // Check if any slot has "other" selected
+  const hasOtherLocation = timeSlots.some((slot) =>
+    (slot.locations || []).includes("other")
+  );
+
+  function toggleSlotLocation(slotIndex, value) {
+    setTimeSlots((prev) =>
+      prev.map((slot, i) => {
+        if (i !== slotIndex) return slot;
+        const locs = slot.locations || [];
+        return {
+          ...slot,
+          locations: locs.includes(value)
+            ? locs.filter((v) => v !== value)
+            : [...locs, value],
+        };
+      })
+    );
+  }
+
+  function updateSlotField(slotIndex, field, value) {
+    setTimeSlots((prev) =>
+      prev.map((slot, i) => (i === slotIndex ? { ...slot, [field]: value } : slot))
+    );
+  }
+
+  function addTimeSlot() {
+    // Default to next logical slot
+    const lastSlot = timeSlots[timeSlots.length - 1];
+    const newDate = lastSlot?.date || saturday.toISOString().split("T")[0];
+    const lastEndHour = lastSlot?.endTime ? parseInt(lastSlot.endTime.split(":")[0], 10) : 12;
+    const newStart = lastEndHour < 17 ? `${String(lastEndHour + 1).padStart(2, "0")}:00` : "08:00";
+    const newEnd = lastEndHour < 13 ? "17:00" : "20:00";
+    // If last slot was afternoon or evening, bump to next day
+    const useNextDay = lastEndHour >= 17;
+    let nextDate = newDate;
+    if (useNextDay) {
+      const d = new Date(newDate + "T00:00:00");
+      d.setDate(d.getDate() + 1);
+      nextDate = d.toISOString().split("T")[0];
     }
-    const option = LIBERTY_LOCATIONS.find((o) => o.value === location);
-    return option?.label || "";
+    setTimeSlots((prev) => [
+      ...prev,
+      { date: nextDate, startTime: useNextDay ? "08:00" : newStart, endTime: useNextDay ? "12:00" : newEnd, locations: [] },
+    ]);
+  }
+
+  function removeTimeSlot(index) {
+    if (timeSlots.length <= 1) return;
+    setTimeSlots((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmitRequest(e, forceSubmit = false) {
@@ -134,12 +189,11 @@ export default function LibertyRequestForm() {
     setDuplicateWarning(null);
     try {
       const formData = {
-        location,
+        timeSlots: timeSlots.map((slot) => ({
+          ...slot,
+          participants: [],
+        })),
         customLocation,
-        departureDate,
-        departureTime,
-        returnDate,
-        returnTime,
         contactNumber,
         purpose,
         notes,
@@ -150,6 +204,8 @@ export default function LibertyRequestForm() {
         })),
         weekendDate: weekendDateStr,
         forceSubmit,
+        isDriver,
+        passengerCapacity: isDriver ? passengerCapacity : 0,
       };
       const result = await createLibertyRequest(formData);
 
@@ -184,17 +240,15 @@ export default function LibertyRequestForm() {
 
   function resetForm() {
     setShowForm(false);
-    setLocation("");
+    setTimeSlots([]);
     setCustomLocation("");
-    setDepartureDate("");
-    setDepartureTime("");
-    setReturnDate("");
-    setReturnTime("");
     setContactNumber(myPersonnelRecord?.phoneNumber || "");
     setPurpose("");
     setNotes("");
     setCompanions([]);
     setCompanionSearch("");
+    setIsDriver(false);
+    setPassengerCapacity(1);
   }
 
   function handleAddCompanion(person) {
@@ -208,12 +262,15 @@ export default function LibertyRequestForm() {
   }
 
   const isFormValid =
-    location &&
-    (location !== "other" || customLocation.trim()) &&
-    departureDate &&
-    departureTime &&
-    returnDate &&
-    returnTime &&
+    timeSlots.length > 0 &&
+    timeSlots.every(
+      (slot) =>
+        slot.date &&
+        slot.startTime &&
+        slot.endTime &&
+        (slot.locations || []).length > 0
+    ) &&
+    (!hasOtherLocation || customLocation.trim()) &&
     contactNumber.trim() &&
     purpose.trim();
 
@@ -311,12 +368,32 @@ export default function LibertyRequestForm() {
               <p className="font-medium text-green-800">Liberty Approved</p>
               <div className="mt-2 text-sm text-green-700 space-y-1">
                 <p><span className="font-medium">Destination:</span> {approvedRequest.destination}</p>
-                <p>
-                  <span className="font-medium">Departure:</span> {formatDate(approvedRequest.departureDate)} at {formatTime(approvedRequest.departureTime)}
-                </p>
-                <p>
-                  <span className="font-medium">Return:</span> {formatDate(approvedRequest.returnDate)} at {formatTime(approvedRequest.returnTime)}
-                </p>
+                {(approvedRequest.timeSlots || []).length > 0 ? (
+                  <div className="space-y-1">
+                    {approvedRequest.timeSlots.map((slot, idx) => (
+                      <p key={idx} className="text-xs">
+                        <span className="font-medium">{getTimeSlotLabel(slot)}:</span> {formatTime(slot.startTime)} - {formatTime(slot.endTime)} &middot; {buildDestinationString(slot.locations, approvedRequest.customLocation || "")}
+                        {(slot.participants || []).length > 0 && (
+                          <span className="text-green-600"> (+{slot.participants.length} joined)</span>
+                        )}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <p>
+                      <span className="font-medium">Departure:</span> {formatDate(approvedRequest.departureDate)} at {formatTime(approvedRequest.departureTime)}
+                    </p>
+                    <p>
+                      <span className="font-medium">Return:</span> {formatDate(approvedRequest.returnDate)} at {formatTime(approvedRequest.returnTime)}
+                    </p>
+                  </>
+                )}
+                {approvedRequest.isDriver && (
+                  <p>
+                    <span className="font-medium">Driver:</span> Yes ({approvedRequest.passengerCapacity} seats)
+                  </p>
+                )}
                 {approvedRequest.companions?.length > 0 && (
                   <p>
                     <span className="font-medium">With:</span> {approvedRequest.companions.map((c) => c.name).join(", ")}
@@ -342,12 +419,29 @@ export default function LibertyRequestForm() {
               </div>
               <div className="mt-2 text-sm text-yellow-700 space-y-1">
                 <p><span className="font-medium">Destination:</span> {pendingRequest.destination}</p>
-                <p>
-                  <span className="font-medium">Departure:</span> {formatDate(pendingRequest.departureDate)} at {formatTime(pendingRequest.departureTime)}
-                </p>
-                <p>
-                  <span className="font-medium">Return:</span> {formatDate(pendingRequest.returnDate)} at {formatTime(pendingRequest.returnTime)}
-                </p>
+                {(pendingRequest.timeSlots || []).length > 0 ? (
+                  <div className="space-y-1">
+                    {pendingRequest.timeSlots.map((slot, idx) => (
+                      <p key={idx} className="text-xs">
+                        <span className="font-medium">{getTimeSlotLabel(slot)}:</span> {formatTime(slot.startTime)} - {formatTime(slot.endTime)} &middot; {buildDestinationString(slot.locations, pendingRequest.customLocation || "")}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <p>
+                      <span className="font-medium">Departure:</span> {formatDate(pendingRequest.departureDate)} at {formatTime(pendingRequest.departureTime)}
+                    </p>
+                    <p>
+                      <span className="font-medium">Return:</span> {formatDate(pendingRequest.returnDate)} at {formatTime(pendingRequest.returnTime)}
+                    </p>
+                  </>
+                )}
+                {pendingRequest.isDriver && (
+                  <p>
+                    <span className="font-medium">Driver:</span> Yes ({pendingRequest.passengerCapacity} seats available)
+                  </p>
+                )}
                 {pendingRequest.companions?.length > 0 && (
                   <p>
                     <span className="font-medium">With:</span> {pendingRequest.companions.map((c) => c.name).join(", ")}
@@ -391,92 +485,148 @@ export default function LibertyRequestForm() {
             </span>
           </div>
 
-          {/* Destination */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Destination <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">Select destination...</option>
-              {LIBERTY_LOCATIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            {location === "other" && (
+          {/* Time Slots */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700">
+                Time Slots <span className="text-red-500">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={addTimeSlot}
+                className="text-xs font-medium text-primary-600 hover:text-primary-800"
+              >
+                + Add Time Slot
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 -mt-1">Add one slot per outing window (e.g. Sat morning, Sat afternoon)</p>
+
+            {timeSlots.map((slot, slotIdx) => (
+              <div key={slotIdx} className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-800">
+                    {getTimeSlotLabel(slot) || `Slot ${slotIdx + 1}`}
+                  </span>
+                  {timeSlots.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeTimeSlot(slotIdx)}
+                      className="text-xs text-red-500 hover:text-red-700"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                {/* Date + Times */}
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Date</label>
+                    <input
+                      type="date"
+                      value={slot.date}
+                      onChange={(e) => updateSlotField(slotIdx, "date", e.target.value)}
+                      min={saturday.toISOString().split("T")[0]}
+                      required
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Start</label>
+                    <input
+                      type="time"
+                      value={slot.startTime}
+                      onChange={(e) => updateSlotField(slotIdx, "startTime", e.target.value)}
+                      required
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">End</label>
+                    <input
+                      type="time"
+                      value={slot.endTime}
+                      onChange={(e) => updateSlotField(slotIdx, "endTime", e.target.value)}
+                      required
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Locations for this slot */}
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Locations</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {LIBERTY_LOCATIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => toggleSlotLocation(slotIdx, opt.value)}
+                        className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                          (slot.locations || []).includes(opt.value)
+                            ? "bg-primary-100 border-primary-500 text-primary-800 font-medium"
+                            : "bg-white border-gray-300 text-gray-600 hover:border-gray-400"
+                        }`}
+                      >
+                        {(slot.locations || []).includes(opt.value) && (
+                          <span className="mr-0.5">&#10003;</span>
+                        )}
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Custom location text if any slot has "other" */}
+          {hasOtherLocation && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Custom Location <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 value={customLocation}
                 onChange={(e) => setCustomLocation(e.target.value)}
                 placeholder="Enter destination..."
                 required
-                className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
+            </div>
+          )}
+
+          {/* Driver Checkbox & Passenger Capacity */}
+          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isDriver"
+                checked={isDriver}
+                onChange={(e) => setIsDriver(e.target.checked)}
+                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+              />
+              <label htmlFor="isDriver" className="text-sm font-medium text-gray-700">
+                I am driving
+              </label>
+            </div>
+            {isDriver && (
+              <div className="mt-3 ml-6">
+                <label className="block text-sm text-gray-600 mb-1">
+                  Available passenger seats
+                </label>
+                <select
+                  value={passengerCapacity}
+                  onChange={(e) => setPassengerCapacity(parseInt(e.target.value, 10))}
+                  className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
             )}
-          </div>
-
-          {/* Departure Date/Time */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Departure Date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={departureDate}
-                onChange={(e) => setDepartureDate(e.target.value)}
-                min={saturday.toISOString().split("T")[0]}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Departure Time <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="time"
-                value={departureTime}
-                onChange={(e) => setDepartureTime(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
-            </div>
-          </div>
-
-          {/* Return Date/Time */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Return Date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={returnDate}
-                onChange={(e) => setReturnDate(e.target.value)}
-                min={departureDate || saturday.toISOString().split("T")[0]}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Return Time <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="time"
-                value={returnTime}
-                onChange={(e) => setReturnTime(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              />
-            </div>
           </div>
 
           {/* Contact Number */}
