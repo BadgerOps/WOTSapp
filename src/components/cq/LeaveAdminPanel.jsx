@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { useLeaveAdminActions, LIBERTY_LOCATIONS, getNextWeekendDates } from '../../hooks/useLibertyRequests';
+import { useLeaveAdminActions, LIBERTY_LOCATIONS, buildDestinationString, getNextWeekendDates } from '../../hooks/useLibertyRequests';
 import { usePassAdminActions } from '../../hooks/usePassApproval';
 
 /**
@@ -34,7 +34,7 @@ export default function LeaveAdminPanel() {
   const [autoApprove, setAutoApprove] = useState(true);
 
   // Form fields for liberty request
-  const [location, setLocation] = useState('');
+  const [selectedLocations, setSelectedLocations] = useState([]);
   const [customLocation, setCustomLocation] = useState('');
   const [departureDate, setDepartureDate] = useState('');
   const [departureTime, setDepartureTime] = useState('');
@@ -42,6 +42,8 @@ export default function LeaveAdminPanel() {
   const [returnTime, setReturnTime] = useState('');
   const [purpose, setPurpose] = useState('');
   const [libertyStatus, setLibertyStatus] = useState('approved');
+  const [isDriver, setIsDriver] = useState(false);
+  const [passengerCapacity, setPassengerCapacity] = useState(1);
 
   // Get next weekend dates for liberty default
   const { saturday } = getNextWeekendDates();
@@ -96,7 +98,7 @@ export default function LeaveAdminPanel() {
     setContactNumber('');
     setNotes('');
     setAutoApprove(true);
-    setLocation('');
+    setSelectedLocations([]);
     setCustomLocation('');
     setDepartureDate('');
     setDepartureTime('');
@@ -104,6 +106,8 @@ export default function LeaveAdminPanel() {
     setReturnTime('');
     setPurpose('');
     setLibertyStatus('approved');
+    setIsDriver(false);
+    setPassengerCapacity(1);
   }
 
   // Handle pass request submission
@@ -148,7 +152,7 @@ export default function LeaveAdminPanel() {
         targetUserId: selectedPerson.userId || selectedPerson.id,
         targetUserName: `${selectedPerson.firstName} ${selectedPerson.lastName}`,
         targetUserEmail: selectedPerson.email,
-        location,
+        locations: selectedLocations,
         customLocation,
         departureDate,
         departureTime,
@@ -160,6 +164,8 @@ export default function LeaveAdminPanel() {
         companions: [],
         weekendDate,
         status: libertyStatus,
+        isDriver,
+        passengerCapacity: isDriver ? passengerCapacity : 0,
       });
 
       if (result.success) {
@@ -376,24 +382,33 @@ export default function LeaveAdminPanel() {
           <form onSubmit={handleSubmitLibertyRequest} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Location *
+                Location(s) *
               </label>
-              <select
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="">Select location...</option>
+              <p className="text-xs text-gray-500 mb-2">Select all that apply</p>
+              <div className="flex flex-wrap gap-2">
                 {LIBERTY_LOCATIONS.map((loc) => (
-                  <option key={loc.value} value={loc.value}>
+                  <button
+                    key={loc.value}
+                    type="button"
+                    onClick={() => setSelectedLocations((prev) =>
+                      prev.includes(loc.value)
+                        ? prev.filter((v) => v !== loc.value)
+                        : [...prev, loc.value]
+                    )}
+                    className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                      selectedLocations.includes(loc.value)
+                        ? 'bg-primary-100 border-primary-500 text-primary-800 font-medium'
+                        : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+                    }`}
+                  >
+                    {selectedLocations.includes(loc.value) && <span className="mr-1">&#10003;</span>}
                     {loc.label}
-                  </option>
+                  </button>
                 ))}
-              </select>
+              </div>
             </div>
 
-            {location === 'other' && (
+            {selectedLocations.includes('other') && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Custom Location *
@@ -408,6 +423,38 @@ export default function LeaveAdminPanel() {
                 />
               </div>
             )}
+
+            {/* Driver Checkbox & Passenger Capacity */}
+            <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="adminIsDriver"
+                  checked={isDriver}
+                  onChange={(e) => setIsDriver(e.target.checked)}
+                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                />
+                <label htmlFor="adminIsDriver" className="text-sm font-medium text-gray-700">
+                  Person is driving
+                </label>
+              </div>
+              {isDriver && (
+                <div className="mt-3 ml-6">
+                  <label className="block text-sm text-gray-600 mb-1">
+                    Available passenger seats
+                  </label>
+                  <select
+                    value={passengerCapacity}
+                    onChange={(e) => setPassengerCapacity(parseInt(e.target.value, 10))}
+                    className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -518,7 +565,7 @@ export default function LeaveAdminPanel() {
 
             <button
               type="submit"
-              disabled={!selectedPerson || !location || (location === 'other' && !customLocation) || loading}
+              disabled={!selectedPerson || selectedLocations.length === 0 || (selectedLocations.includes('other') && !customLocation) || loading}
               className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Creating...' : 'Create Liberty Request'}

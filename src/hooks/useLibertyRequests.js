@@ -26,15 +26,35 @@ export const LIBERTY_REQUEST_STATUS = {
 };
 
 /**
- * Common liberty locations (matches pass request destinations)
+ * Common liberty locations (multi-select supported)
  */
 export const LIBERTY_LOCATIONS = [
   { value: "shoppette", label: "Shoppette" },
   { value: "bx_commissary", label: "BX/Commissary" },
   { value: "gym", label: "Gym" },
   { value: "library", label: "Library" },
+  { value: "px", label: "PX" },
+  { value: "dfac", label: "DFAC" },
+  { value: "off_post", label: "Off Post" },
   { value: "other", label: "Other" },
 ];
+
+/**
+ * Build a human-readable destination string from selected locations
+ * @param {Array<string>} locations - Array of location values
+ * @param {string} customLocation - Custom location text if "other" is selected
+ * @returns {string} Comma-separated destination string
+ */
+export function buildDestinationString(locations, customLocation) {
+  if (!locations || locations.length === 0) return "";
+  const labels = locations
+    .map((loc) => {
+      if (loc === "other") return customLocation || "Other";
+      return LIBERTY_LOCATIONS.find((l) => l.value === loc)?.label || loc;
+    })
+    .filter(Boolean);
+  return labels.join(", ");
+}
 
 /**
  * Get the next upcoming weekend dates
@@ -243,7 +263,8 @@ export function useLibertyRequestActions() {
   /**
    * Create a new liberty request
    * @param {Object} requestData - Liberty request details
-   * @param {string} requestData.location - Where they're going
+   * @param {Array<string>} requestData.locations - Array of selected location values (multi-select)
+   * @param {string} requestData.location - Single location (legacy, converted to locations array)
    * @param {string} requestData.customLocation - Custom location if "other" selected
    * @param {string} requestData.departureDate - Departure date (ISO string)
    * @param {string} requestData.departureTime - Departure time
@@ -255,6 +276,8 @@ export function useLibertyRequestActions() {
    * @param {Array} requestData.companions - Array of companion objects {id, name, rank}
    * @param {string} requestData.weekendDate - The weekend this is for (Saturday date as ISO string)
    * @param {boolean} requestData.forceSubmit - If true, cancel existing and create new
+   * @param {boolean} requestData.isDriver - Whether the requester is driving
+   * @param {number} requestData.passengerCapacity - Number of available passenger seats (if driver)
    */
   async function createLibertyRequest(requestData) {
     setLoading(true);
@@ -291,17 +314,17 @@ export function useLibertyRequestActions() {
         }
       }
 
-      // Build the destination string
-      const destination = requestData.location === "other"
-        ? requestData.customLocation
-        : LIBERTY_LOCATIONS.find(l => l.value === requestData.location)?.label || requestData.location;
+      // Support both multi-select locations array and legacy single location
+      const locations = requestData.locations || (requestData.location ? [requestData.location] : []);
+      const destination = buildDestinationString(locations, requestData.customLocation);
 
       // Create the main request
       const requestDoc = await addDoc(collection(db, "libertyRequests"), {
         requesterId: user.uid,
         requesterName: user.displayName || user.email,
         requesterEmail: user.email,
-        location: requestData.location,
+        locations,
+        location: locations[0] || null, // Keep legacy field for backward compat
         destination,
         departureDate: requestData.departureDate || null,
         departureTime: requestData.departureTime || null,
@@ -312,6 +335,9 @@ export function useLibertyRequestActions() {
         notes: requestData.notes || null,
         companions,
         weekendDate,
+        isDriver: requestData.isDriver || false,
+        passengerCapacity: requestData.isDriver ? (requestData.passengerCapacity || 0) : 0,
+        passengers: [], // Users who sign up to ride with this driver
         status: "pending",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -572,10 +598,9 @@ export function useLeaveAdminActions() {
     try {
       const companions = requestData.companions || [];
 
-      // Build the destination string
-      const destination = requestData.location === "other"
-        ? requestData.customLocation
-        : LIBERTY_LOCATIONS.find(l => l.value === requestData.location)?.label || requestData.location;
+      // Support both multi-select locations array and legacy single location
+      const locations = requestData.locations || (requestData.location ? [requestData.location] : []);
+      const destination = buildDestinationString(locations, requestData.customLocation);
 
       // Get admin's initials for approval tracking
       const personnelQuery = await getDoc(doc(db, "personnel", user.uid));
@@ -605,7 +630,8 @@ export function useLeaveAdminActions() {
         requesterId: requestData.targetUserId,
         requesterName: requestData.targetUserName,
         requesterEmail: requestData.targetUserEmail,
-        location: requestData.location,
+        locations,
+        location: locations[0] || null, // Keep legacy field for backward compat
         destination,
         departureDate: requestData.departureDate || null,
         departureTime: requestData.departureTime || null,
@@ -616,6 +642,9 @@ export function useLeaveAdminActions() {
         notes: requestData.notes || null,
         companions,
         weekendDate: requestData.weekendDate,
+        isDriver: requestData.isDriver || false,
+        passengerCapacity: requestData.isDriver ? (requestData.passengerCapacity || 0) : 0,
+        passengers: [],
         status,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -748,34 +777,80 @@ export function useAvailableLibertyRequests() {
   const weekendDate = saturday.toISOString().split('T')[0];
 
   useEffect(() => {
-    // Fetch all requests for this weekend, filter in memory for pending/approved
-    const q = query(
+    // We need two queries since Firestore doesn't support OR in where clauses
+    // Query for pending requests for this weekend
+    const pendingQuery = query(
       collection(db, "libertyRequests"),
       where("weekendDate", "==", weekendDate),
+      where("status", "==", "pending"),
       orderBy("createdAt", "desc")
     );
 
-    const unsubscribe = onSnapshot(
-      q,
+    // Query for approved requests for this weekend
+    const approvedQuery = query(
+      collection(db, "libertyRequests"),
+      where("weekendDate", "==", weekendDate),
+      where("status", "==", "approved"),
+      orderBy("createdAt", "desc")
+    );
+
+    let pendingData = [];
+    let approvedData = [];
+    let pendingDone = false;
+    let approvedDone = false;
+
+    function mergeAndSet() {
+      if (!pendingDone || !approvedDone) return;
+      // Combine and sort by createdAt desc
+      const all = [...pendingData, ...approvedData].sort((a, b) => {
+        const aTime = a.createdAt?.toDate?.()?.getTime() || 0;
+        const bTime = b.createdAt?.toDate?.()?.getTime() || 0;
+        return bTime - aTime;
+      });
+      setRequests(all);
+      setLoading(false);
+    }
+
+    const unsubPending = onSnapshot(
+      pendingQuery,
       (snapshot) => {
-        const data = snapshot.docs
-          .map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }))
-          // Only show pending and approved requests (not cancelled or rejected)
-          .filter((r) => r.status === "pending" || r.status === "approved");
-        setRequests(data);
-        setLoading(false);
+        pendingData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        pendingDone = true;
+        mergeAndSet();
       },
       (err) => {
-        console.error("Error fetching available liberty requests:", err);
+        console.error("Error fetching pending liberty requests:", err);
         setError(err.message);
-        setLoading(false);
+        pendingDone = true;
+        mergeAndSet();
       }
     );
 
-    return unsubscribe;
+    const unsubApproved = onSnapshot(
+      approvedQuery,
+      (snapshot) => {
+        approvedData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        approvedDone = true;
+        mergeAndSet();
+      },
+      (err) => {
+        console.error("Error fetching approved liberty requests:", err);
+        setError(err.message);
+        approvedDone = true;
+        mergeAndSet();
+      }
+    );
+
+    return () => {
+      unsubPending();
+      unsubApproved();
+    };
   }, [weekendDate]);
 
   return { requests, loading, error, weekendDate };
@@ -1048,11 +1123,126 @@ export function useLibertyJoinActions() {
     }
   }
 
+  /**
+   * Sign up as a passenger with a driver
+   * @param {string} libertyRequestId - The liberty request with a driver
+   */
+  async function signUpAsPassenger(libertyRequestId) {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRef = doc(db, "libertyRequests", libertyRequestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error("Liberty request not found");
+      }
+
+      const requestData = requestDoc.data();
+
+      if (!requestData.isDriver) {
+        throw new Error("This person is not offering a ride");
+      }
+
+      if (requestData.requesterId === user.uid) {
+        throw new Error("You cannot sign up as a passenger on your own request");
+      }
+
+      const passengers = requestData.passengers || [];
+      const alreadyPassenger = passengers.some((p) => p.id === user.uid);
+      if (alreadyPassenger) {
+        throw new Error("You are already signed up as a passenger");
+      }
+
+      if (passengers.length >= (requestData.passengerCapacity || 0)) {
+        throw new Error("No available seats");
+      }
+
+      // Get user's personnel record for rank/name
+      const personnelDoc = await getDoc(doc(db, "personnel", user.uid));
+      let userRank = "";
+      let firstName = "";
+      let lastName = "";
+
+      if (personnelDoc.exists()) {
+        const personnelData = personnelDoc.data();
+        userRank = personnelData.rank || "";
+        firstName = personnelData.firstName || "";
+        lastName = personnelData.lastName || "";
+      }
+
+      const displayName = firstName && lastName
+        ? `${firstName} ${lastName}`
+        : user.displayName || user.email;
+
+      const newPassenger = {
+        id: user.uid,
+        name: displayName,
+        rank: userRank,
+        signedUpAt: new Date(),
+      };
+
+      await updateDoc(requestRef, {
+        passengers: [...passengers, newPassenger],
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error("Error signing up as passenger:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
+  /**
+   * Remove yourself as a passenger
+   * @param {string} libertyRequestId - The liberty request
+   */
+  async function cancelPassengerSignUp(libertyRequestId) {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRef = doc(db, "libertyRequests", libertyRequestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error("Liberty request not found");
+      }
+
+      const requestData = requestDoc.data();
+      const passengers = requestData.passengers || [];
+
+      const updatedPassengers = passengers.filter((p) => p.id !== user.uid);
+
+      if (updatedPassengers.length === passengers.length) {
+        throw new Error("You are not signed up as a passenger");
+      }
+
+      await updateDoc(requestRef, {
+        passengers: updatedPassengers,
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error("Error cancelling passenger sign-up:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
   return {
     requestToJoin,
     approveJoinRequest,
     rejectJoinRequest,
     cancelJoinRequest,
+    signUpAsPassenger,
+    cancelPassengerSignUp,
     loading,
     error,
   };

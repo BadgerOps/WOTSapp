@@ -4,6 +4,7 @@ import {
   useLibertyRequestActions,
   LIBERTY_REQUEST_STATUS,
   LIBERTY_LOCATIONS,
+  buildDestinationString,
   getNextWeekendDates,
   isBeforeDeadline,
   getDeadlineDate,
@@ -30,7 +31,7 @@ export default function LibertyRequestForm() {
   const { personnel } = usePersonnel();
 
   const [showForm, setShowForm] = useState(false);
-  const [location, setLocation] = useState("");
+  const [selectedLocations, setSelectedLocations] = useState([]);
   const [customLocation, setCustomLocation] = useState("");
   const [departureDate, setDepartureDate] = useState("");
   const [departureTime, setDepartureTime] = useState("");
@@ -43,6 +44,8 @@ export default function LibertyRequestForm() {
   const [companionSearch, setCompanionSearch] = useState("");
   const [showCompanionDropdown, setShowCompanionDropdown] = useState(false);
   const [duplicateWarning, setDuplicateWarning] = useState(null);
+  const [isDriver, setIsDriver] = useState(false);
+  const [passengerCapacity, setPassengerCapacity] = useState(1);
 
   // Get weekend dates
   const { saturday, sunday } = getNextWeekendDates();
@@ -122,11 +125,15 @@ export default function LibertyRequestForm() {
   const error = requestError;
 
   function getDestination() {
-    if (location === "other") {
-      return customLocation;
-    }
-    const option = LIBERTY_LOCATIONS.find((o) => o.value === location);
-    return option?.label || "";
+    return buildDestinationString(selectedLocations, customLocation);
+  }
+
+  function toggleLocation(value) {
+    setSelectedLocations((prev) =>
+      prev.includes(value)
+        ? prev.filter((v) => v !== value)
+        : [...prev, value]
+    );
   }
 
   async function handleSubmitRequest(e, forceSubmit = false) {
@@ -134,7 +141,7 @@ export default function LibertyRequestForm() {
     setDuplicateWarning(null);
     try {
       const formData = {
-        location,
+        locations: selectedLocations,
         customLocation,
         departureDate,
         departureTime,
@@ -150,6 +157,8 @@ export default function LibertyRequestForm() {
         })),
         weekendDate: weekendDateStr,
         forceSubmit,
+        isDriver,
+        passengerCapacity: isDriver ? passengerCapacity : 0,
       };
       const result = await createLibertyRequest(formData);
 
@@ -184,7 +193,7 @@ export default function LibertyRequestForm() {
 
   function resetForm() {
     setShowForm(false);
-    setLocation("");
+    setSelectedLocations([]);
     setCustomLocation("");
     setDepartureDate("");
     setDepartureTime("");
@@ -195,6 +204,8 @@ export default function LibertyRequestForm() {
     setNotes("");
     setCompanions([]);
     setCompanionSearch("");
+    setIsDriver(false);
+    setPassengerCapacity(1);
   }
 
   function handleAddCompanion(person) {
@@ -208,8 +219,8 @@ export default function LibertyRequestForm() {
   }
 
   const isFormValid =
-    location &&
-    (location !== "other" || customLocation.trim()) &&
+    selectedLocations.length > 0 &&
+    (!selectedLocations.includes("other") || customLocation.trim()) &&
     departureDate &&
     departureTime &&
     returnDate &&
@@ -317,6 +328,11 @@ export default function LibertyRequestForm() {
                 <p>
                   <span className="font-medium">Return:</span> {formatDate(approvedRequest.returnDate)} at {formatTime(approvedRequest.returnTime)}
                 </p>
+                {approvedRequest.isDriver && (
+                  <p>
+                    <span className="font-medium">Driver:</span> Yes ({approvedRequest.passengers?.length || 0}/{approvedRequest.passengerCapacity} passengers)
+                  </p>
+                )}
                 {approvedRequest.companions?.length > 0 && (
                   <p>
                     <span className="font-medium">With:</span> {approvedRequest.companions.map((c) => c.name).join(", ")}
@@ -348,6 +364,11 @@ export default function LibertyRequestForm() {
                 <p>
                   <span className="font-medium">Return:</span> {formatDate(pendingRequest.returnDate)} at {formatTime(pendingRequest.returnTime)}
                 </p>
+                {pendingRequest.isDriver && (
+                  <p>
+                    <span className="font-medium">Driver:</span> Yes ({pendingRequest.passengerCapacity} seats available)
+                  </p>
+                )}
                 {pendingRequest.companions?.length > 0 && (
                   <p>
                     <span className="font-medium">With:</span> {pendingRequest.companions.map((c) => c.name).join(", ")}
@@ -391,25 +412,32 @@ export default function LibertyRequestForm() {
             </span>
           </div>
 
-          {/* Destination */}
+          {/* Destinations (multi-select) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Destination <span className="text-red-500">*</span>
+              Destination(s) <span className="text-red-500">*</span>
             </label>
-            <select
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">Select destination...</option>
+            <p className="text-xs text-gray-500 mb-2">Select all that apply</p>
+            <div className="flex flex-wrap gap-2">
               {LIBERTY_LOCATIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => toggleLocation(opt.value)}
+                  className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                    selectedLocations.includes(opt.value)
+                      ? "bg-primary-100 border-primary-500 text-primary-800 font-medium"
+                      : "bg-white border-gray-300 text-gray-600 hover:border-gray-400"
+                  }`}
+                >
+                  {selectedLocations.includes(opt.value) && (
+                    <span className="mr-1">&#10003;</span>
+                  )}
                   {opt.label}
-                </option>
+                </button>
               ))}
-            </select>
-            {location === "other" && (
+            </div>
+            {selectedLocations.includes("other") && (
               <input
                 type="text"
                 value={customLocation}
@@ -418,6 +446,38 @@ export default function LibertyRequestForm() {
                 required
                 className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
+            )}
+          </div>
+
+          {/* Driver Checkbox & Passenger Capacity */}
+          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isDriver"
+                checked={isDriver}
+                onChange={(e) => setIsDriver(e.target.checked)}
+                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+              />
+              <label htmlFor="isDriver" className="text-sm font-medium text-gray-700">
+                I am driving
+              </label>
+            </div>
+            {isDriver && (
+              <div className="mt-3 ml-6">
+                <label className="block text-sm text-gray-600 mb-1">
+                  Available passenger seats
+                </label>
+                <select
+                  value={passengerCapacity}
+                  onChange={(e) => setPassengerCapacity(parseInt(e.target.value, 10))}
+                  className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
 

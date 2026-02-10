@@ -3,6 +3,7 @@ import {
   useAvailableLibertyRequests,
   useLibertyJoinActions,
   getNextWeekendDates,
+  LIBERTY_LOCATIONS,
 } from '../../hooks/useLibertyRequests'
 import { useAuth } from '../../contexts/AuthContext'
 import Loading from '../common/Loading'
@@ -29,7 +30,7 @@ function formatTime(timeString) {
 export default function ApprovedLibertyList() {
   const { user } = useAuth()
   const { requests, loading, error, weekendDate } = useAvailableLibertyRequests()
-  const { requestToJoin, cancelJoinRequest, approveJoinRequest, rejectJoinRequest, loading: actionLoading } = useLibertyJoinActions()
+  const { requestToJoin, cancelJoinRequest, approveJoinRequest, rejectJoinRequest, signUpAsPassenger, cancelPassengerSignUp, loading: actionLoading } = useLibertyJoinActions()
   const [expandedId, setExpandedId] = useState(null)
   const [actionError, setActionError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
@@ -75,6 +76,29 @@ export default function ApprovedLibertyList() {
     try {
       await rejectJoinRequest(requestId, userId)
       setSuccessMessage('Join request rejected.')
+      setTimeout(() => setSuccessMessage(null), 3000)
+    } catch (err) {
+      setActionError(err.message)
+    }
+  }
+
+  async function handleSignUpAsPassenger(requestId) {
+    setActionError(null)
+    setSuccessMessage(null)
+    try {
+      await signUpAsPassenger(requestId)
+      setSuccessMessage('Signed up as passenger!')
+      setTimeout(() => setSuccessMessage(null), 3000)
+    } catch (err) {
+      setActionError(err.message)
+    }
+  }
+
+  async function handleCancelPassenger(requestId) {
+    setActionError(null)
+    try {
+      await cancelPassengerSignUp(requestId)
+      setSuccessMessage('Passenger sign-up cancelled.')
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
       setActionError(err.message)
@@ -150,6 +174,11 @@ export default function ApprovedLibertyList() {
           const companionCount = (request.companions || []).length
           const isPending = request.status === 'pending'
           const isApproved = request.status === 'approved'
+          const isDriverRequest = request.isDriver
+          const passengers = request.passengers || []
+          const passengerCapacity = request.passengerCapacity || 0
+          const isPassenger = passengers.some(p => p.id === user?.uid)
+          const seatsAvailable = passengerCapacity - passengers.length
 
           return (
             <div key={request.id} className="p-4">
@@ -193,6 +222,16 @@ export default function ApprovedLibertyList() {
                     {isApproved && (
                       <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">
                         Approved
+                      </span>
+                    )}
+                    {isDriverRequest && (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
+                        Driver ({seatsAvailable} seat{seatsAvailable !== 1 ? 's' : ''} open)
+                      </span>
+                    )}
+                    {isPassenger && (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
+                        Riding
                       </span>
                     )}
                     {isOwner && (
@@ -267,6 +306,51 @@ export default function ApprovedLibertyList() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Driver / Passengers */}
+                  {isDriverRequest && (
+                    <div className="p-3 bg-indigo-50 rounded-lg">
+                      <h4 className="text-sm font-medium text-indigo-800 mb-2">
+                        Ride Available ({passengers.length}/{passengerCapacity} passengers)
+                      </h4>
+                      {passengers.length > 0 && (
+                        <div className="space-y-1 mb-2">
+                          {passengers.map((p, idx) => (
+                            <div key={idx} className="flex items-center gap-2 text-sm text-indigo-700">
+                              <span>{p.rank && `${p.rank} `}{p.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {!isOwner && !isPassenger && seatsAvailable > 0 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleSignUpAsPassenger(request.id)
+                          }}
+                          disabled={actionLoading}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          Sign Up for Ride
+                        </button>
+                      )}
+                      {isPassenger && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleCancelPassenger(request.id)
+                          }}
+                          disabled={actionLoading}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+                        >
+                          Cancel Ride
+                        </button>
+                      )}
+                      {seatsAvailable <= 0 && !isPassenger && !isOwner && (
+                        <p className="text-xs text-indigo-600">No seats available</p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Purpose if available */}
                   {request.purpose && (

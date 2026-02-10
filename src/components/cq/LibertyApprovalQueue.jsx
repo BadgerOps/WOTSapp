@@ -288,10 +288,15 @@ export default function LibertyApprovalQueue() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="font-semibold text-gray-900">
                               {request.requesterName}
                             </h3>
+                            {request.isDriver && (
+                              <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-medium rounded-full">
+                                Driver ({request.passengerCapacity} seats)
+                              </span>
+                            )}
                             {companionCount > 0 && (
                               <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
                                 +{companionCount} companion{companionCount > 1 ? 's' : ''}
@@ -398,6 +403,24 @@ export default function LibertyApprovalQueue() {
                             <div>
                               <span className="text-sm font-medium text-gray-700">Notes: </span>
                               <span className="text-sm text-gray-600">{request.notes}</span>
+                            </div>
+                          )}
+
+                          {request.isDriver && (
+                            <div>
+                              <span className="text-sm font-medium text-gray-700">Driver: </span>
+                              <span className="text-sm text-gray-600">
+                                Yes - {request.passengerCapacity} seat{request.passengerCapacity !== 1 ? 's' : ''} available
+                              </span>
+                              {(request.passengers || []).length > 0 && (
+                                <ul className="mt-1 pl-4">
+                                  {request.passengers.map((p, idx) => (
+                                    <li key={idx} className="text-sm text-gray-600">
+                                      {p.rank && `${p.rank} `}{p.name} (passenger)
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                             </div>
                           )}
 

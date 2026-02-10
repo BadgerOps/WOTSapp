@@ -106,6 +106,9 @@ export default function LibertyRequestsManager() {
       'Return Time',
       'Contact Number',
       'Purpose',
+      'Driver',
+      'Passenger Capacity',
+      'Passengers',
       'Companions',
       'Status',
       'Submitted At',
@@ -122,6 +125,9 @@ export default function LibertyRequestsManager() {
       r.returnTime || '',
       r.contactNumber || '',
       r.purpose || '',
+      r.isDriver ? 'Yes' : 'No',
+      r.isDriver ? (r.passengerCapacity || 0) : '',
+      r.passengers?.map((p) => p.name).join('; ') || '',
       r.companions?.map((c) => c.name).join('; ') || '',
       r.status || '',
       r.createdAt?.toDate ? r.createdAt.toDate().toISOString() : '',
@@ -327,12 +333,19 @@ export default function LibertyRequestsManager() {
                           <div className="font-medium text-gray-900">
                             {request.requesterName}
                           </div>
-                          {companionCount > 0 && (
-                            <div className="text-xs text-gray-500">
-                              +{companionCount} companion
-                              {companionCount > 1 ? 's' : ''}
-                            </div>
-                          )}
+                          <div className="flex gap-1 flex-wrap">
+                            {request.isDriver && (
+                              <span className="text-xs text-indigo-600 font-medium">
+                                Driver
+                              </span>
+                            )}
+                            {companionCount > 0 && (
+                              <span className="text-xs text-gray-500">
+                                +{companionCount} companion
+                                {companionCount > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                           {request.destination}
@@ -400,6 +413,28 @@ export default function LibertyRequestsManager() {
                                   {request.purpose || '--'}
                                 </span>
                               </div>
+                              {request.isDriver && (
+                                <div>
+                                  <span className="font-medium text-gray-700">
+                                    Driver:{' '}
+                                  </span>
+                                  <span className="text-gray-600">
+                                    Yes - {request.passengerCapacity} seat{request.passengerCapacity !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              )}
+                              {(request.passengers || []).length > 0 && (
+                                <div className="md:col-span-2 lg:col-span-3">
+                                  <span className="font-medium text-gray-700">
+                                    Passengers:{' '}
+                                  </span>
+                                  <span className="text-gray-600">
+                                    {request.passengers
+                                      .map((p) => p.name)
+                                      .join(', ')}
+                                  </span>
+                                </div>
+                              )}
                               {companionCount > 0 && (
                                 <div className="md:col-span-2 lg:col-span-3">
                                   <span className="font-medium text-gray-700">

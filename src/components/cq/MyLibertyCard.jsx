@@ -89,6 +89,11 @@ export default function MyLibertyCard() {
               <p>
                 <span className="font-medium">Return:</span> {formatDate(weekendRequest.returnDate)} at {formatTime(weekendRequest.returnTime)}
               </p>
+              {weekendRequest.isDriver && (
+                <p>
+                  <span className="font-medium">Driver:</span> {weekendRequest.passengers?.length || 0}/{weekendRequest.passengerCapacity} passengers
+                </p>
+              )}
               {weekendRequest.companions?.length > 0 && (
                 <p>
                   <span className="font-medium">With:</span> {weekendRequest.companions.map(c => c.name).join(', ')}
