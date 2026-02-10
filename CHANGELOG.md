@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-02-10
+
+### Added
+
+#### Multi-Sheet Excel Export for Liberty Requests
+- **"Export Excel" button** on Liberty Requests Manager generates a `.xlsx` workbook with three purpose-built sheets:
+  - **Summary** - One row per liberty request (at-a-glance view: name, status, weekend, destination, driver Y/N, contact, purpose)
+  - **Time Slots** - One row per time slot per request (schedule view: requester, day, time range, locations, participants and count)
+  - **Drivers & Rides** - One row per driver (transportation view: driver name, capacity, passenger list, open seats, contact)
+- Auto-fitted column widths for readability in Excel
+- Filename includes weekend date and status filters (e.g., `liberty_requests_2026-02-15_approved.xlsx`)
+- Legacy single-window requests handled gracefully with `(legacy)` marker in Time Slots sheet
+- Existing CSV export retained as secondary option
+
+### New Files
+- `src/lib/exportLibertyExcel.js` - Multi-sheet Excel workbook generation using SheetJS (xlsx)
+
+### Modified Files
+- `src/components/cq/LibertyRequestsManager.jsx` - Added Export Excel button, demoted CSV to secondary style
+
+### Dependencies
+- Added `xlsx` (^0.18.5) - SheetJS Community Edition for browser-side Excel generation
+
+---
+
 ## [0.7.0] - 2026-02-09
 
 ### Added

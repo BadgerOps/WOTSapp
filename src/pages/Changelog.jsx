@@ -4,7 +4,28 @@ import { APP_VERSION } from '../config/appVersion'
 const changelog = [
   {
     version: APP_VERSION,
-    date: '2026-02-01',
+    date: '2026-02-10',
+    sections: [
+      {
+        title: 'Added',
+        items: [
+          {
+            category: 'Multi-Sheet Excel Export for Liberty Requests',
+            details: [
+              '"Export Excel" button on Liberty Requests Manager generates a .xlsx workbook with three sheets',
+              'Summary sheet: one row per request with name, status, weekend, destination, driver info',
+              'Time Slots sheet: one row per slot with day, time range, locations, and participants',
+              'Drivers & Rides sheet: one row per driver with capacity, passengers, and open seats',
+              'Auto-fitted column widths and filename includes active filters',
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.7.0',
+    date: '2026-02-09',
     sections: [
       {
         title: 'Added',
