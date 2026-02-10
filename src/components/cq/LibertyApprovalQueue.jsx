@@ -3,6 +3,8 @@ import {
   usePendingLibertyRequests,
   useLibertyApprovalActions,
   LIBERTY_REQUEST_STATUS,
+  getTimeSlotLabel,
+  buildDestinationString,
 } from '../../hooks/useLibertyRequests'
 import { useAuth } from '../../contexts/AuthContext'
 import Loading from '../common/Loading'
@@ -323,21 +325,29 @@ export default function LibertyApprovalQueue() {
 
                       {/* Quick Info */}
                       <div className="flex flex-wrap gap-4 text-sm">
-                        {request.departureDate && (
+                        {(request.timeSlots || []).length > 0 ? (
                           <div>
-                            <span className="text-gray-500">Depart:</span>{' '}
-                            <span className="font-medium">
-                              {formatDate(request.departureDate)} {formatTime(request.departureTime)}
-                            </span>
+                            <span className="text-gray-500">{request.timeSlots.length} time slot{request.timeSlots.length > 1 ? 's' : ''}</span>
                           </div>
-                        )}
-                        {request.returnDate && (
-                          <div>
-                            <span className="text-gray-500">Return:</span>{' '}
-                            <span className="font-medium">
-                              {formatDate(request.returnDate)} {formatTime(request.returnTime)}
-                            </span>
-                          </div>
+                        ) : (
+                          <>
+                            {request.departureDate && (
+                              <div>
+                                <span className="text-gray-500">Depart:</span>{' '}
+                                <span className="font-medium">
+                                  {formatDate(request.departureDate)} {formatTime(request.departureTime)}
+                                </span>
+                              </div>
+                            )}
+                            {request.returnDate && (
+                              <div>
+                                <span className="text-gray-500">Return:</span>{' '}
+                                <span className="font-medium">
+                                  {formatDate(request.returnDate)} {formatTime(request.returnTime)}
+                                </span>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
 
@@ -367,22 +377,46 @@ export default function LibertyApprovalQueue() {
                             </div>
                           )}
 
-                          {request.departureDate && (
+                          {/* Time Slots Itinerary */}
+                          {(request.timeSlots || []).length > 0 ? (
                             <div>
-                              <span className="text-sm font-medium text-gray-700">Departure: </span>
-                              <span className="text-sm text-gray-600">
-                                {formatDate(request.departureDate)} at {formatTime(request.departureTime)}
-                              </span>
+                              <span className="text-sm font-medium text-gray-700">Itinerary:</span>
+                              <div className="mt-1 space-y-1.5">
+                                {request.timeSlots.map((slot, idx) => {
+                                  const slotParticipants = slot.participants || []
+                                  return (
+                                    <div key={idx} className="text-sm text-gray-600 p-2 bg-gray-50 rounded">
+                                      <span className="font-medium">{getTimeSlotLabel(slot)}</span>: {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                                      <span className="text-gray-400 mx-1">&middot;</span>
+                                      {buildDestinationString(slot.locations, request.customLocation || '')}
+                                      {slotParticipants.length > 0 && (
+                                        <span className="text-primary-600 ml-1">({slotParticipants.length} joined)</span>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
                             </div>
-                          )}
+                          ) : (
+                            <>
+                              {request.departureDate && (
+                                <div>
+                                  <span className="text-sm font-medium text-gray-700">Departure: </span>
+                                  <span className="text-sm text-gray-600">
+                                    {formatDate(request.departureDate)} at {formatTime(request.departureTime)}
+                                  </span>
+                                </div>
+                              )}
 
-                          {request.returnDate && (
-                            <div>
-                              <span className="text-sm font-medium text-gray-700">Return: </span>
-                              <span className="text-sm text-gray-600">
-                                {formatDate(request.returnDate)} at {formatTime(request.returnTime)}
-                              </span>
-                            </div>
+                              {request.returnDate && (
+                                <div>
+                                  <span className="text-sm font-medium text-gray-700">Return: </span>
+                                  <span className="text-sm text-gray-600">
+                                    {formatDate(request.returnDate)} at {formatTime(request.returnTime)}
+                                  </span>
+                                </div>
+                              )}
+                            </>
                           )}
 
                           {request.contactNumber && (

@@ -3,6 +3,8 @@ import {
   useAvailableLibertyRequests,
   useLibertyJoinActions,
   getNextWeekendDates,
+  getTimeSlotLabel,
+  buildDestinationString,
   LIBERTY_LOCATIONS,
 } from '../../hooks/useLibertyRequests'
 import { useAuth } from '../../contexts/AuthContext'
@@ -30,7 +32,7 @@ function formatTime(timeString) {
 export default function ApprovedLibertyList() {
   const { user } = useAuth()
   const { requests, loading, error, weekendDate } = useAvailableLibertyRequests()
-  const { requestToJoin, cancelJoinRequest, approveJoinRequest, rejectJoinRequest, signUpAsPassenger, cancelPassengerSignUp, loading: actionLoading } = useLibertyJoinActions()
+  const { requestToJoin, cancelJoinRequest, approveJoinRequest, rejectJoinRequest, signUpAsPassenger, cancelPassengerSignUp, joinTimeSlot, leaveTimeSlot, loading: actionLoading } = useLibertyJoinActions()
   const [expandedId, setExpandedId] = useState(null)
   const [actionError, setActionError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
@@ -99,6 +101,29 @@ export default function ApprovedLibertyList() {
     try {
       await cancelPassengerSignUp(requestId)
       setSuccessMessage('Passenger sign-up cancelled.')
+      setTimeout(() => setSuccessMessage(null), 3000)
+    } catch (err) {
+      setActionError(err.message)
+    }
+  }
+
+  async function handleJoinSlot(requestId, slotIndex) {
+    setActionError(null)
+    setSuccessMessage(null)
+    try {
+      await joinTimeSlot(requestId, slotIndex)
+      setSuccessMessage('Joined time slot!')
+      setTimeout(() => setSuccessMessage(null), 3000)
+    } catch (err) {
+      setActionError(err.message)
+    }
+  }
+
+  async function handleLeaveSlot(requestId, slotIndex) {
+    setActionError(null)
+    try {
+      await leaveTimeSlot(requestId, slotIndex)
+      setSuccessMessage('Left time slot.')
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
       setActionError(err.message)
@@ -179,6 +204,10 @@ export default function ApprovedLibertyList() {
           const passengerCapacity = request.passengerCapacity || 0
           const isPassenger = passengers.some(p => p.id === user?.uid)
           const seatsAvailable = passengerCapacity - passengers.length
+          const hasTimeSlots = (request.timeSlots || []).length > 0
+          const isInAnySlot = hasTimeSlots && request.timeSlots.some(
+            (slot) => (slot.participants || []).some((p) => p.id === user?.uid)
+          )
 
           return (
             <div key={request.id} className="p-4">
@@ -229,9 +258,9 @@ export default function ApprovedLibertyList() {
                         Driver ({seatsAvailable} seat{seatsAvailable !== 1 ? 's' : ''} open)
                       </span>
                     )}
-                    {isPassenger && (
+                    {(isPassenger || isInAnySlot) && (
                       <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
-                        Riding
+                        {isInAnySlot ? 'Joined' : 'Riding'}
                       </span>
                     )}
                     {isOwner && (
@@ -262,7 +291,10 @@ export default function ApprovedLibertyList() {
                   </p>
 
                   <p className="text-xs text-gray-500 mt-1">
-                    {formatDate(request.departureDate)} at {formatTime(request.departureTime)} - {formatDate(request.returnDate)} at {formatTime(request.returnTime)}
+                    {hasTimeSlots
+                      ? `${request.timeSlots.length} time slot${request.timeSlots.length > 1 ? 's' : ''}`
+                      : `${formatDate(request.departureDate)} at ${formatTime(request.departureTime)} - ${formatDate(request.returnDate)} at ${formatTime(request.returnTime)}`
+                    }
                   </p>
                 </div>
 
@@ -307,8 +339,96 @@ export default function ApprovedLibertyList() {
                     </div>
                   </div>
 
-                  {/* Driver / Passengers */}
-                  {isDriverRequest && (
+                  {/* Time Slots Itinerary (new) */}
+                  {hasTimeSlots && (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium text-gray-700">Itinerary</h4>
+                      {request.timeSlots.map((slot, slotIdx) => {
+                        const slotParticipants = slot.participants || []
+                        const isInSlot = slotParticipants.some((p) => p.id === user?.uid)
+                        const slotSeatsAvailable = isDriverRequest
+                          ? passengerCapacity - slotParticipants.length
+                          : null
+                        const slotLocLabel = buildDestinationString(slot.locations, request.customLocation || '')
+
+                        return (
+                          <div key={slotIdx} className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <span className="text-sm font-medium text-gray-800">
+                                  {getTimeSlotLabel(slot)}
+                                </span>
+                                <p className="text-xs text-gray-600">
+                                  {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-0.5">{slotLocLabel}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isDriverRequest && (
+                                  <span className="text-xs text-indigo-600 font-medium">
+                                    {slotParticipants.length}/{passengerCapacity} riders
+                                  </span>
+                                )}
+                                {!isDriverRequest && slotParticipants.length > 0 && (
+                                  <span className="text-xs text-gray-500">
+                                    {slotParticipants.length} joined
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Participants list */}
+                            {slotParticipants.length > 0 && (
+                              <div className="mt-2 space-y-0.5">
+                                {slotParticipants.map((p, pIdx) => (
+                                  <div key={pIdx} className="text-xs text-gray-600">
+                                    {p.rank && `${p.rank} `}{p.name}
+                                    {p.id === user?.uid && <span className="text-primary-600 ml-1">(you)</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Join / Leave buttons */}
+                            {!isOwner && (
+                              <div className="mt-2">
+                                {!isInSlot && (isDriverRequest ? slotSeatsAvailable > 0 : true) && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleJoinSlot(request.id, slotIdx)
+                                    }}
+                                    disabled={actionLoading}
+                                    className="px-3 py-1 text-xs font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50"
+                                  >
+                                    Join This Slot
+                                  </button>
+                                )}
+                                {isInSlot && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleLeaveSlot(request.id, slotIdx)
+                                    }}
+                                    disabled={actionLoading}
+                                    className="px-3 py-1 text-xs font-medium rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+                                  >
+                                    Leave Slot
+                                  </button>
+                                )}
+                                {isDriverRequest && slotSeatsAvailable <= 0 && !isInSlot && (
+                                  <p className="text-xs text-gray-500">No seats available</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Legacy Driver / Passengers (for old requests without timeSlots) */}
+                  {!hasTimeSlots && isDriverRequest && (
                     <div className="p-3 bg-indigo-50 rounded-lg">
                       <h4 className="text-sm font-medium text-indigo-800 mb-2">
                         Ride Available ({passengers.length}/{passengerCapacity} passengers)
@@ -400,36 +520,38 @@ export default function ApprovedLibertyList() {
                     </div>
                   )}
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2">
-                    {/* Show Join button if not owner, not companion, and no pending request */}
-                    {!isOwner && !isCompanion && !myJoinRequest && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleJoinRequest(request.id)
-                        }}
-                        disabled={actionLoading}
-                        className="btn-primary text-sm disabled:opacity-50"
-                      >
-                        Request to Join
-                      </button>
-                    )}
+                  {/* Action Buttons (legacy - only for requests without time slots) */}
+                  {!hasTimeSlots && (
+                    <div className="flex gap-2">
+                      {/* Show Join button if not owner, not companion, and no pending request */}
+                      {!isOwner && !isCompanion && !myJoinRequest && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleJoinRequest(request.id)
+                          }}
+                          disabled={actionLoading}
+                          className="btn-primary text-sm disabled:opacity-50"
+                        >
+                          Request to Join
+                        </button>
+                      )}
 
-                    {/* Cancel pending request */}
-                    {myJoinRequest?.status === 'pending' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleCancelJoinRequest(request.id)
-                        }}
-                        disabled={actionLoading}
-                        className="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
-                      >
-                        Cancel Request
-                      </button>
-                    )}
-                  </div>
+                      {/* Cancel pending request */}
+                      {myJoinRequest?.status === 'pending' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleCancelJoinRequest(request.id)
+                          }}
+                          disabled={actionLoading}
+                          className="px-3 py-1.5 text-sm font-medium rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+                        >
+                          Cancel Request
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

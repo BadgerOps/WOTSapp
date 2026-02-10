@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { useLeaveAdminActions, LIBERTY_LOCATIONS, buildDestinationString, getNextWeekendDates } from '../../hooks/useLibertyRequests';
+import { useLeaveAdminActions, LIBERTY_LOCATIONS, buildDestinationString, getTimeSlotLabel, getNextWeekendDates } from '../../hooks/useLibertyRequests';
 import { usePassAdminActions } from '../../hooks/usePassApproval';
 
 /**
@@ -34,16 +34,12 @@ export default function LeaveAdminPanel() {
   const [autoApprove, setAutoApprove] = useState(true);
 
   // Form fields for liberty request
-  const [selectedLocations, setSelectedLocations] = useState([]);
   const [customLocation, setCustomLocation] = useState('');
-  const [departureDate, setDepartureDate] = useState('');
-  const [departureTime, setDepartureTime] = useState('');
-  const [returnDate, setReturnDate] = useState('');
-  const [returnTime, setReturnTime] = useState('');
   const [purpose, setPurpose] = useState('');
   const [libertyStatus, setLibertyStatus] = useState('approved');
   const [isDriver, setIsDriver] = useState(false);
   const [passengerCapacity, setPassengerCapacity] = useState(1);
+  const [timeSlots, setTimeSlots] = useState([]);
 
   // Get next weekend dates for liberty default
   const { saturday } = getNextWeekendDates();
@@ -98,12 +94,8 @@ export default function LeaveAdminPanel() {
     setContactNumber('');
     setNotes('');
     setAutoApprove(true);
-    setSelectedLocations([]);
+    setTimeSlots([]);
     setCustomLocation('');
-    setDepartureDate('');
-    setDepartureTime('');
-    setReturnDate('');
-    setReturnTime('');
     setPurpose('');
     setLibertyStatus('approved');
     setIsDriver(false);
@@ -152,12 +144,8 @@ export default function LeaveAdminPanel() {
         targetUserId: selectedPerson.userId || selectedPerson.id,
         targetUserName: `${selectedPerson.firstName} ${selectedPerson.lastName}`,
         targetUserEmail: selectedPerson.email,
-        locations: selectedLocations,
+        timeSlots: timeSlots.map((slot) => ({ ...slot, participants: [] })),
         customLocation,
-        departureDate,
-        departureTime,
-        returnDate,
-        returnTime,
         contactNumber,
         purpose,
         notes,
@@ -380,35 +368,115 @@ export default function LeaveAdminPanel() {
         {/* Liberty Request Form */}
         {requestType === 'liberty' && (
           <form onSubmit={handleSubmitLibertyRequest} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Location(s) *
-              </label>
-              <p className="text-xs text-gray-500 mb-2">Select all that apply</p>
-              <div className="flex flex-wrap gap-2">
-                {LIBERTY_LOCATIONS.map((loc) => (
-                  <button
-                    key={loc.value}
-                    type="button"
-                    onClick={() => setSelectedLocations((prev) =>
-                      prev.includes(loc.value)
-                        ? prev.filter((v) => v !== loc.value)
-                        : [...prev, loc.value]
-                    )}
-                    className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
-                      selectedLocations.includes(loc.value)
-                        ? 'bg-primary-100 border-primary-500 text-primary-800 font-medium'
-                        : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
-                    }`}
-                  >
-                    {selectedLocations.includes(loc.value) && <span className="mr-1">&#10003;</span>}
-                    {loc.label}
-                  </button>
-                ))}
+            {/* Time Slots */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700">
+                  Time Slots *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const lastSlot = timeSlots[timeSlots.length - 1];
+                    const newDate = lastSlot?.date || saturday.toISOString().split('T')[0];
+                    setTimeSlots((prev) => [
+                      ...prev,
+                      { date: newDate, startTime: '13:00', endTime: '17:00', locations: [] },
+                    ]);
+                  }}
+                  className="text-xs font-medium text-primary-600 hover:text-primary-800"
+                >
+                  + Add Time Slot
+                </button>
               </div>
+
+              {timeSlots.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => setTimeSlots([{ date: saturday.toISOString().split('T')[0], startTime: '08:00', endTime: '12:00', locations: [] }])}
+                  className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-primary-400 hover:text-primary-600"
+                >
+                  Click to add first time slot
+                </button>
+              )}
+
+              {timeSlots.map((slot, slotIdx) => (
+                <div key={slotIdx} className="p-3 border border-gray-200 rounded-lg bg-gray-50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-800">
+                      {getTimeSlotLabel(slot) || `Slot ${slotIdx + 1}`}
+                    </span>
+                    {timeSlots.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setTimeSlots((prev) => prev.filter((_, i) => i !== slotIdx))}
+                        className="text-xs text-red-500 hover:text-red-700"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Date</label>
+                      <input
+                        type="date"
+                        value={slot.date}
+                        onChange={(e) => setTimeSlots((prev) => prev.map((s, i) => i === slotIdx ? { ...s, date: e.target.value } : s))}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Start</label>
+                      <input
+                        type="time"
+                        value={slot.startTime}
+                        onChange={(e) => setTimeSlots((prev) => prev.map((s, i) => i === slotIdx ? { ...s, startTime: e.target.value } : s))}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">End</label>
+                      <input
+                        type="time"
+                        value={slot.endTime}
+                        onChange={(e) => setTimeSlots((prev) => prev.map((s, i) => i === slotIdx ? { ...s, endTime: e.target.value } : s))}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Locations</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {LIBERTY_LOCATIONS.map((loc) => (
+                        <button
+                          key={loc.value}
+                          type="button"
+                          onClick={() => setTimeSlots((prev) => prev.map((s, i) => {
+                            if (i !== slotIdx) return s;
+                            const locs = s.locations || [];
+                            return { ...s, locations: locs.includes(loc.value) ? locs.filter((v) => v !== loc.value) : [...locs, loc.value] };
+                          }))}
+                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                            (slot.locations || []).includes(loc.value)
+                              ? 'bg-primary-100 border-primary-500 text-primary-800 font-medium'
+                              : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+                          }`}
+                        >
+                          {(slot.locations || []).includes(loc.value) && <span className="mr-0.5">&#10003;</span>}
+                          {loc.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            {selectedLocations.includes('other') && (
+            {/* Custom location if any slot has "other" */}
+            {timeSlots.some((s) => (s.locations || []).includes('other')) && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Custom Location *
@@ -454,56 +522,6 @@ export default function LeaveAdminPanel() {
                   </select>
                 </div>
               )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Departure Date
-                </label>
-                <input
-                  type="date"
-                  value={departureDate}
-                  onChange={(e) => setDepartureDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Departure Time
-                </label>
-                <input
-                  type="time"
-                  value={departureTime}
-                  onChange={(e) => setDepartureTime(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Return Date
-                </label>
-                <input
-                  type="date"
-                  value={returnDate}
-                  onChange={(e) => setReturnDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Return Time
-                </label>
-                <input
-                  type="time"
-                  value={returnTime}
-                  onChange={(e) => setReturnTime(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
             </div>
 
             <div>
@@ -565,7 +583,7 @@ export default function LeaveAdminPanel() {
 
             <button
               type="submit"
-              disabled={!selectedPerson || selectedLocations.length === 0 || (selectedLocations.includes('other') && !customLocation) || loading}
+              disabled={!selectedPerson || timeSlots.length === 0 || !timeSlots.every((s) => (s.locations || []).length > 0 && s.date && s.startTime && s.endTime) || (timeSlots.some((s) => (s.locations || []).includes('other')) && !customLocation) || loading}
               className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Creating...' : 'Create Liberty Request'}
