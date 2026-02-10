@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-02-09
+
+### Added
+
+#### Liberty Driver/Passenger System
+- **Driver designation** on liberty requests — users can mark themselves as a driver with configurable passenger capacity
+- **Multi-select locations** — liberty requests support selecting multiple standard destinations (PX, Commissary, Gym, Library, Mall, etc.) plus a custom "Other" option
+- **Passenger sign-up** — other users can request to ride with a driver on existing liberty groups
+
+#### Multi-Slot Time Windows
+- **Flexible time slot itineraries** replace the old single departure/return model for liberty requests
+- Each liberty request can now have **multiple time slots** (e.g., Saturday morning, Saturday afternoon, Sunday morning)
+- Each slot has its own **date, start/end time, locations, and participant list**
+- **Per-slot join/leave** — joining a time slot is the same as being a passenger (unified concept)
+- **Driver capacity enforced per-slot** — each slot independently tracks available seats
+- **Smart slot defaults** — adding a new slot auto-fills the next logical time window based on the previous slot (morning → afternoon → evening → next day)
+- **Time slot labels** — auto-generated labels like "Sat Morning", "Sun Afternoon" based on date and start time
+- **Itinerary display** across all views: student form, approval queue, admin manager, home card, and weekend liberty groups
+
+#### Liberty Request Form Enhancements
+- Per-slot UI with date picker, start/end time inputs, and location toggle pills
+- Add/remove time slots dynamically (minimum one slot required)
+- Form validation ensures every slot has date, times, and at least one location
+- Approved/pending request display shows full itinerary
+
+#### Weekend Liberty Groups (Join System)
+- Per-slot join/leave buttons with real-time capacity tracking
+- Slot-level participant lists with "(you)" marker
+- "No seats available" indicator when a slot reaches driver capacity
+- "Joined" badge for time-slot-based requests
+
+#### Admin & Leadership Views
+- Approval queue shows slot count summary and expandable itinerary with per-slot participant counts
+- Admin request manager shows slot details in table and expanded view
+- CSV export includes formatted time slot descriptions
+- Admin create-for-user form supports multi-slot UI
+
+### Fixed
+
+#### Leave Admin Approval Permissions
+- **`leave_admin` role can now see and action the Liberty and Passes tabs** on the Approvals page
+- `useUnifiedApprovalCount` hook was using `isCandidateLeadership || isAdmin` to gate pass and liberty approval access, which excluded `leave_admin`
+- Updated to `isLeaveAdmin || isCandidateLeadership || isAdmin` — matches Firestore security rules which already allowed `leave_admin` to approve these request types
+
+### Backward Compatibility
+- Existing liberty requests without `timeSlots` continue to work with legacy `departureDate`/`returnDate`/`passengers` fields
+- All UI components check for `timeSlots` presence and fall back to legacy rendering
+- No data migration required
+
+### New Files
+- `docs/ARCHITECTURE_FAILURE_MODES.md` - Documents the Firestore dual-query pattern for OR-like queries
+
+### Modified Files
+- `src/hooks/useLibertyRequests.js` - Added `buildTimeSlotsDestination()`, `getTimeSlotLabel()`, `joinTimeSlot()`, `leaveTimeSlot()`, driver/passenger fields, multi-slot support in create functions
+- `src/hooks/useUnifiedApprovalCount.js` - Added `isLeaveAdmin` to pass and liberty approval permission checks
+- `src/components/cq/LibertyRequestForm.jsx` - Multi-slot form UI with dynamic slot management
+- `src/components/cq/ApprovedLibertyList.jsx` - Per-slot join/leave UI, driver info display
+- `src/components/cq/LibertyApprovalQueue.jsx` - Time slot itinerary in approval details
+- `src/components/cq/LibertyRequestsManager.jsx` - Slot details in admin table and CSV export
+- `src/components/cq/LeaveAdminPanel.jsx` - Multi-slot UI for admin create-for-user
+- `src/components/cq/MyLibertyCard.jsx` - Itinerary display on home page card
+
+---
+
 ## [0.6.0] - 2026-02-02
 
 ### Added

@@ -46,17 +46,19 @@ function useCountWithPermission(collectionName, statusValue, enabled) {
 /**
  * Hook that provides unified approval counts across all approval types.
  * Only queries collections that the user has permission to access:
- * - candidate_leadership or admin: passes, liberty, details, swaps
+ * - leave_admin, candidate_leadership, or admin: passes, liberty
+ * - candidate_leadership or admin: details, swaps
  * - uniform_admin or admin: weather
  *
  * @returns {Object} Object containing total and individual counts
  */
 export function useUnifiedApprovalCount() {
-  const { isCandidateLeadership, canApproveWeatherUOTD, isAdmin } = useAuth()
+  const { isCandidateLeadership, isLeaveAdmin, canApproveWeatherUOTD, isAdmin } = useAuth()
 
   // Calculate permission flags first
-  const canApprovePasses = isCandidateLeadership || isAdmin
-  const canApproveLiberty = isCandidateLeadership || isAdmin
+  // leave_admin can approve passes and liberty (matches Firestore rules: isLeaveAdmin())
+  const canApprovePasses = isLeaveAdmin || isCandidateLeadership || isAdmin
+  const canApproveLiberty = isLeaveAdmin || isCandidateLeadership || isAdmin
   const canApproveDetails = isCandidateLeadership || isAdmin
   const canApproveSwaps = isCandidateLeadership || isAdmin
   const canApproveWeather = canApproveWeatherUOTD || isAdmin
