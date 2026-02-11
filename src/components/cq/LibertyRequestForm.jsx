@@ -17,8 +17,10 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useAppConfig } from "../../hooks/useAppConfig";
 import Loading from "../common/Loading";
 
+const EDITABLE_STATUSES = ["pending", "approved"];
+
 export default function LibertyRequestForm() {
-  const { user } = useAuth();
+  const { user, isLeaveAdmin, isAdmin } = useAuth();
   const { config, loading: configLoading } = useAppConfig();
   const {
     requests: myLibertyRequests,
@@ -27,6 +29,7 @@ export default function LibertyRequestForm() {
   const {
     createLibertyRequest,
     cancelLibertyRequest,
+    updateLibertyRequest,
     loading: requestActionLoading,
     error: requestError,
   } = useLibertyRequestActions();
@@ -43,6 +46,9 @@ export default function LibertyRequestForm() {
   const [duplicateWarning, setDuplicateWarning] = useState(null);
   const [isDriver, setIsDriver] = useState(false);
   const [passengerCapacity, setPassengerCapacity] = useState(1);
+
+  // Edit mode state
+  const [editingRequest, setEditingRequest] = useState(null);
 
   // Time slots state - each slot: { date, startTime, endTime, locations: [] }
   const [timeSlots, setTimeSlots] = useState([]);
@@ -94,9 +100,9 @@ export default function LibertyRequestForm() {
     }
   }, [myPersonnelRecord]);
 
-  // Set default time slot when form opens
+  // Set default time slot when form opens (not in edit mode - edit populates its own)
   useEffect(() => {
-    if (showForm && timeSlots.length === 0) {
+    if (showForm && !editingRequest && timeSlots.length === 0) {
       setTimeSlots([
         {
           date: saturday.toISOString().split("T")[0],
@@ -106,7 +112,7 @@ export default function LibertyRequestForm() {
         },
       ]);
     }
-  }, [showForm, timeSlots.length, saturday]);
+  }, [showForm, editingRequest, timeSlots.length, saturday]);
 
   // Filter personnel for companion search (exclude current user)
   const filteredPersonnel = useMemo(() => {
@@ -184,6 +190,54 @@ export default function LibertyRequestForm() {
     setTimeSlots((prev) => prev.filter((_, i) => i !== index));
   }
 
+  /**
+   * Populate the form with existing request data for editing
+   */
+  function startEditing(request) {
+    setEditingRequest(request);
+    // Populate time slots - preserve participants from existing slots
+    if (request.timeSlots && request.timeSlots.length > 0) {
+      setTimeSlots(request.timeSlots.map((slot) => ({
+        date: slot.date || "",
+        startTime: slot.startTime || "",
+        endTime: slot.endTime || "",
+        locations: slot.locations || [],
+        participants: slot.participants || [],
+      })));
+    } else {
+      // Legacy single-window format
+      setTimeSlots([{
+        date: request.departureDate || saturday.toISOString().split("T")[0],
+        startTime: request.departureTime || "08:00",
+        endTime: request.returnTime || "12:00",
+        locations: request.locations || [],
+        participants: [],
+      }]);
+    }
+    setCustomLocation(request.customLocation || "");
+    setContactNumber(request.contactNumber || "");
+    setPurpose(request.purpose || "");
+    setNotes(request.notes || "");
+    // Populate companions - map to personnel format for display
+    const existingCompanions = (request.companions || []).map((c) => {
+      // Try to find matching personnel record for full data
+      const personnelMatch = personnel.find((p) => (p.userId || p.id) === c.id);
+      if (personnelMatch) return personnelMatch;
+      // Fallback: parse name into first/last
+      const nameParts = (c.name || "").split(" ");
+      return {
+        id: c.id,
+        firstName: nameParts[0] || "",
+        lastName: nameParts.slice(1).join(" ") || "",
+        rank: c.rank || "",
+      };
+    });
+    setCompanions(existingCompanions);
+    setIsDriver(request.isDriver || false);
+    setPassengerCapacity(request.passengerCapacity || 1);
+    setShowForm(true);
+  }
+
   async function handleSubmitRequest(e, forceSubmit = false) {
     if (e) e.preventDefault();
     setDuplicateWarning(null);
@@ -191,7 +245,8 @@ export default function LibertyRequestForm() {
       const formData = {
         timeSlots: timeSlots.map((slot) => ({
           ...slot,
-          participants: [],
+          // Preserve existing participants when editing
+          participants: editingRequest ? (slot.participants || []) : [],
         })),
         customLocation,
         contactNumber,
@@ -199,7 +254,7 @@ export default function LibertyRequestForm() {
         notes,
         companions: companions.map((c) => ({
           id: c.userId || c.id,
-          name: `${c.firstName} ${c.lastName}`,
+          name: c.firstName && c.lastName ? `${c.firstName} ${c.lastName}` : c.name || "",
           rank: c.rank,
         })),
         weekendDate: weekendDateStr,
@@ -207,11 +262,22 @@ export default function LibertyRequestForm() {
         isDriver,
         passengerCapacity: isDriver ? passengerCapacity : 0,
       };
-      const result = await createLibertyRequest(formData);
 
-      if (result.isDuplicate) {
-        setDuplicateWarning(result.existingRequest);
-        return;
+      if (editingRequest) {
+        // Update existing request
+        await updateLibertyRequest(
+          editingRequest.id,
+          formData,
+          { isAdmin: isAdmin || isLeaveAdmin }
+        );
+      } else {
+        // Create new request
+        const result = await createLibertyRequest(formData);
+
+        if (result.isDuplicate) {
+          setDuplicateWarning(result.existingRequest);
+          return;
+        }
       }
 
       resetForm();
@@ -229,10 +295,12 @@ export default function LibertyRequestForm() {
     resetForm();
   }
 
-  async function handleCancelRequest() {
-    if (!pendingRequest) return;
+  async function handleCancelRequest(request) {
+    const target = request || pendingRequest;
+    if (!target) return;
+    if (!EDITABLE_STATUSES.includes(target.status)) return;
     try {
-      await cancelLibertyRequest(pendingRequest.id);
+      await cancelLibertyRequest(target.id, { isAdmin: isAdmin || isLeaveAdmin });
     } catch (err) {
       // Error handled by hook
     }
@@ -240,6 +308,7 @@ export default function LibertyRequestForm() {
 
   function resetForm() {
     setShowForm(false);
+    setEditingRequest(null);
     setTimeSlots([]);
     setCustomLocation("");
     setContactNumber(myPersonnelRecord?.phoneNumber || "");
@@ -400,9 +469,27 @@ export default function LibertyRequestForm() {
                   </p>
                 )}
               </div>
-              <p className="mt-2 text-xs text-green-600">
-                Approved by {approvedRequest.approvedByName} ({approvedRequest.approverInitials})
-              </p>
+              <div className="mt-2 flex items-center justify-between">
+                <p className="text-xs text-green-600">
+                  Approved by {approvedRequest.approvedByName} ({approvedRequest.approverInitials})
+                </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => startEditing(approvedRequest)}
+                    disabled={loading}
+                    className="text-green-700 hover:text-green-900 text-sm font-medium"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleCancelRequest(approvedRequest)}
+                    disabled={loading}
+                    className="text-red-600 hover:text-red-800 text-sm font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -412,7 +499,7 @@ export default function LibertyRequestForm() {
       {pendingRequest && !showForm && (
         <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
           <div className="flex items-start justify-between">
-            <div>
+            <div className="flex-1">
               <div className="flex items-center gap-2">
                 <div className="animate-pulse w-2 h-2 bg-yellow-500 rounded-full"></div>
                 <span className="font-medium text-yellow-800">Liberty Request Pending</span>
@@ -452,13 +539,22 @@ export default function LibertyRequestForm() {
                 Waiting for leadership approval...
               </p>
             </div>
-            <button
-              onClick={handleCancelRequest}
-              disabled={loading}
-              className="text-yellow-700 hover:text-yellow-900 text-sm font-medium"
-            >
-              Cancel
-            </button>
+            <div className="flex flex-col items-end gap-2">
+              <button
+                onClick={() => startEditing(pendingRequest)}
+                disabled={loading}
+                className="text-yellow-700 hover:text-yellow-900 text-sm font-medium"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => handleCancelRequest(pendingRequest)}
+                disabled={loading}
+                className="text-red-600 hover:text-red-800 text-sm font-medium"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -477,12 +573,18 @@ export default function LibertyRequestForm() {
       {showForm && (
         <form onSubmit={handleSubmitRequest} className="space-y-4">
           <div className="flex items-center gap-2 mb-2">
-            <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-primary-100 text-primary-800">
-              Liberty Request
+            <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${editingRequest ? "bg-amber-100 text-amber-800" : "bg-primary-100 text-primary-800"}`}>
+              {editingRequest ? "Edit Liberty Request" : "Liberty Request"}
             </span>
-            <span className="text-xs text-gray-500">
-              (Requires leadership approval)
-            </span>
+            {editingRequest ? (
+              <span className="text-xs text-gray-500">
+                (Editing {editingRequest.status} request)
+              </span>
+            ) : (
+              <span className="text-xs text-gray-500">
+                (Requires leadership approval)
+              </span>
+            )}
           </div>
 
           {/* Time Slots */}
@@ -753,7 +855,7 @@ export default function LibertyRequestForm() {
               disabled={loading || !isFormValid}
               className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
             >
-              {loading ? "Submitting..." : "Submit Request"}
+              {loading ? (editingRequest ? "Saving..." : "Submitting...") : (editingRequest ? "Save Changes" : "Submit Request")}
             </button>
           </div>
         </form>

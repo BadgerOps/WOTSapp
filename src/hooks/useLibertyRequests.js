@@ -401,10 +401,14 @@ export function useLibertyRequestActions() {
   }
 
   /**
-   * Cancel a pending liberty request (user can cancel their own)
+   * Cancel a pending or approved liberty request
+   * Users can cancel their own; admins/leave admins can cancel any
    * @param {string} requestId
+   * @param {Object} options
+   * @param {boolean} options.isAdmin - If true, skip ownership check (for admin/leave admin users)
+   * @param {string} options.reason - Optional cancellation reason
    */
-  async function cancelLibertyRequest(requestId) {
+  async function cancelLibertyRequest(requestId, { isAdmin: isAdminUser = false, reason = "" } = {}) {
     setLoading(true);
     setError(null);
     try {
@@ -415,12 +419,14 @@ export function useLibertyRequestActions() {
         throw new Error("Request not found");
       }
 
-      if (requestDoc.data().requesterId !== user.uid) {
+      const data = requestDoc.data();
+
+      if (!isAdminUser && data.requesterId !== user.uid) {
         throw new Error("You can only cancel your own requests");
       }
 
-      if (requestDoc.data().status !== "pending") {
-        throw new Error("Can only cancel pending requests");
+      if (data.status !== "pending" && data.status !== "approved") {
+        throw new Error("Can only cancel pending or approved requests");
       }
 
       await updateDoc(requestRef, {
@@ -428,6 +434,7 @@ export function useLibertyRequestActions() {
         cancelledAt: serverTimestamp(),
         cancelledBy: user.uid,
         cancelledByName: user.displayName || user.email,
+        cancelReason: reason || null,
         updatedAt: serverTimestamp(),
       });
 
@@ -441,9 +448,89 @@ export function useLibertyRequestActions() {
     }
   }
 
+  /**
+   * Update an existing liberty request (edit fields, time slots, etc.)
+   * Allowed on pending or approved requests only.
+   * Users can edit their own; admins/leave admins can edit any.
+   * @param {string} requestId - The request to update
+   * @param {Object} requestData - Updated request fields
+   * @param {Object} options
+   * @param {boolean} options.isAdmin - If true, skip ownership check
+   */
+  async function updateLibertyRequest(requestId, requestData, { isAdmin: isAdminUser = false } = {}) {
+    setLoading(true);
+    setError(null);
+    try {
+      const requestRef = doc(db, "libertyRequests", requestId);
+      const requestDoc = await getDoc(requestRef);
+
+      if (!requestDoc.exists()) {
+        throw new Error("Request not found");
+      }
+
+      const data = requestDoc.data();
+
+      if (!isAdminUser && data.requesterId !== user.uid) {
+        throw new Error("You can only edit your own requests");
+      }
+
+      if (data.status !== "pending" && data.status !== "approved") {
+        throw new Error("Can only edit pending or approved requests");
+      }
+
+      // Build time slots or fallback
+      const timeSlots = requestData.timeSlots || [];
+
+      let locations, destination;
+      if (timeSlots.length > 0) {
+        timeSlots.forEach((slot) => {
+          if (!slot.participants) slot.participants = [];
+        });
+        locations = [...new Set(timeSlots.flatMap((s) => s.locations || []))];
+        destination = buildTimeSlotsDestination(timeSlots, requestData.customLocation);
+      } else {
+        locations = requestData.locations || (requestData.location ? [requestData.location] : []);
+        destination = buildDestinationString(locations, requestData.customLocation);
+      }
+
+      const updateData = {
+        locations,
+        location: locations[0] || null,
+        destination,
+        departureDate: requestData.departureDate || (timeSlots[0]?.date || null),
+        departureTime: requestData.departureTime || (timeSlots[0]?.startTime || null),
+        returnDate: requestData.returnDate || (timeSlots[timeSlots.length - 1]?.date || null),
+        returnTime: requestData.returnTime || (timeSlots[timeSlots.length - 1]?.endTime || null),
+        contactNumber: requestData.contactNumber || null,
+        purpose: requestData.purpose || null,
+        notes: requestData.notes || null,
+        companions: requestData.companions || [],
+        isDriver: requestData.isDriver || false,
+        passengerCapacity: requestData.isDriver ? (requestData.passengerCapacity || 0) : 0,
+        timeSlots: timeSlots.length > 0 ? timeSlots : [],
+        customLocation: requestData.customLocation || null,
+        updatedAt: serverTimestamp(),
+        lastEditedBy: user.uid,
+        lastEditedByName: user.displayName || user.email,
+        lastEditedAt: serverTimestamp(),
+      };
+
+      await updateDoc(requestRef, updateData);
+
+      setLoading(false);
+      return { success: true };
+    } catch (err) {
+      console.error("Error updating liberty request:", err);
+      setError(err.message);
+      setLoading(false);
+      throw err;
+    }
+  }
+
   return {
     createLibertyRequest,
     cancelLibertyRequest,
+    updateLibertyRequest,
     loading,
     error,
   };
