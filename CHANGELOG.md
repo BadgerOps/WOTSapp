@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-02-11
+
+### Fixed
+
+#### Liberty Request Editing & Cancellation
+- **Users can now edit submitted (pending) and approved liberty requests** — previously requests were immutable after creation, requiring cancellation and re-submission to make any changes
+- **Edit button** on both pending and approved request cards opens the form pre-populated with all existing data (time slots, locations, companions, driver info, contact, purpose, notes)
+- **Time slot modifications** — add, remove, or change time slots on existing requests; existing slot participants are preserved during edits
+- **Cancel approved requests** — users can now cancel approved liberty requests, not just pending ones
+- **Admin/leave admin override** — admins and leave admins can edit or cancel any user's pending or approved request, not just their own
+- **Rejected and cancelled requests remain immutable** — edit/cancel actions are only available on pending and approved statuses
+
+### Modified Files
+- `src/hooks/useLibertyRequests.js` — Added `updateLibertyRequest()` function; updated `cancelLibertyRequest()` to support approved status and admin override; added edit tracking fields (`lastEditedBy`, `lastEditedByName`, `lastEditedAt`)
+- `src/components/cq/LibertyRequestForm.jsx` — Added edit mode with `startEditing()`, Edit/Cancel buttons on approved and pending cards, form pre-population, participant preservation, edit-aware submit/cancel handlers
+- `firestore.rules` — Updated cancellation rule to allow `approved → cancelled` transition for request owners
+
+---
+
 ## [0.7.1] - 2026-02-10
 
 ### Added
