@@ -292,12 +292,12 @@ service cloud.firestore {
       // Leave admins can create requests on behalf of other users
       allow create: if isLeaveAdmin() &&
         request.resource.data.createdOnBehalfOf == true;
-      // Users can cancel their own pending requests
+      // Users can cancel their own pending or approved requests
       allow update: if isAuthenticated() &&
         resource.data.requesterId == request.auth.uid &&
-        resource.data.status == 'pending' &&
+        (resource.data.status == 'pending' || resource.data.status == 'approved') &&
         request.resource.data.status == 'cancelled';
-      // Owner can update their pending or approved request (manage join requests, companions)
+      // Owner can update their pending or approved request (edit fields, manage join requests, companions)
       allow update: if isAuthenticated() &&
         resource.data.requesterId == request.auth.uid &&
         (resource.data.status == 'approved' || resource.data.status == 'pending');
