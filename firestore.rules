@@ -320,18 +320,20 @@ service cloud.firestore {
         (request.resource.data.groupSignOut == true ||
          request.resource.data.groupSignIn == true ||
          request.resource.data.groupUpdate == true);
-      // Candidate leadership and admins can read and write all
-      allow read, write: if isCandidateLeadership();
+      // Leave admins, candidate leadership and admins can read and write all
+      // (leave_admin needs write access for pass approval sign-outs)
+      allow read, write: if isLeaveAdmin();
       // Anyone authenticated can read all status (for status display)
       allow read: if isAuthenticated();
     }
 
     // Personnel Status History collection
     match /personnelStatusHistory/{logId} {
-      // Candidate leadership and admins can read all history
-      allow read: if isCandidateLeadership();
-      // Candidate leadership and admins can create history entries
-      allow create: if isCandidateLeadership();
+      // Leave admins, candidate leadership and admins can read all history
+      allow read: if isLeaveAdmin();
+      // Leave admins, candidate leadership and admins can create history entries
+      // (leave_admin needs create access for pass approval history logging)
+      allow create: if isLeaveAdmin();
       // Users can create their own history entries (for self sign-out)
       allow create: if isAuthenticated() &&
         request.resource.data.personnelId == request.auth.uid &&
