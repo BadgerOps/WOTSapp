@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] - 2026-02-14
+
+### Fixed
+
+#### Liberty Leave Cards Disappearing on Weekends
+- **Weekend liberty cards now remain visible through Monday** (the day after the event ends) — previously cards disappeared as soon as Saturday started because `getNextWeekendDates()` skipped to the following weekend
+- Added `getCurrentWeekendDate()` helper that returns the current/recent weekend's Saturday on Sat/Sun/Mon, `null` on Tue-Fri
+- **MyLibertyCard** now checks for requests matching the current weekend first, then falls back to the upcoming weekend
+- **ApprovedLibertyList** (weekend liberty groups showing people/locations) now displays the current weekend's groups on Sat/Sun/Mon instead of the next weekend's
+- **useAvailableLibertyRequests** hook queries the active weekend on Sat/Sun/Mon so the CQ runner view stays populated through Monday
+
+#### Leave Admin Pass Approval Firestore Rules
+- **`leave_admin` role can now fully approve pass requests** — previously the frontend showed the Approve button but the Firestore batch write failed silently
+- `personnelStatus` write rules changed from `isCandidateLeadership()` to `isLeaveAdmin()` (which includes `leave_admin`, `candidate_leadership`, and `admin`)
+- `personnelStatusHistory` create rules similarly updated to `isLeaveAdmin()`
+- Root cause: approving a pass writes to `personnelStatus` (sign-out) and `personnelStatusHistory` (audit log), but those collections only allowed `candidate_leadership` and `admin` — not `leave_admin`
+
+### Modified Files
+- `src/hooks/useLibertyRequests.js` — Added `getCurrentWeekendDate()` helper; updated `useAvailableLibertyRequests()` to use current weekend on Sat/Sun/Mon
+- `src/hooks/useLibertyRequests.test.js` — Added 5 tests for `getCurrentWeekendDate()` covering all days of the week
+- `src/components/cq/MyLibertyCard.jsx` — Updated `weekendRequest` memo to check current/recent weekend first
+- `src/components/cq/ApprovedLibertyList.jsx` — Derives display dates from hook's `weekendDate` instead of calling `getNextWeekendDates()` independently
+- `firestore.rules` — Updated `personnelStatus` and `personnelStatusHistory` rules from `isCandidateLeadership()` to `isLeaveAdmin()`
+
+---
+
 ## [0.7.2] - 2026-02-11
 
 ### Fixed

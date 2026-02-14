@@ -110,6 +110,33 @@ export function getNextWeekendDates() {
 }
 
 /**
+ * Get the Saturday date string of the current or most recent weekend,
+ * if today is Saturday, Sunday, or Monday (the day after the event ends).
+ * Returns null on Tuesday-Friday when there is no active/recent weekend.
+ * @returns {string|null} ISO date string (YYYY-MM-DD) of the Saturday, or null
+ */
+export function getCurrentWeekendDate() {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, 6=Sat
+
+  let daysBack;
+  if (dayOfWeek === 6) {
+    daysBack = 0; // Saturday - this is the weekend
+  } else if (dayOfWeek === 0) {
+    daysBack = 1; // Sunday - Saturday was yesterday
+  } else if (dayOfWeek === 1) {
+    daysBack = 2; // Monday - day after event; Saturday was 2 days ago
+  } else {
+    return null; // Tue-Fri: no active/recent weekend to show
+  }
+
+  const saturday = new Date(today);
+  saturday.setDate(today.getDate() - daysBack);
+  saturday.setHours(0, 0, 0, 0);
+  return saturday.toISOString().split('T')[0];
+}
+
+/**
  * Check if today is before the deadline for liberty requests
  * @param {Object} config - App config with libertyDeadlineDayOfWeek and libertyDeadlineTime
  * @returns {boolean} True if current time is before the deadline
@@ -910,9 +937,10 @@ export function useAllLibertyRequests(filterStatus = null, filterWeekend = null)
 }
 
 /**
- * Hook to fetch available liberty requests for the upcoming weekend
- * Shows both pending and approved requests so users can join before deadline
- * This is publicly visible to all authenticated users
+ * Hook to fetch available liberty requests for the relevant weekend.
+ * On Sat/Sun/Mon shows the current/just-passed weekend so cards remain
+ * visible until the day after the event. On Tue-Fri shows the upcoming weekend.
+ * This is publicly visible to all authenticated users.
  */
 export function useAvailableLibertyRequests() {
   const [requests, setRequests] = useState([]);
@@ -920,7 +948,10 @@ export function useAvailableLibertyRequests() {
   const [error, setError] = useState(null);
 
   const { saturday } = getNextWeekendDates();
-  const weekendDate = saturday.toISOString().split('T')[0];
+  const nextWeekendDate = saturday.toISOString().split('T')[0];
+  const currentWeekendDate = getCurrentWeekendDate();
+  // On Sat/Sun/Mon show the current weekend; otherwise show the upcoming one
+  const weekendDate = currentWeekendDate || nextWeekendDate;
 
   useEffect(() => {
     // We need two queries since Firestore doesn't support OR in where clauses
