@@ -53,6 +53,7 @@ import {
   LIBERTY_REQUEST_STATUS,
   LIBERTY_LOCATIONS,
   getNextWeekendDates,
+  getCurrentWeekendDate,
   isBeforeDeadline,
   getDeadlineDate,
   getDeadlineDayName,
@@ -114,6 +115,55 @@ describe("getNextWeekendDates", () => {
     const diff = sunday.getTime() - saturday.getTime();
     const oneDayMs = 24 * 60 * 60 * 1000;
     expect(diff).toBe(oneDayMs);
+  });
+});
+
+describe("getCurrentWeekendDate", () => {
+  it("should return Saturday date string on Saturday", () => {
+    // Saturday Feb 14, 2026
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 1, 14, 10, 0, 0)); // Feb 14 is a Saturday
+    const result = getCurrentWeekendDate();
+    expect(result).toBe("2026-02-14");
+    vi.useRealTimers();
+  });
+
+  it("should return Saturday date string on Sunday", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 1, 15, 10, 0, 0)); // Feb 15 is a Sunday
+    const result = getCurrentWeekendDate();
+    expect(result).toBe("2026-02-14");
+    vi.useRealTimers();
+  });
+
+  it("should return Saturday date string on Monday (day after event)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 1, 16, 10, 0, 0)); // Feb 16 is a Monday
+    const result = getCurrentWeekendDate();
+    expect(result).toBe("2026-02-14");
+    vi.useRealTimers();
+  });
+
+  it("should return null on Tuesday", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 1, 17, 10, 0, 0)); // Feb 17 is a Tuesday
+    const result = getCurrentWeekendDate();
+    expect(result).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("should return null on Wednesday through Friday", () => {
+    vi.useFakeTimers();
+    // Wednesday Feb 18
+    vi.setSystemTime(new Date(2026, 1, 18, 10, 0, 0));
+    expect(getCurrentWeekendDate()).toBeNull();
+    // Thursday Feb 19
+    vi.setSystemTime(new Date(2026, 1, 19, 10, 0, 0));
+    expect(getCurrentWeekendDate()).toBeNull();
+    // Friday Feb 20
+    vi.setSystemTime(new Date(2026, 1, 20, 10, 0, 0));
+    expect(getCurrentWeekendDate()).toBeNull();
+    vi.useRealTimers();
   });
 });
 

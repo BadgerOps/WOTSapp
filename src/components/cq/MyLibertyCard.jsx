@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   useMyLibertyRequests,
   getNextWeekendDates,
+  getCurrentWeekendDate,
   isBeforeDeadline,
   getDeadlineDate,
   getDeadlineDayName,
@@ -38,18 +39,31 @@ export default function MyLibertyCard() {
   // Get weekend dates
   const { saturday, sunday } = getNextWeekendDates()
   const weekendDateStr = saturday.toISOString().split('T')[0]
+  const currentWeekendDateStr = getCurrentWeekendDate()
   const canSubmit = isBeforeDeadline(config)
   const deadline = getDeadlineDate(config)
   const deadlineDayName = getDeadlineDayName(config?.libertyDeadlineDayOfWeek)
 
-  // Get pending or approved liberty request for this weekend
+  // Get pending or approved liberty request for this weekend.
+  // On Sat/Sun/Mon, also check the current/just-passed weekend so cards
+  // remain visible until the day after the event ends.
   const weekendRequest = useMemo(() => {
+    // On Sat/Sun/Mon, prioritize the current/recent weekend request
+    if (currentWeekendDateStr && currentWeekendDateStr !== weekendDateStr) {
+      const currentRequest = requests.find(
+        (r) =>
+          (r.status === 'pending' || r.status === 'approved') &&
+          r.weekendDate === currentWeekendDateStr
+      )
+      if (currentRequest) return currentRequest
+    }
+    // Then check upcoming weekend
     return requests.find(
       (r) =>
         (r.status === 'pending' || r.status === 'approved') &&
         r.weekendDate === weekendDateStr
     )
-  }, [requests, weekendDateStr])
+  }, [requests, weekendDateStr, currentWeekendDateStr])
 
   // Don't show if loading or no relevant request and deadline passed
   if (loading || configLoading) return null

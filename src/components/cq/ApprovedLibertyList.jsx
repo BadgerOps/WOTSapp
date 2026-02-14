@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   useAvailableLibertyRequests,
   useLibertyJoinActions,
-  getNextWeekendDates,
   getTimeSlotLabel,
   buildDestinationString,
   LIBERTY_LOCATIONS,
@@ -37,7 +36,10 @@ export default function ApprovedLibertyList() {
   const [actionError, setActionError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
 
-  const { saturday, sunday } = getNextWeekendDates()
+  // Derive display dates from the hook's weekendDate (which accounts for current weekend on Sat/Sun/Mon)
+  const saturday = new Date(weekendDate + 'T00:00:00')
+  const sunday = new Date(saturday)
+  sunday.setDate(saturday.getDate() + 1)
 
   async function handleJoinRequest(requestId) {
     setActionError(null)
