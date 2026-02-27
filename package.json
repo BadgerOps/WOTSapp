@@ -21,7 +21,7 @@
   "dependencies": {
     "@sentry/react": "^10.36.0",
     "date-fns": "^4.1.0",
-    "firebase": "^11.2.0",
+    "firebase": "^12.10.0",
     "jspdf": "^4.0.0",
     "jspdf-autotable": "^5.0.7",
     "leaflet": "^1.9.4",
