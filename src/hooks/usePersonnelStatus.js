@@ -7,7 +7,9 @@ import {
   onSnapshot,
   doc,
   setDoc,
+  updateDoc,
   addDoc,
+  arrayUnion,
   serverTimestamp,
   writeBatch,
   getDoc,
@@ -344,6 +346,8 @@ export function usePersonnelStatusActions() {
           companions: null,
           withPersonId: null,
           withPersonName: null,
+          lastLocation: null,
+          locationUpdates: null,
           updatedBy: user.uid,
           updatedByName: user.displayName || user.email,
           updatedAt: serverTimestamp(),
@@ -551,6 +555,8 @@ export function useSelfSignOut() {
         contactNumber: null,
         notes: null,
         companions: null,
+        lastLocation: null,
+        locationUpdates: null,
         updatedBy: user.uid,
         updatedByName: user.displayName || user.email,
         userEmail: user.email, // Store email for matching unlinked personnel
@@ -563,7 +569,7 @@ export function useSelfSignOut() {
         batch.delete(doc(db, "personnelStatus", myStatusId));
       }
 
-      // Add to history
+      // Add to history - include location data for historical review
       const historyRef = doc(collection(db, "personnelStatusHistory"));
       batch.set(historyRef, {
         personnelId: user.uid,
@@ -572,6 +578,8 @@ export function useSelfSignOut() {
         previousStatus,
         previousStage,
         action: "arrived_barracks",
+        destination: currentData?.destination || null,
+        locationUpdates: currentData?.locationUpdates || null,
         updatedBy: user.uid,
         updatedByName: user.displayName || user.email,
         timestamp: serverTimestamp(),
@@ -591,6 +599,8 @@ export function useSelfSignOut() {
           notes: null,
           withPersonId: null,
           withPersonName: null,
+          lastLocation: null,
+          locationUpdates: null,
           updatedBy: user.uid,
           updatedByName: user.displayName || user.email,
           updatedAt: serverTimestamp(),
@@ -898,6 +908,56 @@ export function useSelfSignOut() {
     }
   }
 
+  /**
+   * Share current GPS location while on pass
+   * Uses browser Geolocation API and stores coordinates in personnelStatus.
+   * Keeps lastLocation for quick access and appends to locationUpdates array
+   * so leadership can see all locations visited during the pass.
+   */
+  async function shareLocation() {
+    setLoading(true);
+    setError(null);
+    try {
+      if (!navigator.geolocation) {
+        throw new Error("Geolocation is not supported by your browser");
+      }
+
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        });
+      });
+
+      const locationEntry = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: Math.round(position.coords.accuracy),
+        timestamp: new Date().toISOString(),
+      };
+
+      const { docId: myStatusId } = await findMyStatusDoc();
+      const statusRef = doc(db, "personnelStatus", myStatusId);
+      await updateDoc(statusRef, {
+        lastLocation: locationEntry,
+        locationUpdates: arrayUnion(locationEntry),
+        updatedAt: serverTimestamp(),
+      });
+
+      setLoading(false);
+    } catch (err) {
+      let message = err.message;
+      if (err.code === 1) message = "Location permission denied";
+      else if (err.code === 2) message = "Location unavailable";
+      else if (err.code === 3) message = "Location request timed out";
+      console.error("Error sharing location:", err);
+      setError(message);
+      setLoading(false);
+      throw new Error(message);
+    }
+  }
+
   return {
     signOut,
     signIn,
@@ -905,6 +965,7 @@ export function useSelfSignOut() {
     updateStage,
     breakFree,
     requestPassApproval,
+    shareLocation,
     loading,
     error,
   };

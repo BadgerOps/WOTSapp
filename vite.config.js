@@ -16,6 +16,7 @@ export default defineConfig({
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-sentry': ['@sentry/react'],
           'vendor-dates': ['date-fns'],
+          'vendor-leaflet': ['leaflet', 'react-leaflet'],
         }
       }
     }
