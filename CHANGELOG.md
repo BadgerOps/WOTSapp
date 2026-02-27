@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-02-27
+
+### Added
+
+#### GPS Location Sharing for Personnel on Pass
+- **Opt-in location sharing** — personnel on town pass can share their GPS location from the pass status card via a "Share Location" button
+- **Periodic location updates** — after initial share, location automatically updates every 5 minutes while the pass is active; users can also manually re-share at any time
+- **Location history** — all check-ins stored as `locationUpdates` array on the personnel status document, with `lastLocation` always pointing to the most recent
+- **Google Maps links** in card and table views for each location update, with "current" marker on the latest and relative timestamps (e.g., "12m ago")
+- **Location data in exports** — signout roster PDF and liberty Excel export now include last known latitude/longitude when available
+
+#### Interactive OpenStreetMap View (Leaflet)
+- **New `PassLocationMap` component** with OpenStreetMap tiles (no API key required)
+- **Map markers** for each person who has shared location, with popups showing name, destination, pass stage, last update time, check-in count, and GPS accuracy
+- **Auto-fit bounds** — map automatically adjusts to show all markers
+- **Sidebar** listing all personnel on pass, split into "location shared" (clickable, flies to marker) and "no location" sections
+- **Empty states** for no personnel on pass and for people on pass who haven't shared yet
+- **Lazy-loaded** via `React.lazy` + `Suspense` — Leaflet JS/CSS only downloaded when map is opened (own vendor chunk, ~45KB gzip)
+
+#### Map View on Personnel Status Tracker
+- **List/Map toggle** button group in the filter bar next to the sort dropdown
+- Clicking the map icon switches from the existing card/table view to the interactive map
+- Map receives the same filtered `personnelOnPass` data as the existing views
+
+#### Map View on CQ Dashboard
+- **List/Map toggle** on the "Personnel Currently Out" section
+- Admins can see all non-present personnel locations at a glance without navigating to the full tracker
+
+### New Files
+- `src/components/cq/PassLocationMap.jsx` — Map + sidebar component (OpenStreetMap + Leaflet)
+
+### Modified Files
+- `src/hooks/usePersonnelStatus.js` — Added `shareLocation()` and `getLocationUpdates()` actions; stores `lastLocation` and `locationUpdates` on personnel status
+- `src/components/cq/MyPassStatusCard.jsx` — Added "Share Location" button with geolocation API, periodic auto-updates, check-in counter
+- `src/components/cq/PersonnelStatusTracker.jsx` — Added lazy map import, `viewMode` state, list/map toggle, conditional rendering
+- `src/components/cq/CQDashboard.jsx` — Added lazy map import, list/map toggle on "Personnel Currently Out" section
+- `src/pages/CQView.jsx` — Location update display in accountability tab personnel list
+- `src/lib/signoutRosterPdf.js` — Added lat/lng columns to PDF export when location data exists
+- `src/lib/exportLibertyExcel.js` — Added location columns to Excel export
+- `vite.config.js` — Added `vendor-leaflet` manual chunk for code splitting
+
+### Dependencies
+- Added `leaflet` (^1.9.4) — map rendering library
+- Added `react-leaflet` (^5.0.0) — React bindings for Leaflet
+
+---
+
 ## [0.7.3] - 2026-02-14
 
 ### Fixed
