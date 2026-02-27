@@ -1,3 +1,4 @@
+import { useState, lazy, Suspense } from "react";
 import {
   usePersonnelStatus,
   STATUS_TYPES,
@@ -6,6 +7,8 @@ import {
 import { useActiveShift, useCQShifts } from "../../hooks/useCQShifts";
 import { useRecentCQNotes, NOTE_TYPES } from "../../hooks/useCQNotes";
 import Loading from "../common/Loading";
+
+const PassLocationMap = lazy(() => import("./PassLocationMap"));
 
 const STATUS_COLORS = {
   present: "bg-green-500",
@@ -29,6 +32,7 @@ export default function CQDashboard() {
   const { activeShift, loading: shiftLoading } = useActiveShift();
   const { shifts } = useCQShifts();
   const { notes, loading: notesLoading } = useRecentCQNotes(5);
+  const [outTab, setOutTab] = useState("list");
 
   if (personnelLoading || shiftLoading || notesLoading) {
     return <Loading />;
@@ -218,53 +222,87 @@ export default function CQDashboard() {
       {/* Personnel Out Summary */}
       {outCount > 0 && (
         <div className="bg-white rounded-lg shadow-md p-4">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Personnel Currently Out
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {personnelWithStatus
-              .filter((p) => p.status !== "present")
-              .map((person) => (
-                <div
-                  key={person.id}
-                  className="p-3 bg-gray-50 rounded-lg border border-gray-200"
-                >
-                  <div className="font-medium text-gray-900">
-                    {person.rank && `${person.rank} `}
-                    {person.lastName}, {person.firstName}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <span
-                      className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_COLORS[
-                        person.status
-                      ]
-                        .replace("bg-", "bg-")
-                        .replace(
-                          "500",
-                          "100",
-                        )} ${STATUS_COLORS[person.status].replace("bg-", "text-").replace("500", "800")}`}
-                    >
-                      {person.status === "pass" && person.statusDetails?.destination
-                        ? person.statusDetails.destination
-                        : STATUS_TYPES[person.status]?.label}
-                    </span>
-                    {person.status === "pass" &&
-                      person.statusDetails?.passStage && (
-                        <span
-                          className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
-                            person.statusDetails.passStage === "arrived"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-orange-100 text-orange-800"
-                          }`}
-                        >
-                          {PASS_STAGES[person.statusDetails.passStage]?.label ||
-                            person.statusDetails.passStage}
-                        </span>
-                      )}
-                  </div>
-                </div>
-              ))}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Personnel Currently Out
+            </h3>
+            <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setOutTab("list")}
+                className={`px-3 py-1.5 text-sm ${outTab === "list" ? "bg-primary-100 text-primary-700" : "bg-white text-gray-500 hover:bg-gray-50"} transition-colors`}
+                title="List view"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setOutTab("map")}
+                className={`px-3 py-1.5 text-sm border-l border-gray-300 ${outTab === "map" ? "bg-primary-100 text-primary-700" : "bg-white text-gray-500 hover:bg-gray-50"} transition-colors`}
+                title="Map view"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+            </div>
           </div>
+
+          {outTab === "list" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {personnelWithStatus
+                .filter((p) => p.status !== "present")
+                .map((person) => (
+                  <div
+                    key={person.id}
+                    className="p-3 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div className="font-medium text-gray-900">
+                      {person.rank && `${person.rank} `}
+                      {person.lastName}, {person.firstName}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <span
+                        className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_COLORS[
+                          person.status
+                        ]
+                          .replace("bg-", "bg-")
+                          .replace(
+                            "500",
+                            "100",
+                          )} ${STATUS_COLORS[person.status].replace("bg-", "text-").replace("500", "800")}`}
+                      >
+                        {person.status === "pass" && person.statusDetails?.destination
+                          ? person.statusDetails.destination
+                          : STATUS_TYPES[person.status]?.label}
+                      </span>
+                      {person.status === "pass" &&
+                        person.statusDetails?.passStage && (
+                          <span
+                            className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
+                              person.statusDetails.passStage === "arrived"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-orange-100 text-orange-800"
+                            }`}
+                          >
+                            {PASS_STAGES[person.statusDetails.passStage]?.label ||
+                              person.statusDetails.passStage}
+                          </span>
+                        )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          {outTab === "map" && (
+            <Suspense fallback={<Loading />}>
+              <PassLocationMap
+                personnelOnPass={personnelWithStatus.filter((p) => p.status !== "present")}
+              />
+            </Suspense>
+          )}
         </div>
       )}
     </div>
