@@ -19,7 +19,7 @@
     "deploy:all": "npm run build && firebase deploy --project wots-app-484617"
   },
   "dependencies": {
-    "@sentry/react": "^10.36.0",
+    "@sentry/react": "^10.40.0",
     "date-fns": "^4.1.0",
     "firebase": "^11.2.0",
     "jspdf": "^4.0.0",
