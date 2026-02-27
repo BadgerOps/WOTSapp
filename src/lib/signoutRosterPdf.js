@@ -175,13 +175,20 @@ export async function generateSignoutRosterPdf(entries, options = {}) {
     // Falls back to empty string for self sign-outs without approval
     const cqInitials = entry.approverInitials || ''
 
+    // Build destination text, appending GPS check-in count if available
+    let destinationText = entry.destination || ''
+    const locUpdates = entry.locationUpdates || []
+    if (locUpdates.length > 0) {
+      destinationText += ` [${locUpdates.length} GPS check-in${locUpdates.length > 1 ? 's' : ''}]`
+    }
+
     return {
       date: formatMilitaryDate(timestamp),
       name: formattedName,
       room: personnelInfo.roomNumber || personnelInfo.room || '',
       flight: personnelInfo.flight || '',
       weekOfTraining,
-      destination: entry.destination || '',
+      destination: destinationText,
       contactNumber: entry.contactNumber || '',
       timeOut: formatMilitaryTime(entry.timeOut ? new Date(entry.timeOut) : timestamp),
       expectedReturn: entry.expectedReturn ? formatMilitaryTime(new Date(entry.expectedReturn)) : '',

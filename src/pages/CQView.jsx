@@ -14,6 +14,17 @@ const STATUS_COLORS = {
   sick_call: "bg-orange-100 text-orange-800",
 };
 
+function locationTimeAgo(isoString) {
+  if (!isoString) return "";
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
 const NOTE_TYPE_COLORS = {
   routine: "bg-gray-100 text-gray-800",
   incident: "bg-red-100 text-red-800",
@@ -214,7 +225,28 @@ export default function CQView() {
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">
                               {person.statusDetails?.destination && (
-                                <span>{person.statusDetails.destination}</span>
+                                <div>{person.statusDetails.destination}</div>
+                              )}
+                              {person.statusDetails?.lastLocation && (
+                                <div>
+                                  <a
+                                    href={`https://www.google.com/maps?q=${person.statusDetails.lastLocation.lat},${person.statusDetails.lastLocation.lng}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-xs"
+                                  >
+                                    <svg className="w-3 h-3" fill="currentColor" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    Location {locationTimeAgo(person.statusDetails.lastLocation.timestamp)}
+                                    {person.statusDetails.locationUpdates?.length > 1 && (
+                                      <span className="text-gray-400">
+                                        ({person.statusDetails.locationUpdates.length} updates)
+                                      </span>
+                                    )}
+                                  </a>
+                                </div>
                               )}
                             </td>
                           </tr>

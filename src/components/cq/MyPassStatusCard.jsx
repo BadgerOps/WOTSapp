@@ -1,9 +1,22 @@
+import { useState } from 'react'
 import { useMyStatus, useSelfSignOut, STATUS_TYPES, PASS_STAGES } from '../../hooks/usePersonnelStatus'
 import Loading from '../common/Loading'
 
+function timeAgo(isoString) {
+  if (!isoString) return null
+  const diff = Date.now() - new Date(isoString).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
 export default function MyPassStatusCard() {
   const { myStatus, loading, error } = useMyStatus()
-  const { signIn, updateStage, breakFree, loading: actionLoading, error: actionError } = useSelfSignOut()
+  const { signIn, updateStage, breakFree, shareLocation, loading: actionLoading, error: actionError } = useSelfSignOut()
+  const [locationShared, setLocationShared] = useState(false)
 
   if (loading) return <Loading />
 
@@ -159,24 +172,57 @@ export default function MyPassStatusCard() {
           </div>
         </div>
 
-        {/* Next Action Button */}
-        <div className="flex-shrink-0 flex flex-col sm:flex-row gap-2">
-          {isCompanion && (
+        {/* Action Buttons */}
+        <div className="flex-shrink-0 flex flex-col gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
+            {isCompanion && (
+              <button
+                onClick={breakFree}
+                disabled={actionLoading}
+                className="w-full sm:w-auto px-3 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm"
+              >
+                Go Solo
+              </button>
+            )}
             <button
-              onClick={breakFree}
+              onClick={handleNextAction}
               disabled={actionLoading}
-              className="w-full sm:w-auto px-3 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm"
+              className={`w-full sm:w-auto px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 font-medium ${getNextActionColor()}`}
             >
-              Go Solo
+              {actionLoading ? 'Updating...' : getNextActionLabel()}
             </button>
-          )}
+          </div>
+
+          {/* Share Location */}
           <button
-            onClick={handleNextAction}
+            onClick={async () => {
+              try {
+                await shareLocation()
+                setLocationShared(true)
+                setTimeout(() => setLocationShared(false), 3000)
+              } catch {
+                // error displayed by hook
+              }
+            }}
             disabled={actionLoading}
-            className={`w-full sm:w-auto px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 font-medium ${getNextActionColor()}`}
+            className="w-full sm:w-auto px-3 py-2 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 bg-white border-indigo-300 text-indigo-700 hover:bg-indigo-50"
           >
-            {actionLoading ? 'Updating...' : getNextActionLabel()}
+            <span className="flex items-center justify-center gap-1.5">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {locationShared ? 'Location Shared!' : 'Update Location'}
+            </span>
           </button>
+          {myStatus.lastLocation?.timestamp && !locationShared && (
+            <p className="text-xs text-gray-500 text-center">
+              Last updated {timeAgo(myStatus.lastLocation.timestamp)}
+              {myStatus.locationUpdates?.length > 1 && (
+                <span> · {myStatus.locationUpdates.length} check-ins</span>
+              )}
+            </p>
+          )}
         </div>
       </div>
 

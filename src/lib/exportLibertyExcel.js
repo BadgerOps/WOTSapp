@@ -34,12 +34,25 @@ function formatTimestamp(timestamp) {
 /**
  * Build the Summary sheet data - one row per liberty request
  */
+function formatLocationUpdates(locationUpdates) {
+  if (!locationUpdates || locationUpdates.length === 0) return ''
+  return locationUpdates
+    .map((loc, i) => {
+      const time = loc.timestamp
+        ? new Date(loc.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+        : ''
+      return `${i + 1}) ${loc.lat?.toFixed(5)}, ${loc.lng?.toFixed(5)} @ ${time}`
+    })
+    .join('; ')
+}
+
 function buildSummarySheet(requests) {
   const headers = [
     'Name',
     'Status',
     'Weekend',
     'Destination',
+    'Location Updates',
     'Driver',
     'Seats',
     'Passengers',
@@ -56,6 +69,7 @@ function buildSummarySheet(requests) {
     r.status || '',
     formatDate(r.weekendDate),
     r.destination || '',
+    formatLocationUpdates(r.locationUpdates),
     r.isDriver ? 'Yes' : 'No',
     r.isDriver ? (r.passengerCapacity || 0) : '',
     (r.passengers || []).map((p) => p.name).join(', '),
