@@ -24,11 +24,14 @@ CI/CD: GitHub Actions (lint, test, preview deploy on PR; tag, release, deploy on
 
 ## Development Environment
 
-**IMPORTANT: Always use `nix-shell` for Node.js CLI commands in this repo.**
+**IMPORTANT: Always use `nix develop` for Node.js CLI commands in this repo.**
 
 ```bash
-# Enter the nix-shell before running any node/npm commands
-nix-shell
+# Enter the dev shell before running any node/npm commands
+nix develop
+
+# Or run a single command
+nix develop --command bash -c "npm install"
 
 # Then run commands as normal
 npm install
@@ -37,9 +40,8 @@ npm run lint
 firebase deploy
 ```
 
-The `shell.nix` provides:
-- Node.js 22 (default)
-- nvm for switching Node versions if needed (`nvm use <version>`)
+The `flake.nix` provides:
+- Node.js 22 LTS (pinned via flake.lock for reproducibility)
 - Proper PATH configuration for node_modules/.bin
 
 ## File References (Read These First)
