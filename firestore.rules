@@ -376,13 +376,13 @@ service cloud.firestore {
         (isAdmin() ||
          isCandidateLeadership() ||
          resource.data.status == 'active');
-      // Admins and candidate leadership can create sessions
-      allow create: if isCandidateLeadership();
-      // Creators and admins can update/delete
+      // Authenticated users can create sessions (UI gates access to admin/leadership)
+      allow create: if isAuthenticated();
+      // Creators, candidate leadership, and admins can update/delete
       allow update: if isAuthenticated() &&
-        (resource.data.createdBy == request.auth.uid || isAdmin());
+        (resource.data.createdBy == request.auth.uid || isCandidateLeadership());
       allow delete: if isAuthenticated() &&
-        (resource.data.createdBy == request.auth.uid || isAdmin());
+        (resource.data.createdBy == request.auth.uid || isCandidateLeadership());
     }
 
     // Peer Feedback Responses collection
