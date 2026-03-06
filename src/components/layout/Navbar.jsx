@@ -25,6 +25,7 @@ export default function Navbar() {
     { path: '/details', label: 'Details' },
     { path: '/cq', label: 'CQ' },
     { path: '/surveys', label: 'Surveys' },
+    { path: '/peer-feedback', label: 'Peer Feedback' },
   ]
 
   // Add Approvals tab for users with approval authority (before Admin)

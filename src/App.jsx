@@ -19,6 +19,7 @@ const Profile = lazy(() => import('./pages/Profile'))
 const Changelog = lazy(() => import('./pages/Changelog'))
 const Surveys = lazy(() => import('./pages/Surveys'))
 const Approvals = lazy(() => import('./pages/Approvals'))
+const PeerFeedback = lazy(() => import('./pages/PeerFeedback'))
 const Admin = lazy(() => import('./pages/Admin'))
 
 function ProtectedRoute({ children, adminOnly = false, routeName = 'unknown' }) {
@@ -157,6 +158,14 @@ export default function App() {
             element={
               <ProtectedRoute routeName="Approvals">
                 <Approvals />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/peer-feedback"
+            element={
+              <ProtectedRoute routeName="PeerFeedback">
+                <PeerFeedback />
               </ProtectedRoute>
             }
           />
