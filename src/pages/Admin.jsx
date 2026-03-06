@@ -35,6 +35,9 @@ import LeaveAdminPanel from '../components/cq/LeaveAdminPanel'
 import SurveyComposer from '../components/surveys/SurveyComposer'
 import SurveyManager from '../components/surveys/SurveyManager'
 import SurveyResults from '../components/surveys/SurveyResults'
+import PeerFeedbackSessionComposer from '../components/peerFeedback/PeerFeedbackSessionComposer'
+import PeerFeedbackSessionManager from '../components/peerFeedback/PeerFeedbackSessionManager'
+import PeerFeedbackResults from '../components/peerFeedback/PeerFeedbackResults'
 import { usePendingCount } from '../hooks/useWeatherRecommendations'
 import { usePendingDetailApprovals } from '../hooks/useDetailAssignments'
 import { useActiveShift } from '../hooks/useCQShifts'
@@ -52,6 +55,9 @@ export default function Admin() {
   const [surveySubTab, setSurveySubTab] = useState('create')
   const [editingSurvey, setEditingSurvey] = useState(null)
   const [viewingSurveyResults, setViewingSurveyResults] = useState(null)
+  const [peerFeedbackSubTab, setPeerFeedbackSubTab] = useState('create')
+  const [editingPeerFeedback, setEditingPeerFeedback] = useState(null)
+  const [viewingPeerFeedbackResults, setViewingPeerFeedbackResults] = useState(null)
   const { count: pendingCount } = usePendingCount()
   const { count: pendingDetailsCount } = usePendingDetailApprovals()
   const { activeShift } = useActiveShift()
@@ -65,6 +71,7 @@ export default function Admin() {
     { id: 'details', label: 'Cleaning Details' },
     { id: 'cq', label: 'CQ', badge: activeShift ? '!' : null },
     { id: 'surveys', label: 'Surveys' },
+    { id: 'peerFeedback', label: 'Peer Feedback' },
     { id: 'documents', label: 'Documents' },
     { id: 'personnel', label: 'Personnel' },
     { id: 'config', label: 'Config' },
@@ -504,6 +511,65 @@ export default function Admin() {
                 setSurveySubTab('create')
               }}
               onViewResults={(survey) => setViewingSurveyResults(survey)}
+            />
+          )}
+        </div>
+      )}
+
+      {activeTab === 'peerFeedback' && (
+        <div className="space-y-6">
+          {!viewingPeerFeedbackResults && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setPeerFeedbackSubTab('create')
+                  setEditingPeerFeedback(null)
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  peerFeedbackSubTab === 'create'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Create Session
+              </button>
+              <button
+                onClick={() => {
+                  setPeerFeedbackSubTab('manage')
+                  setEditingPeerFeedback(null)
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  peerFeedbackSubTab === 'manage'
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Manage Sessions
+              </button>
+            </div>
+          )}
+
+          {viewingPeerFeedbackResults ? (
+            <PeerFeedbackResults
+              session={viewingPeerFeedbackResults}
+              onBack={() => setViewingPeerFeedbackResults(null)}
+            />
+          ) : peerFeedbackSubTab === 'create' ? (
+            <PeerFeedbackSessionComposer
+              editSession={editingPeerFeedback}
+              onCancel={editingPeerFeedback ? () => setEditingPeerFeedback(null) : undefined}
+              onSaved={() => {
+                setEditingPeerFeedback(null)
+                setPeerFeedbackSubTab('manage')
+              }}
+            />
+          ) : (
+            <PeerFeedbackSessionManager
+              onEdit={(session) => {
+                setEditingPeerFeedback(session)
+                setPeerFeedbackSubTab('create')
+              }}
+              onViewResults={(session) => setViewingPeerFeedbackResults(session)}
             />
           )}
         </div>

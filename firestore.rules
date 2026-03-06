@@ -369,6 +369,39 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Peer Feedback Sessions collection
+    match /peerFeedbackSessions/{sessionId} {
+      // Anyone authenticated can read active sessions
+      allow read: if isAuthenticated() &&
+        (isAdmin() ||
+         isCandidateLeadership() ||
+         resource.data.status == 'active');
+      // Admins and candidate leadership can create sessions
+      allow create: if isCandidateLeadership();
+      // Creators and admins can update/delete
+      allow update: if isAuthenticated() &&
+        (resource.data.createdBy == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() &&
+        (resource.data.createdBy == request.auth.uid || isAdmin());
+    }
+
+    // Peer Feedback Responses collection
+    match /peerFeedbackResponses/{responseId} {
+      // Admins and candidate leadership can read all responses
+      allow read: if isCandidateLeadership();
+      // Users can read their own submitted responses
+      allow read: if isAuthenticated() &&
+        resource.data.reviewerId == request.auth.uid;
+      // Any authenticated user can create a response
+      allow create: if isAuthenticated() &&
+        request.resource.data.reviewerId == request.auth.uid;
+      // Users can update their own responses
+      allow update: if isAuthenticated() &&
+        resource.data.reviewerId == request.auth.uid;
+      // Admins can delete responses
+      allow delete: if isAdmin();
+    }
+
     // Surveys collection
     match /surveys/{surveyId} {
       // Read: user is admin, OR user created it, OR it's published
