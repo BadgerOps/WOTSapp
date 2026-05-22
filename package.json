@@ -33,7 +33,7 @@
     "@e965/xlsx": "^0.20.3"
   },
   "overrides": {
-    "serialize-javascript": "^7.0.4"
+    "serialize-javascript": "^7.0.5"
   },
   "devDependencies": {
     "@sentry/vite-plugin": "^5.1.1",
