@@ -45,3 +45,4 @@ data/
 cq_list_converted.csv
 screenshots/
 test-results/
+.clawpatch/
